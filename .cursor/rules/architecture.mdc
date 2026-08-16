@@ -1,0 +1,54 @@
+---
+description: Venting backend architecture and folder layout
+alwaysApply: true
+---
+
+# Venting Backend — Architecture
+
+FastAPI app for the Venting mobile API. Contract source: `venting_mobile_app/docs/api-endpoints.md`.
+
+## Folder layout
+
+```
+app/
+  main.py                 # create_app() only — no business logic
+  api/
+    deps.py               # shared Depends (auth, db, settings)
+    v1/
+      router.py           # aggregates domain routers under /v1
+      health.py           # non-versioned probes mounted from main
+      auth/               # domain package (template for new domains)
+        router.py         # HTTP routes only
+        schemas.py        # request/response Pydantic models
+        service.py        # business logic
+  core/                   # cross-cutting (config, envelopes, errors, handlers)
+  schemas/envelope.py     # shared success/error envelopes only
+  db/                     # engine, sessions, migrations helpers
+  models/                 # ORM models
+  services/               # shared infra (email, storage) — not domain logic
+static/
+```
+
+## Where new code goes
+
+| Change | Put it in |
+|--------|-----------|
+| New endpoint (`POST /v1/auth/login`) | `app/api/v1/<domain>/router.py` + `service.py` + `schemas.py` |
+| New API domain | New package under `app/api/v1/<domain>/`, register in `v1/router.py` |
+| Shared auth/db dependency | `app/api/deps.py` |
+| Env/config | `app/core/config.py` |
+| Business API error | `raise MainAPIException` or helper in `app/core/errors.py` |
+| ORM table | `app/models/` |
+| Shared non-domain utility | `app/services/` |
+
+## Layering rules
+
+- **Routers**: validate input, call service, return `success_response(...)` or raise `MainAPIException`. No DB queries in routers.
+- **Services**: business rules; may use models/db/deps. No `Request`/`Response` objects.
+- **Models**: persistence shape only.
+- **Do not** put domain schemas in `app/schemas/` — only shared envelopes live there.
+- Prefer **domain packages** (`api/v1/auth/`) over flat `endpoints/` + giant `services/` folders.
+
+## Domains (from API spec)
+
+`auth`, `ventors`, `listeners`, `sessions`, `earnings`, `rewards`, `notifications`, `training`, `promo`

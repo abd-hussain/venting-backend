@@ -1,0 +1,17 @@
+---
+description: Python / FastAPI coding standards for this repo
+globs: app/**/*.py
+alwaysApply: false
+---
+
+# Python standards
+
+- Python 3.11+ syntax; use `X | Y` unions, not `Optional[X]` unless needed for runtime.
+- Type-annotate public functions and FastAPI dependencies.
+- Use `Annotated[..., Depends(...)]` aliases in `app/api/deps.py` for shared deps.
+- Keep `app/main.py` limited to `create_app()` wiring (middleware, routers, static).
+- New settings go in `app/core/config.py` (`pydantic_settings`), read via `get_settings()`.
+- Avoid circular imports: routers → services → models/db; schemas stay free of service imports.
+- Do not commit secrets; use `.env` (gitignored) for local config.
+- Name route modules `router.py`, not `endpoints.py` / `views.py`.
+- When adding a domain package, include at least: `router.py`, `schemas.py`, `service.py`, `__init__.py` exporting `router`.
