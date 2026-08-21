@@ -39,7 +39,7 @@ static/
 | Env/config | `app/core/config.py` |
 | Business API error | `raise MainAPIException` or helper in `app/core/errors.py` |
 | ORM table | `app/models/` |
-| Shared non-domain utility | `app/services/` |
+| Migration | `alembic revision --autogenerate` after model change |
 
 ## Layering rules
 

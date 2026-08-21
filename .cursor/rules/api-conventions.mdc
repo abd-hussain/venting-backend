@@ -67,3 +67,7 @@ Shape:
 - Do not leak stack traces or internal exception strings in responses.
 - Use `/v1/...` paths; register routers on `app.api.v1.router.api_router`.
 - Dates: ISO-8601 UTC. Money: number USD, 2 decimals. IDs: strings.
+- **Lists**: return `{ items, total, page, page_size }` via `app.core.pagination.clamp_page`.
+- **Idempotent writes**: accept / decline / cancel / redeem / end / favorite toggles should be safe to retry (return current success state, not a hard error, when already applied).
+- **Aggregates**: prefer home/dashboard endpoints over many small calls for a single screen.
+- **Static URLs** (terms/privacy/help/support): configure via Settings / env — not counted API endpoints.

@@ -7,6 +7,10 @@ __pycache__
 venv/
 .env
 
+# Uploaded user files (keep directory placeholders)
+static/uploads/**
+!static/uploads/**/.gitkeep
+
 # Node artifact files
 node_modules/
 dist/

@@ -121,10 +121,11 @@ venting_backend/
 │   │           └── service.py  # business logic
 │   ├── core/                   # config, envelopes, MainAPIException, handlers
 │   ├── schemas/envelope.py     # shared success/error models only
-│   ├── db/                     # engine / sessions
-│   ├── models/                 # ORM (map to docs/database-schema.md)
+│   ├── db/                     # Base, engine, SessionLocal, get_db
+│   ├── models/                 # SQLAlchemy ORM — one module per schema doc §
 │   └── services/               # shared infra (email, storage, …)
-├── docs/
+├── alembic/                    # migrations (versions/)
+├── alembic.ini
 │   ├── api-endpoints.md        # ← HTTP contract (73 endpoints)
 │   └── database-schema.md      # ← data model (43 tables)
 ├── static/
@@ -184,6 +185,76 @@ Do not put domain schemas in `app/schemas/` — only shared envelopes live there
 
 ---
 
+## Database & migrations
+
+PostgreSQL schema is defined in [**docs/database-schema.md**](docs/database-schema.md). ORM models mirror that doc under `app/models/`.
+
+### Where tables go
+
+| Schema doc | Model file |
+|------------|------------|
+| § 1 Auth | `app/models/auth.py` |
+| § 2 Profiles | `app/models/profiles.py` |
+| § 3 Lookups | `app/models/lookups.py` |
+| § 4–12 … | `availability.py`, `ventor_wellness.py`, `settings.py`, `sessions.py`, `earnings.py`, `rewards.py`, `notifications.py`, `training.py`, `promo.py` |
+
+Shared enums → `app/models/enums.py`. Register new model modules in `app/models/__init__.py`.
+
+### Local Postgres (Docker)
+
+```bash
+docker compose -f docker-compose-dev.yml up -d postgres
+```
+
+Default connection (see `docker-compose-dev.yml`):
+
+```env
+DATABASE_HOSTNAME=localhost
+DATABASE_PORT=5432
+DATABASE_USERNAME=postgres
+DATABASE_PASSWORD=password123
+DATABASE_NAME=ventingDB
+```
+
+Or set a single `DATABASE_URL=postgresql+psycopg://postgres:password123@localhost:5432/ventingDB`.
+
+### Alembic commands
+
+```bash
+source venv/bin/activate
+pip install -r requirements.txt   # includes alembic, SQLAlchemy, psycopg
+
+alembic upgrade head              # apply migrations
+alembic current                   # show revision
+alembic history                   # list revisions
+
+# after adding/changing models in app/models/
+alembic revision --autogenerate -m "profiles: ventor and listener tables"
+alembic upgrade head
+```
+
+**Workflow per domain:** read schema doc → add ORM classes → import in `models/__init__.py` → autogenerate migration → review → upgrade.
+
+Initial migration `001_auth` creates `users` and `refresh_tokens`.
+
+### Demo data
+
+```bash
+python -m scripts.seed_demo_data
+```
+
+Seeds lookup catalogs (languages, comfort areas, …) plus demo accounts:
+
+| Email | Role | Password |
+|-------|------|----------|
+| `ventor@venting.app` | ventor | `Password123!` |
+| `listener@venting.app` | listener (online) | `Password123!` |
+| `listener2@venting.app` | listener | `Password123!` |
+
+Safe to re-run (idempotent).
+
+---
+
 ## Configuration
 
 Settings live in `app/core/config.py` (`pydantic-settings`). Use a local `.env` (gitignored), for example:
@@ -192,8 +263,12 @@ Settings live in `app/core/config.py` (`pydantic-settings`). Use a local `.env` 
 APP_ENV=development
 DEBUG=true
 API_V1_PREFIX=/v1
-# DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/venting
-# JWT_SECRET=change-me
+DATABASE_HOSTNAME=localhost
+DATABASE_PORT=5432
+DATABASE_USERNAME=postgres
+DATABASE_PASSWORD=password123
+DATABASE_NAME=ventingDB
+# DATABASE_URL=postgresql+psycopg://postgres:password123@localhost:5432/ventingDB
 ```
 
 ---
@@ -215,5 +290,5 @@ Mobile API base URL: `String.fromEnvironment('BASE_URL')` pointing at this servi
 |------|--------|
 | Project scaffold + response envelopes | Done |
 | Domain routers beyond health / auth stub | In progress |
-| DB models & migrations (43 tables) | Not started — follow `docs/database-schema.md` |
+| DB models & migrations (43 tables) | Done — all tables from `docs/database-schema.md` applied |
 | Endpoint coverage vs 73 | Track against master checklist in `docs/api-endpoints.md` |
