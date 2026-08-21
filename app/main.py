@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -21,7 +23,11 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+    # Ensure static exists on Heroku (ephemeral FS; may not be in the slug).
+    static_dir = Path(settings.static_dir)
+    static_dir.mkdir(parents=True, exist_ok=True)
+    (static_dir / settings.upload_subdir).mkdir(parents=True, exist_ok=True)
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     # Platform / local probes at `/`; versioned API under `/v1`.
     app.include_router(health_router)
