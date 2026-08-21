@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     support_email: str = "support@venting.app"
     support_whatsapp: str = ""
 
+    # Admin portal / GA4 embed (A97)
+    ga4_measurement_id: str = ""
+
     @property
     def sqlalchemy_database_url(self) -> str:
         if self.database_url:

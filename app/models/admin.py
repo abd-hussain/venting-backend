@@ -55,6 +55,30 @@ class AdminUser(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         secondary="admin_user_roles",
         back_populates="users",
     )
+    refresh_tokens = relationship("AdminRefreshToken", back_populates="admin_user")
+
+
+class AdminRefreshToken(Base, UUIDPrimaryKeyMixin):
+    __tablename__ = "admin_refresh_tokens"
+
+    admin_user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("admin_users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    token_hash = Column(String(255), nullable=False, unique=True)
+    device_info = Column(String(255), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    admin_user = relationship("AdminUser", back_populates="refresh_tokens")
+
+    __table_args__ = (Index("ix_admin_refresh_tokens_admin_user_id", "admin_user_id"),)
 
 
 class AdminRole(Base, UUIDPrimaryKeyMixin):

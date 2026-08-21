@@ -53,6 +53,40 @@ def decode_access_token(token: str, settings: Settings) -> dict[str, Any]:
     return payload
 
 
+ADMIN_JWT_ISS = "venting-admin"
+ADMIN_JWT_AUD = "venting-admin"
+ADMIN_ACCESS_TYPE = "admin_access"
+
+
+def create_admin_access_token(*, admin_id: UUID, settings: Settings) -> str:
+    now = datetime.now(timezone.utc)
+    payload: dict[str, Any] = {
+        "sub": str(admin_id),
+        "type": ADMIN_ACCESS_TYPE,
+        "iss": ADMIN_JWT_ISS,
+        "aud": ADMIN_JWT_AUD,
+        "iat": now,
+        "exp": now + timedelta(minutes=settings.access_token_expire_minutes),
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
+
+
+def decode_admin_access_token(token: str, settings: Settings) -> dict[str, Any]:
+    try:
+        payload = jwt.decode(
+            token,
+            settings.secret_key,
+            algorithms=[settings.jwt_algorithm],
+            audience=ADMIN_JWT_AUD,
+            issuer=ADMIN_JWT_ISS,
+        )
+    except JWTError as exc:
+        raise ValueError("Invalid admin access token") from exc
+    if payload.get("type") != ADMIN_ACCESS_TYPE:
+        raise ValueError("Invalid admin access token type")
+    return payload
+
+
 def generate_refresh_token() -> str:
     return secrets.token_urlsafe(48)
 
