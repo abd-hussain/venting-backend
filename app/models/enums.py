@@ -148,3 +148,40 @@ class MoodKind(str, enum.Enum):
     anxious = "anxious"
     sad = "sad"
     angry = "angry"
+
+
+# --- Admin portal / CMS (docs/admin-portal-cms.md) ---
+
+
+class AdminStatus(str, enum.Enum):
+    active = "active"
+    invited = "invited"
+    disabled = "disabled"
+
+
+class ModerationActionType(str, enum.Enum):
+    warn = "warn"
+    suspend = "suspend"
+    unsuspend = "unsuspend"
+    ban = "ban"
+    unban = "unban"
+    force_logout = "force_logout"
+
+
+class ReviewDecision(str, enum.Enum):
+    approved = "approved"
+    rejected = "rejected"
+    needs_more_info = "needs_more_info"
+
+
+class CmsPageStatus(str, enum.Enum):
+    draft = "draft"
+    published = "published"
+    archived = "archived"
+
+
+class BannerPlacement(str, enum.Enum):
+    ventor_home = "ventor_home"
+    listener_home = "listener_home"
+    checkout = "checkout"
+    global_ = "global"

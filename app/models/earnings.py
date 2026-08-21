@@ -87,6 +87,12 @@ class Payout(Base, UUIDPrimaryKeyMixin):
     )
     processed_at = Column(DateTime(timezone=True), nullable=True)
     failure_reason = Column(Text, nullable=True)
+    reviewed_by_admin_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    admin_note = Column(Text, nullable=True)
 
     __table_args__ = (Index("ix_payouts_listener_id", "listener_id"),)
 

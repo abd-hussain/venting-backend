@@ -23,11 +23,15 @@ from app.models.auth import User
 from app.models.availability import ListenerAvailabilitySettings, ListenerAvailabilitySlot
 from app.models.earnings import ListenerWallet
 from app.models.enums import (
+    AdminStatus,
+    BannerPlacement,
     CallMode,
+    CmsPageStatus,
     DayOfWeek,
     EarningsTier,
     Gender,
     InviteStatus,
+    ModerationActionType,
     MoodKind,
     NotificationType,
     ProfileStatus,
@@ -62,8 +66,21 @@ from app.models.settings import (
 )
 from app.models.training import ListenerTrainingProgress, TrainingModule
 from app.models.ventor_wellness import Achievement, MoodCheckin, VentorFavorite
+from app.models.admin import (
+    AdminAuditLog,
+    AdminNote,
+    AdminRole,
+    AdminUser,
+    AdminUserRole,
+    AppConfigKv,
+    AppFeatureFlag,
+    CmsBanner,
+    CmsPage,
+    ModerationAction,
+)
 
 DEMO_PASSWORD = "Password123!"
+DEMO_ADMIN_PASSWORD = "Admin123!"
 
 
 def _hash_password(password: str) -> str:
@@ -548,6 +565,333 @@ def seed_demo_users(db: Session) -> dict[str, uuid.UUID]:
     return ids
 
 
+def _admin_by_email(db: Session, email: str) -> AdminUser | None:
+    return db.query(AdminUser).filter(AdminUser.email == email).one_or_none()
+
+
+def _role_id(db: Session, key: str) -> uuid.UUID:
+    role = db.query(AdminRole).filter(AdminRole.key == key).one()
+    return role.id
+
+
+def seed_admin_cms(db: Session, mobile_ids: dict[str, uuid.UUID] | None = None) -> None:
+    """Demo staff accounts + CMS config/content. Roles/permissions come from migration."""
+    password_hash = _hash_password(DEMO_ADMIN_PASSWORD)
+    now = datetime.now(timezone.utc)
+    mobile_ids = mobile_ids or {}
+
+    demo_admins = [
+        {
+            "email": "super@venting.app",
+            "full_name": "Sara Super",
+            "role_key": "super_admin",
+            "status": AdminStatus.active,
+        },
+        {
+            "email": "ops@venting.app",
+            "full_name": "Omar Ops",
+            "role_key": "ops",
+            "status": AdminStatus.active,
+        },
+        {
+            "email": "support@venting.app",
+            "full_name": "Nora Support",
+            "role_key": "support",
+            "status": AdminStatus.active,
+        },
+        {
+            "email": "finance@venting.app",
+            "full_name": "Fadi Finance",
+            "role_key": "finance",
+            "status": AdminStatus.active,
+        },
+        {
+            "email": "content@venting.app",
+            "full_name": "Celine Content",
+            "role_key": "content",
+            "status": AdminStatus.active,
+        },
+        {
+            "email": "analyst@venting.app",
+            "full_name": "Ana Analyst",
+            "role_key": "analyst",
+            "status": AdminStatus.invited,
+        },
+    ]
+
+    admin_ids: dict[str, uuid.UUID] = {}
+    for row in demo_admins:
+        admin = _admin_by_email(db, row["email"])
+        if admin is None:
+            admin = AdminUser(
+                id=uuid.uuid4(),
+                email=row["email"],
+                password_hash=password_hash,
+                full_name=row["full_name"],
+                status=row["status"],
+                mfa_enabled=False,
+                last_login_at=now if row["status"] == AdminStatus.active else None,
+            )
+            db.add(admin)
+            db.flush()
+            db.add(
+                AdminUserRole(
+                    admin_user_id=admin.id,
+                    role_id=_role_id(db, row["role_key"]),
+                )
+            )
+            print(f"  + created admin {row['email']} ({row['role_key']})")
+        else:
+            print(f"  · admin exists {row['email']}")
+        admin_ids[row["role_key"]] = admin.id
+
+    super_id = admin_ids["super_admin"]
+    ops_id = admin_ids["ops"]
+    content_id = admin_ids["content"]
+
+    # Feature flags
+    for key, description, enabled, audience in [
+        ("instant_match_enabled", "Allow ventors to start instant match", True, "ventor"),
+        ("voice_change_enabled", "Voice anonymization in calls", True, "all"),
+        ("tips_enabled", "Allow tips after sessions", True, "all"),
+        ("invite_rewards_enabled", "Invite friends rewards tab", True, "ventor"),
+        ("listener_discovery_v2", "New listener discovery ranking", False, "ventor"),
+    ]:
+        existing = db.get(AppFeatureFlag, key)
+        if existing is None:
+            db.add(
+                AppFeatureFlag(
+                    key=key,
+                    description=description,
+                    enabled=enabled,
+                    rollout_percent=100 if enabled else 10,
+                    audience=audience,
+                    updated_by=content_id,
+                )
+            )
+        else:
+            existing.description = description
+            existing.enabled = enabled
+            existing.audience = audience
+            existing.updated_by = content_id
+
+    # App config KV
+    config_rows = {
+        "terms_url": "https://venting.app/terms",
+        "privacy_url": "https://venting.app/privacy",
+        "support_email": "support@venting.app",
+        "min_payout_amount": 25.0,
+        "voice_change_fee": 0.99,
+        "earnings_tiers": {
+            "starter": {"rate_per_minute": 0.25, "min_sessions": 0},
+            "rising": {"rate_per_minute": 0.35, "min_sessions": 25},
+            "trusted": {"rate_per_minute": 0.45, "min_sessions": 100},
+            "expert": {"rate_per_minute": 0.55, "min_sessions": 250},
+            "elite": {"rate_per_minute": 0.70, "min_sessions": 500},
+        },
+    }
+    for key, value in config_rows.items():
+        existing = db.get(AppConfigKv, key)
+        if existing is None:
+            db.add(AppConfigKv(key=key, value=value, updated_by=super_id))
+        else:
+            existing.value = value
+            existing.updated_by = super_id
+
+    # CMS pages
+    pages = [
+        {
+            "slug": "help/cancel-session",
+            "title": "How to cancel a session",
+            "locale": "en",
+            "body_markdown": (
+                "## Cancel a session\n\n"
+                "Open **Upcoming**, choose the session, then tap **Cancel**.\n\n"
+                "Cancellations within 15 minutes of start may not be refunded."
+            ),
+            "status": CmsPageStatus.published,
+        },
+        {
+            "slug": "help/cancel-session",
+            "title": "كيفية إلغاء جلسة",
+            "locale": "ar",
+            "body_markdown": (
+                "## إلغاء جلسة\n\n"
+                "افتح **القادمة**، اختر الجلسة، ثم اضغط **إلغاء**."
+            ),
+            "status": CmsPageStatus.published,
+        },
+        {
+            "slug": "legal/terms",
+            "title": "Terms of Service",
+            "locale": "en",
+            "body_markdown": "# Terms of Service\n\nDemo terms for local CMS preview.",
+            "status": CmsPageStatus.published,
+        },
+        {
+            "slug": "legal/privacy",
+            "title": "Privacy Policy (draft)",
+            "locale": "en",
+            "body_markdown": "# Privacy Policy\n\nDraft — not published yet.",
+            "status": CmsPageStatus.draft,
+        },
+    ]
+    for page in pages:
+        existing = (
+            db.query(CmsPage)
+            .filter(CmsPage.slug == page["slug"], CmsPage.locale == page["locale"])
+            .one_or_none()
+        )
+        if existing is None:
+            db.add(
+                CmsPage(
+                    id=uuid.uuid4(),
+                    slug=page["slug"],
+                    title=page["title"],
+                    locale=page["locale"],
+                    body_markdown=page["body_markdown"],
+                    status=page["status"],
+                    published_at=now if page["status"] == CmsPageStatus.published else None,
+                    updated_by=content_id,
+                )
+            )
+        else:
+            existing.title = page["title"]
+            existing.body_markdown = page["body_markdown"]
+            existing.status = page["status"]
+            existing.updated_by = content_id
+
+    # Banners — skip duplicates by title+placement
+    banners = [
+        {
+            "title": "Welcome to Venting",
+            "body": "Book your first calm conversation today.",
+            "cta_label": "Find a listener",
+            "cta_url": "venting://listeners",
+            "placement": BannerPlacement.ventor_home,
+            "audience": "ventor",
+        },
+        {
+            "title": "Complete your training",
+            "body": "Finish modules to go live and earn.",
+            "cta_label": "Open training",
+            "cta_url": "venting://training",
+            "placement": BannerPlacement.listener_home,
+            "audience": "listener",
+        },
+        {
+            "title": "Limited promo",
+            "body": "Use code WELCOME10 at checkout.",
+            "cta_label": "Apply promo",
+            "cta_url": "venting://checkout",
+            "placement": BannerPlacement.checkout,
+            "audience": "ventor",
+        },
+    ]
+    for banner in banners:
+        existing = (
+            db.query(CmsBanner)
+            .filter(
+                CmsBanner.title == banner["title"],
+                CmsBanner.placement == banner["placement"],
+            )
+            .one_or_none()
+        )
+        if existing is None:
+            db.add(
+                CmsBanner(
+                    id=uuid.uuid4(),
+                    title=banner["title"],
+                    body=banner["body"],
+                    cta_label=banner["cta_label"],
+                    cta_url=banner["cta_url"],
+                    placement=banner["placement"],
+                    audience=banner["audience"],
+                    starts_at=now - timedelta(days=1),
+                    ends_at=now + timedelta(days=30),
+                    is_active=True,
+                )
+            )
+
+    # Notes + audit (once)
+    note_marker = "DEMO_NOTE_LISTENER"
+    if (
+        db.query(AdminNote)
+        .filter(AdminNote.body.contains(note_marker))
+        .one_or_none()
+        is None
+    ):
+        listener_id = mobile_ids.get("listener")
+        entity_id = listener_id or uuid.UUID("00000000-0000-0000-0000-000000000001")
+        db.add(
+            AdminNote(
+                id=uuid.uuid4(),
+                admin_user_id=ops_id,
+                entity_type="user",
+                entity_id=entity_id,
+                body=f"[{note_marker}] Strong listener — approved after ID review. Keep an eye on first-week ratings.",
+            )
+        )
+        db.add(
+            AdminAuditLog(
+                id=uuid.uuid4(),
+                admin_user_id=ops_id,
+                action="listener.approve",
+                entity_type="listener",
+                entity_id=str(entity_id),
+                before={"profile_status": "under_review"},
+                after={"profile_status": "approved", "is_verified": True},
+                ip="127.0.0.1",
+                user_agent="seed-demo/1.0",
+            )
+        )
+        db.add(
+            AdminAuditLog(
+                id=uuid.uuid4(),
+                admin_user_id=content_id,
+                action="cms.page.publish",
+                entity_type="cms_page",
+                entity_id="help/cancel-session",
+                before={"status": "draft"},
+                after={"status": "published"},
+                ip="127.0.0.1",
+                user_agent="seed-demo/1.0",
+            )
+        )
+
+    # Link review metadata on demo listener if present
+    listener_id = mobile_ids.get("listener")
+    if listener_id is not None:
+        profile = db.get(ListenerProfile, listener_id)
+        if profile is not None and profile.reviewed_by_admin_id is None:
+            profile.reviewed_by_admin_id = ops_id
+            profile.reviewed_at = now
+            profile.rejection_reason = None
+
+    # Sample moderation warn on listener2 if exists
+    listener2_id = mobile_ids.get("listener2")
+    mod_marker = "DEMO_MOD_WARN"
+    if listener2_id is not None and (
+        db.query(ModerationAction)
+        .filter(ModerationAction.reason.contains(mod_marker))
+        .one_or_none()
+        is None
+    ):
+        db.add(
+            ModerationAction(
+                id=uuid.uuid4(),
+                user_id=listener2_id,
+                admin_user_id=ops_id,
+                action=ModerationActionType.warn,
+                reason=f"[{mod_marker}] Late start on two sessions — verbal warning only.",
+                starts_at=now,
+                ends_at=None,
+            )
+        )
+
+    db.flush()
+
+
 def main() -> None:
     get_settings.cache_clear()
     settings = get_settings()
@@ -558,13 +902,22 @@ def main() -> None:
         print("Catalogs:")
         seed_catalogs(db)
         print("Demo users:")
-        seed_demo_users(db)
+        ids = seed_demo_users(db)
+        print("Admin CMS:")
+        seed_admin_cms(db, ids)
         db.commit()
         print("\nDone.")
-        print("Demo logins (password for all):", DEMO_PASSWORD)
+        print("Mobile logins (password for all):", DEMO_PASSWORD)
         print("  ventor@venting.app")
         print("  listener@venting.app")
         print("  listener2@venting.app")
+        print("Admin portal logins (password for all):", DEMO_ADMIN_PASSWORD)
+        print("  super@venting.app   (super_admin)")
+        print("  ops@venting.app     (ops)")
+        print("  support@venting.app (support)")
+        print("  finance@venting.app (finance)")
+        print("  content@venting.app (content)")
+        print("  analyst@venting.app (analyst, invited)")
     except Exception:
         db.rollback()
         raise

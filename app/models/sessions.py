@@ -278,6 +278,13 @@ class SessionReport(Base, UUIDPrimaryKeyMixin):
     )
     details = Column(Text, nullable=True)
     status = Column(String(32), nullable=False, server_default="open")
+    assigned_admin_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    resolution_note = Column(Text, nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
