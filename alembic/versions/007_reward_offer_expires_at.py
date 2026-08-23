@@ -1,7 +1,7 @@
 """reward_offers expires_at column
 
 Revision ID: 007_reward_offer_expires_at
-Revises: 006_ventor_favorites_listener_idx
+Revises: 006_favorites_listener_idx
 Create Date: 2026-08-23 16:50:00.000000
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "007_reward_offer_expires_at"
-down_revision: Union[str, Sequence[str], None] = "006_ventor_favorites_listener_idx"
+down_revision: Union[str, Sequence[str], None] = "006_favorites_listener_idx"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
