@@ -11,6 +11,24 @@ class AuthRole(str, Enum):
     listener = "listener"
 
 
+class CheckEmailRequest(BaseModel):
+    email: EmailStr
+    role: AuthRole | None = None
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
+
+
+class CheckEmailResponse(BaseModel):
+    exists: bool
+    email: str
+    role: AuthRole | None = None
+    registration_complete: bool | None = None
+    listener_profile_status: str | None = None
+
+
 def _validate_password_strength(value: str) -> str:
     if len(value) < 8:
         raise ValueError("Password must be at least 8 characters")

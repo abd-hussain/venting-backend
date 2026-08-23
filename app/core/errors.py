@@ -173,3 +173,68 @@ def tier_has_listeners(tier_id: str, count: int) -> MainAPIException:
         },
         http_status=status.HTTP_409_CONFLICT,
     )
+
+
+def invalid_email() -> MainAPIException:
+    return MainAPIException(
+        type="validation",
+        code=110,
+        message="Invalid email",
+        localized_message={
+            "en": "Invalid email address",
+            "ar": "عنوان البريد الإلكتروني غير صالح",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def invalid_auth_role() -> MainAPIException:
+    return MainAPIException(
+        type="validation",
+        code=111,
+        message="Invalid role",
+        localized_message={
+            "en": "Role must be ventor or listener",
+            "ar": "يجب أن يكون الدور ventor أو listener",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def auth_role_mismatch() -> MainAPIException:
+    return MainAPIException(
+        type="auth",
+        code=112,
+        message="Role mismatch",
+        localized_message={
+            "en": "This email is registered with a different account type",
+            "ar": "هذا البريد مسجل بنوع حساب مختلف",
+        },
+        http_status=status.HTTP_409_CONFLICT,
+    )
+
+
+def account_disabled() -> MainAPIException:
+    return MainAPIException(
+        type="auth",
+        code=113,
+        message="Account disabled",
+        localized_message={
+            "en": "This account is disabled or unavailable",
+            "ar": "هذا الحساب معطل أو غير متاح",
+        },
+        http_status=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def rate_limited() -> MainAPIException:
+    return MainAPIException(
+        type="rate_limit",
+        code=429,
+        message="Too many requests",
+        localized_message={
+            "en": "Too many requests. Please try again later.",
+            "ar": "طلبات كثيرة جداً. يرجى المحاولة لاحقاً.",
+        },
+        http_status=status.HTTP_429_TOO_MANY_REQUESTS,
+    )

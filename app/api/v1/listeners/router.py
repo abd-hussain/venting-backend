@@ -91,6 +91,9 @@ async def register(
     notifications_enabled: str | None = Form("true"),
     voice_intro_seconds: int | None = Form(None),
     avatar: UploadFile | None = File(None),
+    identity_document: UploadFile | None = File(
+        None, description="Spec alias for identity_document_front"
+    ),
     identity_document_front: UploadFile | None = File(None),
     identity_document_back: UploadFile | None = File(None),
     selfie: UploadFile | None = File(None),
@@ -117,7 +120,7 @@ async def register(
         session_minutes=session_minutes,
         notifications_enabled=notifications_enabled,
         avatar=avatar,
-        identity_document_front=identity_document_front,
+        identity_document_front=identity_document_front or identity_document,
         identity_document_back=identity_document_back,
         selfie=selfie,
         voice_intro=voice_intro,

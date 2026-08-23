@@ -1,8 +1,10 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 
 from app.api.deps import CurrentUser, DbSession, SettingsDep
 from app.api.v1.auth.schemas import (
     ChangePasswordRequest,
+    CheckEmailRequest,
+    CheckEmailResponse,
     DeleteAccountRequest,
     LoginRequest,
     LoginResponse,
@@ -16,6 +18,7 @@ from app.api.v1.auth.schemas import (
 )
 from app.api.v1.auth.service import (
     change_password,
+    check_email,
     delete_account,
     get_me,
     login_user,
@@ -27,6 +30,33 @@ from app.core.responses import success_response
 from app.schemas.envelope import APIErrorResponse, APISuccessResponse
 
 router = APIRouter()
+
+
+@router.post(
+    "/check-email",
+    response_model=APISuccessResponse[CheckEmailResponse],
+    responses={
+        400: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        409: {"model": APIErrorResponse},
+        429: {"model": APIErrorResponse},
+    },
+    summary="Check whether an email is registered (email-first auth branching)",
+)
+def check_email_route(
+    body: CheckEmailRequest,
+    request: Request,
+    db: DbSession,
+):
+    client_ip = request.client.host if request.client else None
+    installation_id = request.headers.get("skel-installation-id")
+    data = check_email(
+        db,
+        body,
+        client_ip=client_ip,
+        installation_id=installation_id,
+    )
+    return success_response(data.model_dump())
 
 
 @router.post(

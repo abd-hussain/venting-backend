@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.api.v1.auth.schemas import (
     AuthRole,
     ChangePasswordRequest,
+    CheckEmailRequest,
+    CheckEmailResponse,
     DeleteAccountRequest,
     LoggedInUser,
     LoginRequest,
@@ -24,10 +26,14 @@ from app.api.v1.auth.schemas import (
 )
 from app.core.config import Settings
 from app.core.errors import (
+    account_disabled,
+    auth_role_mismatch,
     email_already_registered,
     invalid_credentials,
+    rate_limited,
     unauthorized,
 )
+from app.core.rate_limit import check_email_limiter
 from app.core.security import (
     create_access_token,
     generate_refresh_token,
@@ -107,6 +113,53 @@ def _get_valid_refresh_token(db: Session, raw_token: str) -> RefreshToken:
         raise unauthorized()
 
     return stored
+
+
+def check_email(
+    db: Session,
+    payload: CheckEmailRequest,
+    *,
+    client_ip: str | None = None,
+    installation_id: str | None = None,
+) -> CheckEmailResponse:
+    if client_ip and not check_email_limiter.allow(f"ip:{client_ip}"):
+        raise rate_limited()
+    if installation_id and not check_email_limiter.allow(f"inst:{installation_id}"):
+        raise rate_limited()
+
+    user = db.query(User).filter(User.email == payload.email).one_or_none()
+    if user is None or user.deleted_at is not None:
+        return CheckEmailResponse(
+            exists=False,
+            email=payload.email,
+        )
+
+    now = datetime.now(timezone.utc)
+    if not user.is_active or (
+        user.suspended_until is not None and user.suspended_until > now
+    ):
+        raise account_disabled()
+
+    role = AuthRole(user.role.value)
+    if payload.role is not None and payload.role != role:
+        raise auth_role_mismatch()
+
+    listener_profile_status: str | None = None
+    if user.role == UserRole.listener:
+        profile = db.get(ListenerProfile, user.id)
+        listener_profile_status = (
+            profile.profile_status.value
+            if profile is not None
+            else ProfileStatus.incomplete.value
+        )
+
+    return CheckEmailResponse(
+        exists=True,
+        email=payload.email,
+        role=role,
+        registration_complete=user.registration_complete,
+        listener_profile_status=listener_profile_status,
+    )
 
 
 def register_user(

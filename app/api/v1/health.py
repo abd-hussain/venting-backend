@@ -11,8 +11,10 @@ router = APIRouter()
     "/",
     response_model=APISuccessResponse[dict],
     responses={400: {"model": APIErrorResponse}},
+    include_in_schema=False,
 )
 def read_root():
+    """Platform / local probe — kept out of OpenAPI docs."""
     return success_response({"message": "Venting Backend Hello, World!"})
 
 

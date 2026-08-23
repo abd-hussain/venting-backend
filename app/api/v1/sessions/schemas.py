@@ -1,9 +1,9 @@
 """Sessions request/response schemas."""
 
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class TimeMode(str, Enum):
@@ -172,7 +172,7 @@ class ReportPayload(BaseModel):
 class RatingRequest(BaseModel):
     stars: int = Field(ge=1, le=5)
     review: str | None = None
-    tip_amount: float | None = None
+    tip_amount: Literal[2, 5, 10] | None = None
     report: ReportPayload | None = None
 
 

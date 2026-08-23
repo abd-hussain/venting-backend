@@ -20,7 +20,7 @@
 
 | Item | Value |
 |------|--------|
-| Base URL | `String.fromEnvironment('BASE_URL')` (replace legacy Zain hosts) |
+| Base URL | `String.fromEnvironment('BASE_URL')` |
 | Content-Type | `application/json; charset=UTF-8` |
 | Auth header | `Authorization: Bearer {accessToken}` |
 | Common headers | `skel-platform`, `skel-os-version`, `skel-app-version`, `skel-installation-id`, `skel-network-type`, `skel-phone-version`, `accept-language` / `skel-accept-language`, `user-agent` |
@@ -63,7 +63,7 @@ List responses may include:
 
 | Domain | Count | Master list # |
 |--------|------:|---------------|
-| Auth & account | 7 | 1–7 |
+| Auth & account | 8 | 0–7 |
 | Ventor profile / home / wellness | 14 | 8–21 |
 | Listener profile / onboarding / dashboard | 15 | 22–36 |
 | Listener availability | 3 | 37–39 |
@@ -74,11 +74,112 @@ List responses may include:
 | Notifications | 3 | 68–70 |
 | Training | 2 | 71–72 |
 | Promo | 1 | 73 |
-| **Total** | **73** | |
+| **Total** | **74** | |
 
 ---
 
 ## 1. Auth & account
+
+### 0. `POST /v1/auth/check-email`
+
+> **Status:** Implemented on backend.  
+> **Purpose:** Email-first discovery — branch **Create account** vs **Sign in** before password submit. Does **not** authenticate.
+
+| | |
+|--|--|
+| **Auth** | Public |
+| **Screen** | Email auth step (after AuthScreen → “Continue with email”) |
+| **When** | User finishes entering a valid email (on blur / Continue), **before** password submit |
+| **Body** | `email` (string, required). Optional `role` (`ventor` \| `listener`) — role chosen on Welcome; used to detect mismatch when account exists |
+| **Response** | `{ exists, email, role?, registration_complete?, listener_profile_status? }` |
+
+**Request examples:**
+
+```json
+{ "email": "user@example.com" }
+```
+
+```json
+{ "email": "user@example.com", "role": "ventor" }
+```
+
+**Success — new email (register path):**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "exists": false,
+    "email": "new@example.com",
+    "role": null,
+    "registration_complete": null,
+    "listener_profile_status": null
+  }
+}
+```
+
+**Success — existing listener, profile incomplete:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "exists": true,
+    "email": "l@example.com",
+    "role": "listener",
+    "registration_complete": false,
+    "listener_profile_status": "incomplete"
+  }
+}
+```
+
+**Response fields (`data`):**
+
+| Field | Type | When present | Meaning |
+|-------|------|--------------|---------|
+| `exists` | boolean | always | `false` = no account (or treated as unknown — see security) |
+| `email` | string | always | Normalized email echoed back |
+| `role` | `ventor` \| `listener` \| null | `exists == true` | Account role |
+| `registration_complete` | boolean \| null | `exists == true` | Same meaning as `#7` |
+| `listener_profile_status` | `incomplete` \| `under_review` \| `approved` \| `rejected` \| null | `exists == true` and `role == listener` | Same enum as `#7` |
+
+**Mobile branching:**
+
+| `exists` | Action | Next API |
+|----------|--------|----------|
+| `false` | Show **Create account** UI (password rules) | `#1 register` with Welcome `role` |
+| `true` | Show **Sign in** UI | `#2 login` with account `role` |
+| `true` + Welcome `role` ≠ account `role` | Block; explain role mismatch | — |
+| After `#1` or `#2` success | Route user | `#7 GET /v1/auth/me` (source of truth) |
+
+**Errors (standard envelope):**
+
+| HTTP | `type` | `code` | When |
+|------|--------|--------|------|
+| 400 | `validation` | 110 | Missing / invalid email |
+| 400 | `validation` | 111 | Invalid `role` |
+| 409 | `auth` | 112 | Email exists but `role` in body ≠ account role |
+| 403 | `auth` | 113 | Account deleted / disabled / banned |
+| 429 | `rate_limit` | 429 | Too many checks (IP / installation id) |
+
+**Security (required):**
+
+- Rate limit (e.g. 10–20/min per IP and per `skel-installation-id`)
+- Normalize email: trim + lowercase server-side
+- No password, tokens, `id`, display name, or avatar in response
+- Soft-deleted accounts: treat as `exists: false` **or** 403 — pick one and document
+- Pure read; no session created
+
+**Out of scope:** login/register replacement, OTP, social identity linking, password validation.
+
+**Acceptance criteria:**
+
+- [x] Public `POST /v1/auth/check-email` with `{ email, role? }`
+- [x] Standard `{ status, data }` success envelope
+- [ ] Mobile can branch register vs login without calling `#1`/`#2` until password submit
+- [x] After auth, `#7` remains routing authority
+
+---
 
 ### 1. `POST /v1/auth/register`
 
@@ -901,7 +1002,7 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 
 ## Static / non-API URLs (not counted)
 
-| URL | Use |
+| URL | Use | 
 |-----|-----|
 | `{termsUrl}` | Terms WebView |
 | `{privacyUrl}` | Privacy WebView |
@@ -915,7 +1016,7 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 
 | Category | Count |
 |----------|------:|
-| Auth & account | 7 |
+| Auth & account | 8 |
 | Ventor profile / home / wellness | 14 |
 | Listener profile / onboarding / dashboard | 15 |
 | Listener availability | 3 |
@@ -926,12 +1027,13 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 | Notifications | 3 |
 | Training | 2 |
 | Promo | 1 |
-| **Total unique API endpoints** | **73** |
+| **Total unique API endpoints** | **74** |
 
 ### Master checklist (method + path)
 
 | # | Method | Path |
 |---|--------|------|
+| 0 | POST | `/v1/auth/check-email` *(proposed)* |
 | 1 | POST | `/v1/auth/register` |
 | 2 | POST | `/v1/auth/login` |
 | 3 | POST | `/v1/auth/refresh` |
