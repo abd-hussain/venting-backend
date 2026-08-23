@@ -3,11 +3,12 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.v1.admin.audit import write_audit
 from app.api.v1.admin.deps import AdminPrincipal
+from app.api.v1.admin.favorite_counts import favorite_counts_map
 from app.api.v1.admin.users.schemas import (
     ActionResponse,
     ListenerSummary,
@@ -65,7 +66,7 @@ def list_users(
     *,
     role: UserRole | None = None,
     is_active: bool | None = None,
-    q: str | None = None,
+    email: str | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> Paginated[UserSummary]:
@@ -75,8 +76,8 @@ def list_users(
         query = query.filter(User.role == role)
     if is_active is not None:
         query = query.filter(User.is_active.is_(is_active))
-    if q and q.strip():
-        query = query.filter(User.email.ilike(f"%{q.strip()}%"))
+    if email and email.strip():
+        query = query.filter(User.email.ilike(f"%{email.strip()}%"))
     total = query.with_entities(func.count(User.id)).scalar() or 0
     rows = (
         query.order_by(User.created_at.desc())
@@ -332,7 +333,7 @@ def force_logout(
 def list_ventors(
     db: Session,
     *,
-    q: str | None = None,
+    email: str | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> Paginated[VentorSummary]:
@@ -342,9 +343,8 @@ def list_ventors(
         .join(User, User.id == VentorProfile.user_id)
         .filter(User.deleted_at.is_(None))
     )
-    if q and q.strip():
-        term = f"%{q.strip()}%"
-        query = query.filter(or_(User.email.ilike(term), VentorProfile.nickname.ilike(term)))
+    if email and email.strip():
+        query = query.filter(User.email.ilike(f"%{email.strip()}%"))
     total = query.with_entities(func.count(VentorProfile.user_id)).scalar() or 0
     rows = (
         query.order_by(User.created_at.desc())
@@ -407,6 +407,7 @@ def list_listeners(
     db: Session,
     *,
     profile_status: ProfileStatus | None = None,
+    email: str | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> Paginated[ListenerSummary]:
@@ -418,6 +419,8 @@ def list_listeners(
     )
     if profile_status is not None:
         query = query.filter(ListenerProfile.profile_status == profile_status)
+    if email and email.strip():
+        query = query.filter(User.email.ilike(f"%{email.strip()}%"))
     total = query.with_entities(func.count(ListenerProfile.user_id)).scalar() or 0
     rows = (
         query.order_by(User.created_at.desc())
@@ -425,6 +428,7 @@ def list_listeners(
         .limit(page_size)
         .all()
     )
+    counts = favorite_counts_map(db, [profile.user_id for profile, _ in rows])
     return Paginated(
         items=[
             ListenerSummary(
@@ -437,7 +441,10 @@ def list_listeners(
                 is_verified=profile.is_verified,
                 profile_status=_value(profile.profile_status),
                 rating=float(profile.rating_avg or 0),
+                rating_count=profile.rating_count,
+                rate_per_minute=float(profile.rate_per_minute or 0),
                 session_count=profile.session_count,
+                favorite_count=counts.get(profile.user_id, 0),
                 created_at=user.created_at,
             )
             for profile, user in rows

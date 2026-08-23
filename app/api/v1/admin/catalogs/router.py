@@ -1,13 +1,16 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
-from app.api.deps import DbSession
+from app.api.deps import DbSession, SettingsDep
+from app.api.v1.admin.catalogs.parse import (
+    parse_catalog_upsert,
+    parse_comfort_area_upsert,
+    validate_catalog_id,
+)
 from app.api.v1.admin.catalogs.schemas import (
     CatalogItemResponse,
-    CatalogUpsertRequest,
     ComfortAreaResponse,
-    ComfortAreaUpsertRequest,
 )
 from app.api.v1.admin.catalogs.service import (
     list_boundaries,
@@ -52,16 +55,32 @@ def languages_list(db: DbSession, _admin: CatalogReader):
 @router.put(
     "/languages/{item_id}",
     response_model=APISuccessResponse[CatalogItemResponse],
-    responses={401: {"model": APIErrorResponse}, 403: {"model": APIErrorResponse}},
+    responses={
+        400: {"model": APIErrorResponse},
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+    },
 )
-def language_upsert(
+async def language_upsert(
     item_id: str,
-    body: CatalogUpsertRequest,
+    request: Request,
     db: DbSession,
     admin: CatalogWriter,
+    settings: SettingsDep,
 ):
+    validate_catalog_id(item_id, max_length=16)
+    payload, image = await parse_catalog_upsert(request)
     return success_response(
-        upsert_language(db, item_id, body, admin).model_dump(mode="json")
+        (
+            await upsert_language(
+                db,
+                item_id,
+                payload,
+                admin,
+                image=image,
+                settings=settings,
+            )
+        ).model_dump(mode="json")
     )
 
 
@@ -79,16 +98,32 @@ def comfort_areas_list(db: DbSession, _admin: CatalogReader):
 @router.put(
     "/comfort-areas/{item_id}",
     response_model=APISuccessResponse[ComfortAreaResponse],
-    responses={401: {"model": APIErrorResponse}, 403: {"model": APIErrorResponse}},
+    responses={
+        400: {"model": APIErrorResponse},
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+    },
 )
-def comfort_area_upsert(
+async def comfort_area_upsert(
     item_id: str,
-    body: ComfortAreaUpsertRequest,
+    request: Request,
     db: DbSession,
     admin: CatalogWriter,
+    settings: SettingsDep,
 ):
+    validate_catalog_id(item_id)
+    payload, image = await parse_comfort_area_upsert(request)
     return success_response(
-        upsert_comfort_area(db, item_id, body, admin).model_dump(mode="json")
+        (
+            await upsert_comfort_area(
+                db,
+                item_id,
+                payload,
+                admin,
+                image=image,
+                settings=settings,
+            )
+        ).model_dump(mode="json")
     )
 
 
@@ -106,16 +141,32 @@ def life_experiences_list(db: DbSession, _admin: CatalogReader):
 @router.put(
     "/life-experiences/{item_id}",
     response_model=APISuccessResponse[CatalogItemResponse],
-    responses={401: {"model": APIErrorResponse}, 403: {"model": APIErrorResponse}},
+    responses={
+        400: {"model": APIErrorResponse},
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+    },
 )
-def life_experience_upsert(
+async def life_experience_upsert(
     item_id: str,
-    body: CatalogUpsertRequest,
+    request: Request,
     db: DbSession,
     admin: CatalogWriter,
+    settings: SettingsDep,
 ):
+    validate_catalog_id(item_id)
+    payload, image = await parse_catalog_upsert(request)
     return success_response(
-        upsert_life_experience(db, item_id, body, admin).model_dump(mode="json")
+        (
+            await upsert_life_experience(
+                db,
+                item_id,
+                payload,
+                admin,
+                image=image,
+                settings=settings,
+            )
+        ).model_dump(mode="json")
     )
 
 
@@ -133,14 +184,30 @@ def boundaries_list(db: DbSession, _admin: CatalogReader):
 @router.put(
     "/boundaries/{item_id}",
     response_model=APISuccessResponse[CatalogItemResponse],
-    responses={401: {"model": APIErrorResponse}, 403: {"model": APIErrorResponse}},
+    responses={
+        400: {"model": APIErrorResponse},
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+    },
 )
-def boundary_upsert(
+async def boundary_upsert(
     item_id: str,
-    body: CatalogUpsertRequest,
+    request: Request,
     db: DbSession,
     admin: CatalogWriter,
+    settings: SettingsDep,
 ):
+    validate_catalog_id(item_id)
+    payload, image = await parse_catalog_upsert(request)
     return success_response(
-        upsert_boundary(db, item_id, body, admin).model_dump(mode="json")
+        (
+            await upsert_boundary(
+                db,
+                item_id,
+                payload,
+                admin,
+                image=image,
+                settings=settings,
+            )
+        ).model_dump(mode="json")
     )

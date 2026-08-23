@@ -38,7 +38,7 @@ from app.api.v1.sessions.schemas import (
     VentorSessionsResponse,
 )
 from app.core.config import Settings
-from app.core.errors import conflict, forbidden, not_found, validation_error
+from app.core.errors import conflict, forbidden, not_found, offer_expired, validation_error
 from app.core.pagination import clamp_page
 from app.models.auth import User
 from app.models.enums import (
@@ -54,6 +54,7 @@ from app.models.enums import (
 from app.models.profiles import ListenerProfile, VentorProfile
 from app.models.promo import PromoCode, PromoRedemption
 from app.models.rewards import RewardOffer
+from app.services.reward_offers import is_offer_expired
 from app.models.sessions import (
     Session as VentingSession,
 )
@@ -240,6 +241,8 @@ def book_session(
             raise validation_error("Invalid reward_offer_id") from exc
         if offer is None or not offer.is_active:
             raise validation_error("Invalid reward offer")
+        if is_offer_expired(offer):
+            raise offer_expired()
 
     amount, voice_fee, discount = _quote_price(
         listener,

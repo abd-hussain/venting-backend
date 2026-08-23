@@ -388,16 +388,16 @@ Query params: `from`, `to`, `granularity` (`day`\|`week`\|`month`).
 
 | # | Method | Path | Use |
 |--:|--------|------|-----|
-| A12 | `GET` | `/v1/admin/users` | Search/filter: role, status, email, date |
+| A12 | `GET` | `/v1/admin/users` | Search/filter: `role`, `is_active`, `email` (partial, case-insensitive) |
 | A13 | `GET` | `/v1/admin/users/{userId}` | Full dossier (profile + counts) |
 | A14 | `PATCH` | `/v1/admin/users/{userId}` | Update limited fields (email rare; flags) |
 | A15 | `POST` | `/v1/admin/users/{userId}/suspend` | Timed or indefinite suspend |
 | A16 | `POST` | `/v1/admin/users/{userId}/unsuspend` | Restore |
 | A17 | `POST` | `/v1/admin/users/{userId}/ban` | Permanent ban |
 | A18 | `POST` | `/v1/admin/users/{userId}/force-logout` | Revoke all refresh tokens |
-| A19 | `GET` | `/v1/admin/ventors` | Ventor list + points/sessions filters |
+| A19 | `GET` | `/v1/admin/ventors` | Ventor list; filter by `email` |
 | A20 | `GET` | `/v1/admin/ventors/{ventorId}` | Ventor detail |
-| A21 | `GET` | `/v1/admin/listeners` | Listener list + `profile_status` filter |
+| A21 | `GET` | `/v1/admin/listeners` | Listener list; `profile_status` + `email` filters |
 
 ---
 
@@ -406,7 +406,9 @@ Query params: `from`, `to`, `granularity` (`day`\|`week`\|`month`).
 | # | Method | Path | Use |
 |--:|--------|------|-----|
 | A22 | `GET` | `/v1/admin/listeners/queue` | `under_review` queue (sorted oldest first) |
-| A23 | `GET` | `/v1/admin/listeners/{listenerId}` | Full profile + tags + availability summary |
+| A23 | `GET` | `/v1/admin/listeners/{listenerId}` | Full profile + tags + metrics + `favorite_count` |
+| A23b | `PATCH` | `/v1/admin/listeners/{listenerId}` | Update cached `rate_per_minute`, `rating`, `rating_count` (`users:write`) |
+| A23c | `GET` | `/v1/admin/listeners/{listenerId}/ratings` | Paginated ventor reviews for listener |
 | A24 | `GET` | `/v1/admin/listeners/{listenerId}/identity` | ID docs + selfie URLs (signed) |
 | A25 | `POST` | `/v1/admin/listeners/{listenerId}/approve` | Set `approved`, `is_verified` |
 | A26 | `POST` | `/v1/admin/listeners/{listenerId}/reject` | Body: `reason`, optional `needs_more_info` |
@@ -439,6 +441,7 @@ On approve: update `listener_profiles.profile_status`, push notification to list
 | A37 | `POST` | `/v1/admin/moderation` | Create warn/suspend/ban |
 | A38 | `GET` | `/v1/admin/moderation` | History by user |
 | A39 | `GET` | `/v1/admin/ratings` | Flagged low ratings / review text search |
+| A39b | `PATCH` | `/v1/admin/ratings/{ratingId}` | Edit review stars/text; recomputes listener cached metrics |
 | A40 | `GET` | `/v1/admin/feedback` | Listener feedback list |
 
 ---
@@ -453,7 +456,7 @@ On approve: update `listener_profiles.profile_status`, push notification to list
 | A44 | `POST` | `/v1/admin/payouts/{payoutId}/reject` | Fail + restore balance |
 | A45 | `GET` | `/v1/admin/listeners/{listenerId}/wallet` | Balances + ledger page |
 | A46 | `POST` | `/v1/admin/listeners/{listenerId}/wallet/adjust` | Manual credit/debit (`adjustment`) |
-| A47 | `GET` | `/v1/admin/earnings/tiers` | Read tier config (or from `app_config_kv`) |
+| A47 | `GET` | `/v1/admin/earnings/tiers` | Tier config with `listener_count` per tier |
 
 ---
 
@@ -475,9 +478,9 @@ Count as **8** if each catalog has list + upsert (4×2). Collapse to fewer with 
 
 | # | Method | Path | Use |
 |--:|--------|------|-----|
-| A53 | `GET` | `/v1/admin/reward-offers` | List |
-| A54 | `POST` | `/v1/admin/reward-offers` | Create |
-| A55 | `PATCH` | `/v1/admin/reward-offers/{id}` | Update / deactivate |
+| A53 | `GET` | `/v1/admin/reward-offers` | List; includes `expires_at`; `include_expired` query (default true) |
+| A54 | `POST` | `/v1/admin/reward-offers` | Create; optional `expires_at` |
+| A55 | `PATCH` | `/v1/admin/reward-offers/{id}` | Update / deactivate; set or clear `expires_at` |
 | A56 | `GET` | `/v1/admin/reward-trades` | Redemption audit |
 | A57 | `GET` | `/v1/admin/promo-codes` | List |
 | A58 | `POST` | `/v1/admin/promo-codes` | Create |
@@ -518,7 +521,7 @@ Count as **8** if each catalog has list + upsert (4×2). Collapse to fewer with 
 | A72 | `GET` | `/v1/admin/config` | All KV |
 | A73 | `PUT` | `/v1/admin/config/{key}` | Upsert JSON value |
 | A74 | `GET` | `/v1/admin/config/earnings-tiers` | Typed helper |
-| A75 | `PUT` | `/v1/admin/config/earnings-tiers` | Update tier table |
+| A75 | `PUT` | `/v1/admin/config/earnings-tiers` | Update tier table; rejects delete when `listener_count > 0` (`409 tier_has_listeners`) |
 
 ---
 

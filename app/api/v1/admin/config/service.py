@@ -3,15 +3,20 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.api.v1.admin.audit import write_audit
+from app.api.v1.admin.deps import AdminPrincipal
 from app.api.v1.admin.config.schemas import (
     ConfigResponse,
     FeatureFlagResponse,
     FeatureFlagUpsertRequest,
 )
-from app.api.v1.admin.deps import AdminPrincipal
 from app.models.admin import AppConfigKv, AppFeatureFlag
-
-EARNINGS_TIERS_KEY = "earnings_tiers"
+from app.services.earnings_tiers import (
+    EARNINGS_TIERS_KEY,
+    get_stored_tiers,
+    refresh_listener_rates,
+    tiers_with_listener_counts,
+    validate_tier_update,
+)
 
 
 def _flag(row: AppFeatureFlag) -> FeatureFlagResponse:
@@ -86,14 +91,30 @@ def upsert_config(
 
 
 def get_earnings_tiers(db: Session) -> dict[str, Any]:
-    row = db.get(AppConfigKv, EARNINGS_TIERS_KEY)
-    if row is None or not isinstance(row.value, dict):
-        return {}
-    return row.value
+    return tiers_with_listener_counts(db)
 
 
 def update_earnings_tiers(
     db: Session, value: dict[str, Any], admin: AdminPrincipal
 ) -> dict[str, Any]:
-    upsert_config(db, EARNINGS_TIERS_KEY, value, admin)
-    return value
+    before = get_stored_tiers(db)
+    sanitized = validate_tier_update(db, value)
+    row = db.get(AppConfigKv, EARNINGS_TIERS_KEY)
+    if row is None:
+        row = AppConfigKv(key=EARNINGS_TIERS_KEY, value=sanitized)
+        db.add(row)
+    else:
+        row.value = sanitized
+    row.updated_by = admin.id
+    refresh_listener_rates(db, sanitized)
+    write_audit(
+        db,
+        admin_user_id=admin.id,
+        action="config.earnings_tiers_update",
+        entity_type="app_config_kv",
+        entity_id=EARNINGS_TIERS_KEY,
+        before=before,
+        after=sanitized,
+    )
+    db.commit()
+    return tiers_with_listener_counts(db)

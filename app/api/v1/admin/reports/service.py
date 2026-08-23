@@ -15,10 +15,12 @@ from app.api.v1.admin.reports.schemas import (
     ModerationCreateRequest,
     RatingItem,
     RatingList,
+    RatingUpdateRequest,
     ReportItem,
     ReportList,
     ReportUpdateRequest,
 )
+from app.api.v1.admin.rating_metrics import recompute_listener_rating_cache
 from app.core.errors import not_found
 from app.core.pagination import clamp_page
 from app.models.admin import AdminUser, ModerationAction
@@ -285,6 +287,48 @@ def list_low_ratings(db: Session, *, page: int) -> RatingList:
         page=page,
         page_size=page_size,
     )
+
+
+def _rating_item(row: SessionRating) -> RatingItem:
+    return RatingItem(
+        id=str(row.id),
+        session_id=str(row.session_id),
+        ventor_id=str(row.ventor_id),
+        listener_id=str(row.listener_id),
+        stars=row.stars,
+        review=row.review,
+        tip_amount=float(row.tip_amount) if row.tip_amount is not None else None,
+        created_at=row.created_at,
+    )
+
+
+def update_rating(
+    db: Session,
+    rating_id: UUID,
+    payload: RatingUpdateRequest,
+    admin: AdminPrincipal,
+) -> RatingItem:
+    row = db.get(SessionRating, rating_id)
+    if row is None:
+        raise not_found("Rating")
+    before = {"stars": row.stars, "review": row.review}
+    if payload.stars is not None:
+        row.stars = payload.stars
+    if "review" in payload.model_fields_set:
+        row.review = payload.review
+    write_audit(
+        db,
+        admin_user_id=admin.id,
+        action="rating.update",
+        entity_type="session_rating",
+        entity_id=row.id,
+        before=before,
+        after={"stars": row.stars, "review": row.review},
+    )
+    recompute_listener_rating_cache(db, row.listener_id)
+    db.commit()
+    db.refresh(row)
+    return _rating_item(row)
 
 
 def list_feedback(db: Session, *, page: int) -> FeedbackList:

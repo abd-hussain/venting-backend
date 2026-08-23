@@ -8,9 +8,10 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.core.errors import not_found, validation_error
+from app.core.errors import not_found, offer_expired, validation_error
 from app.models.profiles import VentorProfile
 from app.models.rewards import InviteCode, InviteEvent, RewardOffer, RewardTrade
+from app.services.reward_offers import is_offer_expired, offer_is_redeemable, utc_now
 from pydantic import BaseModel, Field
 
 EARN_RULES = {
@@ -29,6 +30,7 @@ class RewardOfferOut(BaseModel):
     free_minutes: int | None = None
     audience: dict
     is_welcome_gift: bool
+    expires_at: str | None = None
 
 
 class RewardsResponse(BaseModel):
@@ -89,12 +91,19 @@ def _iso(dt: datetime) -> str:
 
 
 def get_rewards(db: Session, profile: VentorProfile) -> RewardsResponse:
+    now = utc_now()
+    active_id = profile.active_reward_offer_id
     offers = (
         db.query(RewardOffer)
         .filter(RewardOffer.is_active.is_(True))
         .order_by(RewardOffer.points_cost.asc())
         .all()
     )
+    visible_offers = [
+        offer
+        for offer in offers
+        if not is_offer_expired(offer, now=now) or offer.id == active_id
+    ]
     welcome_claimed = (
         db.query(RewardTrade)
         .filter(
@@ -123,8 +132,9 @@ def get_rewards(db: Session, profile: VentorProfile) -> RewardsResponse:
                     "max_tier": o.max_tier.value if o.max_tier else None,
                 },
                 is_welcome_gift=o.is_welcome_gift,
+                expires_at=_iso(o.expires_at) if o.expires_at is not None else None,
             )
-            for o in offers
+            for o in visible_offers
         ],
         earn_rules=EARN_RULES,
     )
@@ -164,6 +174,9 @@ def redeem_offer(db: Session, profile: VentorProfile, payload: RedeemRequest) ->
             ),
             active_offer_id=str(offer.id),
         )
+
+    if not offer_is_redeemable(offer):
+        raise offer_expired()
 
     if offer.is_welcome_gift:
         points_spent = 0

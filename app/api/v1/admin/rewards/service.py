@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.api.v1.admin.audit import write_audit
@@ -27,6 +27,7 @@ from app.core.errors import conflict, not_found
 from app.core.pagination import clamp_page
 from app.models.promo import PromoCode, PromoRedemption
 from app.models.rewards import RewardOffer, RewardTrade
+from app.services.reward_offers import normalize_expires_at, utc_now
 
 
 def _offer_response(row: RewardOffer) -> RewardOfferResponse:
@@ -41,6 +42,7 @@ def _offer_response(row: RewardOffer) -> RewardOfferResponse:
         max_tier=row.max_tier,
         is_welcome_gift=row.is_welcome_gift,
         is_active=row.is_active,
+        expires_at=row.expires_at,
         created_at=row.created_at,
     )
 
@@ -69,10 +71,22 @@ def _promo_snapshot(row: PromoCode) -> dict[str, Any]:
 
 
 def list_reward_offers(
-    db: Session, *, page: int = 1, page_size: int = 20
+    db: Session,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+    include_expired: bool = True,
 ) -> RewardOfferList:
     page, page_size = clamp_page(page, page_size)
     query = db.query(RewardOffer)
+    if not include_expired:
+        now = utc_now()
+        query = query.filter(
+            or_(
+                RewardOffer.expires_at.is_(None),
+                RewardOffer.expires_at > now,
+            )
+        )
     total = query.with_entities(func.count(RewardOffer.id)).scalar() or 0
     rows = (
         query.order_by(RewardOffer.created_at.desc(), RewardOffer.code.asc())
@@ -96,9 +110,11 @@ def create_reward_offer(
     code = payload.code.strip().lower()
     if db.query(RewardOffer.id).filter(RewardOffer.code == code).first() is not None:
         raise conflict("Reward offer code already exists")
+    data = payload.model_dump(exclude={"code", "expires_at"})
     row = RewardOffer(
-        **payload.model_dump(exclude={"code"}),
+        **data,
         code=code,
+        expires_at=normalize_expires_at(payload.expires_at, reject_past=True),
     )
     db.add(row)
     db.flush()
@@ -136,6 +152,8 @@ def update_reward_offer(
         if duplicate is not None:
             raise conflict("Reward offer code already exists")
         changes["code"] = code
+    if "expires_at" in payload.model_fields_set:
+        changes["expires_at"] = normalize_expires_at(payload.expires_at, reject_past=False)
     for field, value in changes.items():
         setattr(row, field, value)
     write_audit(

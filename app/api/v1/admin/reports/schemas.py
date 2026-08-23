@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.core.pagination import Paginated
 from app.models.enums import ModerationActionType
@@ -74,6 +74,17 @@ class RatingItem(BaseModel):
 
 class RatingList(Paginated[RatingItem]):
     pass
+
+
+class RatingUpdateRequest(BaseModel):
+    stars: int | None = Field(default=None, ge=1, le=5)
+    review: str | None = None
+
+    @model_validator(mode="after")
+    def require_change(self) -> "RatingUpdateRequest":
+        if not self.model_fields_set:
+            raise ValueError("At least one field is required")
+        return self
 
 
 class FeedbackItem(BaseModel):

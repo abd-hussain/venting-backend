@@ -6,6 +6,7 @@ class CatalogItemResponse(BaseModel):
     name_en: str
     name_ar: str
     is_active: bool
+    image_url: str | None = None
 
 
 class ComfortAreaResponse(CatalogItemResponse):

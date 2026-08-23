@@ -107,3 +107,69 @@ def validation_error(message: str, *, en: str | None = None, ar: str | None = No
         },
         http_status=status.HTTP_422_UNPROCESSABLE_ENTITY,
     )
+
+
+def image_required() -> MainAPIException:
+    return MainAPIException(
+        type="validation",
+        code=1201,
+        message="image_required",
+        localized_message={
+            "en": "A category image is required",
+            "ar": "صورة الفئة مطلوبة",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def invalid_image_type() -> MainAPIException:
+    return MainAPIException(
+        type="validation",
+        code=1202,
+        message="invalid_image_type",
+        localized_message={
+            "en": "Image must be PNG, JPG, or JPEG",
+            "ar": "يجب أن تكون الصورة بصيغة PNG أو JPG أو JPEG",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def file_too_large() -> MainAPIException:
+    return MainAPIException(
+        type="validation",
+        code=1203,
+        message="file_too_large",
+        localized_message={
+            "en": "Image must be 2MB or smaller",
+            "ar": "يجب ألا يتجاوز حجم الصورة 2 ميجابايت",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def offer_expired() -> MainAPIException:
+    return MainAPIException(
+        type="conflict",
+        code=1301,
+        message="offer_expired",
+        localized_message={
+            "en": "This reward offer has expired.",
+            "ar": "انتهت صلاحية عرض المكافأة هذا.",
+        },
+        http_status=status.HTTP_409_CONFLICT,
+    )
+
+
+def tier_has_listeners(tier_id: str, count: int) -> MainAPIException:
+    message = f'Cannot delete tier "{tier_id}": {count} listeners are assigned.'
+    return MainAPIException(
+        type="conflict",
+        code=1302,
+        message="tier_has_listeners",
+        localized_message={
+            "en": message,
+            "ar": f'لا يمكن حذف المستوى "{tier_id}": {count} مستمعين مرتبطين به.',
+        },
+        http_status=status.HTTP_409_CONFLICT,
+    )

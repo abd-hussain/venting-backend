@@ -60,9 +60,15 @@ def reward_offers_list(
     _admin: RewardReader,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=50)] = 20,
+    include_expired: bool = True,
 ):
     return success_response(
-        list_reward_offers(db, page=page, page_size=page_size).model_dump(mode="json")
+        list_reward_offers(
+            db,
+            page=page,
+            page_size=page_size,
+            include_expired=include_expired,
+        ).model_dump(mode="json")
     )
 
 

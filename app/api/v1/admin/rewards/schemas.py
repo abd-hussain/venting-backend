@@ -18,6 +18,7 @@ class RewardOfferResponse(BaseModel):
     max_tier: EarningsTier | None = None
     is_welcome_gift: bool
     is_active: bool
+    expires_at: datetime | None = None
     created_at: datetime
 
 
@@ -35,6 +36,7 @@ class RewardOfferCreateRequest(BaseModel):
     max_tier: EarningsTier | None = None
     is_welcome_gift: bool = False
     is_active: bool = True
+    expires_at: datetime | None = None
 
 
 class RewardOfferUpdateRequest(BaseModel):
@@ -47,6 +49,7 @@ class RewardOfferUpdateRequest(BaseModel):
     max_tier: EarningsTier | None = None
     is_welcome_gift: bool | None = None
     is_active: bool | None = None
+    expires_at: datetime | None = None
 
     @model_validator(mode="after")
     def require_change(self) -> "RewardOfferUpdateRequest":

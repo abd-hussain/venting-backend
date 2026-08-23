@@ -86,4 +86,4 @@ class WalletAdjustmentResponse(BaseModel):
 
 
 class EarningsTiersResponse(BaseModel):
-    tiers: dict[str, dict[str, int | float]]
+    tiers: dict[str, dict[str, int | float | str | None]]

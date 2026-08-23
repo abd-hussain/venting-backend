@@ -1,6 +1,6 @@
 """Lookup & tag-link tables — docs/database-schema.md § 3."""
 
-from sqlalchemy import Boolean, Column, ForeignKey, String
+from sqlalchemy import Boolean, Column, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.db.base import Base
@@ -13,6 +13,7 @@ class Language(Base):
     name_en = Column(String(64), nullable=False)
     name_ar = Column(String(64), nullable=False)
     is_active = Column(Boolean, nullable=False, server_default="true")
+    image_url = Column(Text, nullable=True)
 
 
 class ComfortArea(Base):
@@ -23,6 +24,7 @@ class ComfortArea(Base):
     name_ar = Column(String(120), nullable=False)
     topic_group = Column(String(64), nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="true")
+    image_url = Column(Text, nullable=True)
 
 
 class LifeExperience(Base):
@@ -32,6 +34,7 @@ class LifeExperience(Base):
     name_en = Column(String(120), nullable=False)
     name_ar = Column(String(120), nullable=False)
     is_active = Column(Boolean, nullable=False, server_default="true")
+    image_url = Column(Text, nullable=True)
 
 
 class Boundary(Base):
@@ -41,6 +44,7 @@ class Boundary(Base):
     name_en = Column(String(120), nullable=False)
     name_ar = Column(String(120), nullable=False)
     is_active = Column(Boolean, nullable=False, server_default="true")
+    image_url = Column(Text, nullable=True)
 
 
 class VentorInterest(Base):

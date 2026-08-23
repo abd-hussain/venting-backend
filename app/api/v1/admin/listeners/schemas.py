@@ -4,7 +4,7 @@ from datetime import date, datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ListenerQueueItem(BaseModel):
@@ -31,6 +31,7 @@ class ListenerReviewDetail(ListenerQueueItem):
     rating: float
     rating_count: int
     session_count: int
+    favorite_count: int = 0
     rejection_reason: str | None = None
     reviewed_at: datetime | None = None
     languages: list[str] = Field(default_factory=list)
@@ -73,4 +74,16 @@ class ListenerReviewResponse(BaseModel):
     profile_status: str
     is_verified: bool
     reviewed_at: datetime | None = None
+
+
+class ListenerMetricsUpdateRequest(BaseModel):
+    rate_per_minute: float | None = Field(default=None, ge=0)
+    rating: float | None = Field(default=None, ge=0, le=5)
+    rating_count: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def require_change(self) -> "ListenerMetricsUpdateRequest":
+        if not self.model_fields_set:
+            raise ValueError("At least one field is required")
+        return self
 

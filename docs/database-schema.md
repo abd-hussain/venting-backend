@@ -297,6 +297,7 @@ Stable catalogs (seed once). App uses string ids like `anxiety_stress`, `en`, `p
 | `name_en` | VARCHAR(64) | |
 | `name_ar` | VARCHAR(64) | |
 | `is_active` | BOOLEAN | default true |
+| `image_url` | TEXT | HTTPS URL to category image |
 
 ### 7. `comfort_areas`
 
@@ -307,6 +308,7 @@ Stable catalogs (seed once). App uses string ids like `anxiety_stress`, `en`, `p
 | `name_ar` | VARCHAR(120) | |
 | `topic_group` | VARCHAR(64) | ? e.g. anxiety, relationships |
 | `is_active` | BOOLEAN | |
+| `image_url` | TEXT | HTTPS URL to category image |
 
 ### 8. `life_experiences`
 
@@ -316,6 +318,7 @@ Stable catalogs (seed once). App uses string ids like `anxiety_stress`, `en`, `p
 | `name_en` | VARCHAR(120) | |
 | `name_ar` | VARCHAR(120) | |
 | `is_active` | BOOLEAN | |
+| `image_url` | TEXT | HTTPS URL to category image |
 
 ### 9. `boundaries`
 
@@ -325,6 +328,7 @@ Stable catalogs (seed once). App uses string ids like `anxiety_stress`, `en`, `p
 | `name_en` | VARCHAR(120) | |
 | `name_ar` | VARCHAR(120) | |
 | `is_active` | BOOLEAN | |
+| `image_url` | TEXT | HTTPS URL to category image |
 
 ### 10. `ventor_interests`
 
@@ -733,6 +737,7 @@ Append-only money movement (earnings chart + audit).
 | `max_tier` | `earnings_tier` | ? |
 | `is_welcome_gift` | BOOLEAN | default false |
 | `is_active` | BOOLEAN | |
+| `expires_at` | TIMESTAMPTZ | ? when set, offer cannot be redeemed after this instant (UTC) |
 | `created_at` | TIMESTAMPTZ | |
 
 ### 36. `reward_trades`

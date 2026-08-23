@@ -15,11 +15,13 @@ from app.api.v1.admin.listeners import service
 from app.api.v1.admin.listeners.schemas import (
     IdentityDecisionRequest,
     IdentityVerificationDetail,
+    ListenerMetricsUpdateRequest,
     ListenerQueueItem,
     ListenerReviewDetail,
     ListenerReviewResponse,
     RejectListenerRequest,
 )
+from app.api.v1.admin.reports.schemas import RatingList
 from app.core.pagination import Paginated
 from app.core.responses import success_response
 from app.schemas.envelope import APISuccessResponse
@@ -57,6 +59,43 @@ def listener_review(
 ):
     return success_response(
         jsonable_encoder(service.get_listener_review(db, listener_id))
+    )
+
+
+@router.patch(
+    "/listeners/{listener_id}",
+    response_model=APISuccessResponse[ListenerReviewDetail],
+)
+def patch_listener_metrics(
+    listener_id: UUID,
+    body: ListenerMetricsUpdateRequest,
+    db: DbSession,
+    admin: AdminPrincipal = Depends(require_permission("users:write")),
+):
+    return success_response(
+        jsonable_encoder(
+            service.update_listener_metrics(db, listener_id, body, admin)
+        )
+    )
+
+
+@router.get(
+    "/listeners/{listener_id}/ratings",
+    response_model=APISuccessResponse[RatingList],
+)
+def listener_ratings(
+    listener_id: UUID,
+    db: DbSession,
+    page: int = 1,
+    page_size: int = 20,
+    _: AdminPrincipal = Depends(require_permission("users:read")),
+):
+    return success_response(
+        jsonable_encoder(
+            service.list_listener_ratings(
+                db, listener_id, page=page, page_size=page_size
+            )
+        )
     )
 
 

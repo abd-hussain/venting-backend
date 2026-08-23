@@ -39,6 +39,8 @@ class VentorFavorite(Base):
         nullable=False,
     )
 
+    __table_args__ = (Index("ix_ventor_favorites_listener_id", "listener_id"),)
+
 
 class MoodCheckin(Base, UUIDPrimaryKeyMixin):
     __tablename__ = "mood_checkins"

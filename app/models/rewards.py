@@ -42,6 +42,7 @@ class RewardOffer(Base):
     )
     is_welcome_gift = Column(Boolean, nullable=False, server_default="false")
     is_active = Column(Boolean, nullable=False, server_default="true")
+    expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

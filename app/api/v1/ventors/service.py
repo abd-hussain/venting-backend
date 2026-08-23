@@ -42,6 +42,7 @@ from app.models.profiles import ListenerProfile, VentorProfile
 from app.models.rewards import RewardOffer
 from app.models.sessions import Session as VentingSession
 from app.models.settings import VentorNotificationPreferences, VentorPrivacySettings
+from app.services.reward_offers import is_offer_expired
 from app.models.ventor_wellness import (
     Achievement,
     MoodCheckin,
@@ -349,7 +350,7 @@ def get_home(db: Session, user: User, profile: VentorProfile) -> HomeResponse:
     discount_percent: float | None = None
     if profile.active_reward_offer_id is not None:
         offer = db.get(RewardOffer, profile.active_reward_offer_id)
-        if offer is not None and offer.is_active:
+        if offer is not None and offer.is_active and not is_offer_expired(offer):
             reward_offer_id = str(offer.id)
             if offer.percent_off is not None:
                 discount_percent = float(offer.percent_off)

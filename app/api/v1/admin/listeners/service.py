@@ -1,6 +1,7 @@
 """Admin listener review services — A22–A27."""
 
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import func
@@ -8,15 +9,18 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.admin.audit import write_audit
 from app.api.v1.admin.deps import AdminPrincipal
+from app.api.v1.admin.favorite_counts import favorite_count
 from app.api.v1.admin.listeners.schemas import (
     IdentityDecision,
     IdentityDecisionRequest,
     IdentityVerificationDetail,
+    ListenerMetricsUpdateRequest,
     ListenerQueueItem,
     ListenerReviewDetail,
     ListenerReviewResponse,
     RejectListenerRequest,
 )
+from app.api.v1.admin.reports.schemas import RatingItem, RatingList
 from app.core.errors import not_found
 from app.core.pagination import Paginated, clamp_page
 from app.models.auth import User
@@ -29,6 +33,7 @@ from app.models.lookups import (
 )
 from app.models.notifications import Notification
 from app.models.profiles import ListenerIdentityVerification, ListenerProfile
+from app.models.sessions import SessionRating
 
 
 def _value(value) -> str:
@@ -146,10 +151,85 @@ def get_listener_review(db: Session, listener_id: UUID) -> ListenerReviewDetail:
         rating=float(profile.rating_avg or 0),
         rating_count=profile.rating_count,
         session_count=profile.session_count,
+        favorite_count=favorite_count(db, listener_id),
         rejection_reason=profile.rejection_reason,
         reviewed_at=profile.reviewed_at,
         **_tag_values(db, listener_id),
     )
+
+
+def list_listener_ratings(
+    db: Session,
+    listener_id: UUID,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+) -> RatingList:
+    _get_listener(db, listener_id)
+    page, page_size = clamp_page(page, page_size)
+    query = db.query(SessionRating).filter(SessionRating.listener_id == listener_id)
+    total = query.with_entities(func.count(SessionRating.id)).scalar() or 0
+    rows = (
+        query.order_by(SessionRating.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return RatingList(
+        items=[
+            RatingItem(
+                id=str(row.id),
+                session_id=str(row.session_id),
+                ventor_id=str(row.ventor_id),
+                listener_id=str(row.listener_id),
+                stars=row.stars,
+                review=row.review,
+                tip_amount=float(row.tip_amount) if row.tip_amount is not None else None,
+                created_at=row.created_at,
+            )
+            for row in rows
+        ],
+        total=int(total),
+        page=page,
+        page_size=page_size,
+    )
+
+
+def update_listener_metrics(
+    db: Session,
+    listener_id: UUID,
+    payload: ListenerMetricsUpdateRequest,
+    admin: AdminPrincipal,
+) -> ListenerReviewDetail:
+    profile, _ = _get_listener(db, listener_id)
+    before = {
+        "rate_per_minute": float(profile.rate_per_minute or 0),
+        "rating_avg": float(profile.rating_avg or 0),
+        "rating_count": profile.rating_count,
+    }
+    changes = payload.model_dump(exclude_unset=True)
+    if "rate_per_minute" in changes:
+        profile.rate_per_minute = Decimal(str(changes["rate_per_minute"]))
+    if "rating" in changes:
+        profile.rating_avg = Decimal(str(changes["rating"]))
+    if "rating_count" in changes:
+        profile.rating_count = changes["rating_count"]
+    write_audit(
+        db,
+        admin_user_id=admin.id,
+        action="listener.metrics_update",
+        entity_type="listener",
+        entity_id=profile.user_id,
+        before=before,
+        after={
+            "rate_per_minute": float(profile.rate_per_minute or 0),
+            "rating_avg": float(profile.rating_avg or 0),
+            "rating_count": profile.rating_count,
+        },
+    )
+    db.commit()
+    db.refresh(profile)
+    return get_listener_review(db, listener_id)
 
 
 def _identity_detail(row: ListenerIdentityVerification) -> IdentityVerificationDetail:

@@ -32,6 +32,7 @@ def users(
     db: DbSession,
     role: UserRole | None = None,
     is_active: bool | None = None,
+    email: str | None = None,
     q: str | None = None,
     page: int = 1,
     page_size: int = 20,
@@ -43,7 +44,7 @@ def users(
                 db,
                 role=role,
                 is_active=is_active,
-                q=q,
+                email=email or q,
                 page=page,
                 page_size=page_size,
             )
@@ -143,6 +144,7 @@ def force_logout(
 @router.get("/ventors", response_model=APISuccessResponse[Paginated[VentorSummary]])
 def ventors(
     db: DbSession,
+    email: str | None = None,
     q: str | None = None,
     page: int = 1,
     page_size: int = 20,
@@ -150,7 +152,7 @@ def ventors(
 ):
     return success_response(
         jsonable_encoder(
-            service.list_ventors(db, q=q, page=page, page_size=page_size)
+            service.list_ventors(db, email=email or q, page=page, page_size=page_size)
         )
     )
 
@@ -171,6 +173,8 @@ def ventor(
 def listeners(
     db: DbSession,
     profile_status: ProfileStatus | None = None,
+    email: str | None = None,
+    q: str | None = None,
     page: int = 1,
     page_size: int = 20,
     _: AdminPrincipal = Depends(require_permission("users:read")),
@@ -180,6 +184,7 @@ def listeners(
             service.list_listeners(
                 db,
                 profile_status=profile_status,
+                email=email or q,
                 page=page,
                 page_size=page_size,
             )

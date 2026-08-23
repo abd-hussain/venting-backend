@@ -78,5 +78,8 @@ class ListenerSummary(BaseModel):
     is_verified: bool
     profile_status: str
     rating: float
+    rating_count: int = 0
+    rate_per_minute: float = 0
     session_count: int
+    favorite_count: int = 0
     created_at: datetime

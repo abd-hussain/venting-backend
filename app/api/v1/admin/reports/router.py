@@ -16,7 +16,9 @@ from app.api.v1.admin.reports.schemas import (
     ModerationActionItem,
     ModerationActionList,
     ModerationCreateRequest,
+    RatingItem,
     RatingList,
+    RatingUpdateRequest,
     ReportItem,
     ReportList,
     ReportStatus,
@@ -29,6 +31,7 @@ from app.api.v1.admin.reports.service import (
     list_low_ratings,
     list_moderation_actions,
     list_reports,
+    update_rating,
     update_report,
 )
 from app.core.responses import success_response
@@ -137,6 +140,26 @@ def get_moderation(
 )
 def get_ratings(db: DbSession, _admin: ReportsAdmin, page: int = 1):
     return success_response(list_low_ratings(db, page=page).model_dump(mode="json"))
+
+
+@router.patch(
+    "/ratings/{rating_id}",
+    response_model=APISuccessResponse[RatingItem],
+    responses={
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        404: {"model": APIErrorResponse},
+    },
+)
+def patch_rating(
+    rating_id: UUID,
+    body: RatingUpdateRequest,
+    db: DbSession,
+    admin: UsersWriteAdmin,
+):
+    return success_response(
+        update_rating(db, rating_id, body, admin).model_dump(mode="json")
+    )
 
 
 @router.get(

@@ -24,7 +24,6 @@ from app.api.v1.admin.payouts.schemas import (
 )
 from app.core.errors import conflict, not_found, validation_error
 from app.core.pagination import Paginated, clamp_page
-from app.models.admin import AppConfigKv
 from app.models.earnings import (
     ListenerWallet,
     Payout,
@@ -32,14 +31,7 @@ from app.models.earnings import (
     WalletLedgerEntry,
 )
 from app.models.enums import LedgerEntryType, PayoutStatus
-
-DEFAULT_EARNINGS_TIERS = {
-    "starter": {"rate_per_minute": 0.25, "min_sessions": 0},
-    "rising": {"rate_per_minute": 0.35, "min_sessions": 25},
-    "trusted": {"rate_per_minute": 0.45, "min_sessions": 100},
-    "expert": {"rate_per_minute": 0.55, "min_sessions": 250},
-    "elite": {"rate_per_minute": 0.70, "min_sessions": 500},
-}
+from app.services.earnings_tiers import tiers_with_listener_counts
 
 
 def _payout_response(row: Payout) -> PayoutResponse:
@@ -337,6 +329,4 @@ def adjust_wallet(
 
 
 def get_earnings_tiers(db: Session) -> EarningsTiersResponse:
-    config = db.get(AppConfigKv, "earnings_tiers")
-    value = config.value if config is not None else DEFAULT_EARNINGS_TIERS
-    return EarningsTiersResponse(tiers=value)
+    return EarningsTiersResponse(tiers=tiers_with_listener_counts(db))
