@@ -40,6 +40,18 @@ class Settings(BaseSettings):
     # Admin portal / GA4 embed (A97)
     ga4_measurement_id: str = ""
 
+    # Social auth — comma-separated allowlists for this deployment (dev vs prod via env)
+    google_client_ids: str = ""
+    apple_audiences: str = ""
+
+    @property
+    def google_client_id_list(self) -> list[str]:
+        return [item.strip() for item in self.google_client_ids.split(",") if item.strip()]
+
+    @property
+    def apple_audience_list(self) -> list[str]:
+        return [item.strip() for item in self.apple_audiences.split(",") if item.strip()]
+
     @property
     def sqlalchemy_database_url(self) -> str:
         if self.database_url:

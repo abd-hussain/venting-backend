@@ -131,3 +131,35 @@ class MeResponse(BaseModel):
     avatar_url: str | None = None
     registration_complete: bool
     listener_profile_status: str | None = None
+
+
+class SocialProvider(str, Enum):
+    google = "google"
+    apple = "apple"
+
+
+class SocialFullName(BaseModel):
+    given_name: str | None = None
+    family_name: str | None = None
+
+
+class SocialAuthRequest(BaseModel):
+    provider: SocialProvider
+    id_token: str = Field(min_length=1)
+    role: AuthRole
+    nonce: str | None = None
+    full_name: SocialFullName | None = None
+
+
+class SocialAuthUser(BaseModel):
+    id: str
+    email: str
+    role: AuthRole
+    is_new: bool
+    registration_complete: bool
+
+
+class SocialAuthResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    user: SocialAuthUser

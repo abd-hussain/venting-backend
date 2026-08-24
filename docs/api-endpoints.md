@@ -170,7 +170,7 @@ List responses may include:
 - Soft-deleted accounts: treat as `exists: false` **or** 403 — pick one and document
 - Pure read; no session created
 
-**Out of scope:** login/register replacement, OTP, social identity linking, password validation.
+**Out of scope:** login/register replacement, OTP, password validation.
 
 **Acceptance criteria:**
 
@@ -178,6 +178,23 @@ List responses may include:
 - [x] Standard `{ status, data }` success envelope
 - [ ] Mobile can branch register vs login without calling `#1`/`#2` until password submit
 - [x] After auth, `#7` remains routing authority
+
+---
+
+### 1b. `POST /v1/auth/social`
+
+| | |
+|--|--|
+| **Auth** | Public |
+| **Purpose** | Verify Google/Apple ID token → create user or log in → return session |
+| **Body** | `provider` (`google` \| `apple`), `id_token`, `role`, optional `nonce` (Apple), optional `full_name` |
+| **Response** | Same session shape as `#1` / `#2`: `access_token`, `refresh_token`, `user` `{ id, email, role, is_new, registration_complete }` |
+
+Mobile still calls `#0 check-email` when email is known (role-mismatch UX). Sessions work with `#3`–`#7`.
+
+**Env config:** `GOOGLE_CLIENT_IDS`, `APPLE_AUDIENCES` (comma-separated allowlists per deployment).
+
+**Errors:** `120` validation, `121` invalid token, `122` Apple nonce, `123` email unavailable, `124` role mismatch, `125` identity conflict, `126` disabled, `127` provider unavailable, `429` rate limit.
 
 ---
 
@@ -1027,14 +1044,15 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 | Notifications | 3 |
 | Training | 2 |
 | Promo | 1 |
-| **Total unique API endpoints** | **74** |
+| **Total unique API endpoints** | **75** |
 
 ### Master checklist (method + path)
 
 | # | Method | Path |
 |---|--------|------|
-| 0 | POST | `/v1/auth/check-email` *(proposed)* |
+| 0 | POST | `/v1/auth/check-email` |
 | 1 | POST | `/v1/auth/register` |
+| 1b | POST | `/v1/auth/social` |
 | 2 | POST | `/v1/auth/login` |
 | 3 | POST | `/v1/auth/refresh` |
 | 4 | POST | `/v1/auth/logout` |

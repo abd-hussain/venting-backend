@@ -15,6 +15,8 @@ from app.api.v1.auth.schemas import (
     RefreshResponse,
     RegisterRequest,
     RegisterResponse,
+    SocialAuthRequest,
+    SocialAuthResponse,
 )
 from app.api.v1.auth.service import (
     change_password,
@@ -25,6 +27,7 @@ from app.api.v1.auth.service import (
     logout_user,
     refresh_tokens,
     register_user,
+    social_login,
 )
 from app.core.responses import success_response
 from app.schemas.envelope import APIErrorResponse, APISuccessResponse
@@ -53,6 +56,37 @@ def check_email_route(
     data = check_email(
         db,
         body,
+        client_ip=client_ip,
+        installation_id=installation_id,
+    )
+    return success_response(data.model_dump())
+
+
+@router.post(
+    "/social",
+    response_model=APISuccessResponse[SocialAuthResponse],
+    responses={
+        400: {"model": APIErrorResponse},
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        409: {"model": APIErrorResponse},
+        429: {"model": APIErrorResponse},
+        503: {"model": APIErrorResponse},
+    },
+    summary="Sign in or register with Google / Apple ID token",
+)
+def social_auth_route(
+    body: SocialAuthRequest,
+    request: Request,
+    db: DbSession,
+    settings: SettingsDep,
+):
+    client_ip = request.client.host if request.client else None
+    installation_id = request.headers.get("skel-installation-id")
+    data = social_login(
+        db,
+        body,
+        settings,
         client_ip=client_ip,
         installation_id=installation_id,
     )
@@ -151,6 +185,7 @@ def account_delete(
     "/change-password",
     response_model=APISuccessResponse[OkResponse],
     responses={
+        400: {"model": APIErrorResponse},
         401: {"model": APIErrorResponse},
         422: {"model": APIErrorResponse},
     },

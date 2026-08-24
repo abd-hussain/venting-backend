@@ -8,6 +8,11 @@ class UserRole(str, enum.Enum):
     listener = "listener"
 
 
+class AuthProvider(str, enum.Enum):
+    google = "google"
+    apple = "apple"
+
+
 class Gender(str, enum.Enum):
     male = "male"
     female = "female"

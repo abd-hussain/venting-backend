@@ -28,3 +28,4 @@ class SlidingWindowRateLimiter:
 
 
 check_email_limiter = SlidingWindowRateLimiter(max_requests=15, window_seconds=60)
+social_auth_limiter = SlidingWindowRateLimiter(max_requests=20, window_seconds=60)

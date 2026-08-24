@@ -23,6 +23,10 @@ from app.api.v1.auth.schemas import (
     RegisterRequest,
     RegisterResponse,
     RegisteredUser,
+    SocialAuthRequest,
+    SocialAuthResponse,
+    SocialAuthUser,
+    SocialFullName,
 )
 from app.core.config import Settings
 from app.core.errors import (
@@ -30,10 +34,18 @@ from app.core.errors import (
     auth_role_mismatch,
     email_already_registered,
     invalid_credentials,
+    invalid_social_token,
+    password_not_set,
     rate_limited,
+    social_account_disabled,
+    social_email_unavailable,
+    social_identity_conflict,
+    social_nonce_mismatch,
+    social_provider_unavailable,
+    social_role_mismatch,
     unauthorized,
 )
-from app.core.rate_limit import check_email_limiter
+from app.core.rate_limit import check_email_limiter, social_auth_limiter
 from app.core.security import (
     create_access_token,
     generate_refresh_token,
@@ -41,9 +53,15 @@ from app.core.security import (
     hash_token,
     verify_password,
 )
-from app.models.auth import RefreshToken, User
-from app.models.enums import ProfileStatus, UserRole
+from app.models.auth import AuthIdentity, RefreshToken, User
+from app.models.enums import AuthProvider, ProfileStatus, UserRole
 from app.models.profiles import ListenerProfile, VentorProfile
+from app.services.social_tokens import (
+    InvalidSocialTokenError,
+    NonceMismatchError,
+    ProviderUnavailableError,
+    verify_social_id_token,
+)
 
 
 def _issue_tokens(db: Session, user: User, settings: Settings) -> tuple[str, str]:
@@ -113,6 +131,231 @@ def _get_valid_refresh_token(db: Session, raw_token: str) -> RefreshToken:
         raise unauthorized()
 
     return stored
+
+
+def _assert_user_can_authenticate(user: User) -> None:
+    now = datetime.now(timezone.utc)
+    if user.deleted_at is not None:
+        raise social_account_disabled()
+    if not user.is_active or (
+        user.suspended_until is not None and user.suspended_until > now
+    ):
+        raise social_account_disabled()
+
+
+def _assert_role_matches(user: User, role: AuthRole) -> None:
+    if user.role.value != role.value:
+        raise social_role_mismatch()
+
+
+def _apply_social_full_name(
+    db: Session,
+    user: User,
+    full_name: SocialFullName | None,
+) -> None:
+    if full_name is None:
+        return
+    display = " ".join(
+        part for part in (full_name.given_name, full_name.family_name) if part
+    ).strip()
+    if not display:
+        return
+
+    if user.role == UserRole.listener:
+        profile = db.get(ListenerProfile, user.id)
+        if profile is not None and not profile.full_name:
+            profile.full_name = display
+    elif user.role == UserRole.ventor:
+        profile = db.get(VentorProfile, user.id)
+        if profile is not None and not profile.nickname:
+            profile.nickname = display[:20]
+
+
+def _upsert_auth_identity(
+    db: Session,
+    *,
+    user: User,
+    provider: AuthProvider,
+    provider_user_id: str,
+    email: str | None,
+    raw_profile: dict | None,
+) -> AuthIdentity:
+    identity = (
+        db.query(AuthIdentity)
+        .filter(
+            AuthIdentity.provider == provider,
+            AuthIdentity.provider_user_id == provider_user_id,
+        )
+        .one_or_none()
+    )
+    if identity is None:
+        existing_for_user = (
+            db.query(AuthIdentity)
+            .filter(
+                AuthIdentity.user_id == user.id,
+                AuthIdentity.provider == provider,
+            )
+            .one_or_none()
+        )
+        if existing_for_user is not None:
+            raise social_identity_conflict()
+
+        identity = AuthIdentity(
+            user_id=user.id,
+            provider=provider,
+            provider_user_id=provider_user_id,
+            email=email,
+            raw_profile=raw_profile,
+        )
+        db.add(identity)
+    else:
+        if identity.user_id != user.id:
+            raise social_identity_conflict()
+        identity.email = email or identity.email
+        if raw_profile:
+            identity.raw_profile = raw_profile
+
+    return identity
+
+
+def social_login(
+    db: Session,
+    payload: SocialAuthRequest,
+    settings: Settings,
+    *,
+    client_ip: str | None = None,
+    installation_id: str | None = None,
+) -> SocialAuthResponse:
+    if client_ip and not social_auth_limiter.allow(f"ip:{client_ip}"):
+        raise rate_limited()
+    if installation_id and not social_auth_limiter.allow(f"inst:{installation_id}"):
+        raise rate_limited()
+
+    provider = AuthProvider(payload.provider.value)
+    try:
+        verified = verify_social_id_token(
+            provider=provider,
+            id_token=payload.id_token,
+            settings=settings,
+            nonce=payload.nonce,
+        )
+    except NonceMismatchError:
+        raise social_nonce_mismatch()
+    except ProviderUnavailableError:
+        raise social_provider_unavailable()
+    except InvalidSocialTokenError:
+        raise invalid_social_token()
+
+    raw_profile: dict | None = None
+    if payload.full_name is not None:
+        raw_profile = {
+            "full_name": payload.full_name.model_dump(exclude_none=True),
+        }
+
+    identity = (
+        db.query(AuthIdentity)
+        .filter(
+            AuthIdentity.provider == provider,
+            AuthIdentity.provider_user_id == verified.provider_user_id,
+        )
+        .one_or_none()
+    )
+
+    is_new = False
+
+    if identity is not None:
+        user = db.get(User, identity.user_id)
+        if user is None:
+            raise invalid_social_token()
+        _assert_user_can_authenticate(user)
+        _assert_role_matches(user, payload.role)
+        identity.email = verified.email or identity.email
+        if raw_profile:
+            merged = dict(identity.raw_profile or {})
+            merged.update(raw_profile)
+            identity.raw_profile = merged
+        _apply_social_full_name(db, user, payload.full_name)
+    else:
+        user: User | None = None
+        if verified.email:
+            user = (
+                db.query(User)
+                .filter(User.email == verified.email)
+                .one_or_none()
+            )
+            if user is not None:
+                if user.deleted_at is not None:
+                    raise social_account_disabled()
+                _assert_user_can_authenticate(user)
+                _assert_role_matches(user, payload.role)
+
+                existing_provider = (
+                    db.query(AuthIdentity)
+                    .filter(
+                        AuthIdentity.user_id == user.id,
+                        AuthIdentity.provider == provider,
+                    )
+                    .one_or_none()
+                )
+                if (
+                    existing_provider is not None
+                    and existing_provider.provider_user_id != verified.provider_user_id
+                ):
+                    raise social_identity_conflict()
+
+                _upsert_auth_identity(
+                    db,
+                    user=user,
+                    provider=provider,
+                    provider_user_id=verified.provider_user_id,
+                    email=verified.email,
+                    raw_profile=raw_profile,
+                )
+                _apply_social_full_name(db, user, payload.full_name)
+        else:
+            raise social_email_unavailable()
+
+        if user is None:
+            if not verified.email:
+                raise social_email_unavailable()
+
+            user = User(
+                email=verified.email,
+                password_hash=None,
+                role=UserRole(payload.role.value),
+                is_active=True,
+                registration_complete=False,
+            )
+            db.add(user)
+            db.flush()
+            is_new = True
+
+            _upsert_auth_identity(
+                db,
+                user=user,
+                provider=provider,
+                provider_user_id=verified.provider_user_id,
+                email=verified.email,
+                raw_profile=raw_profile,
+            )
+            _apply_social_full_name(db, user, payload.full_name)
+
+    user.last_login_at = datetime.now(timezone.utc)
+    access_token, refresh_token = _issue_tokens(db, user, settings)
+    db.commit()
+    db.refresh(user)
+
+    return SocialAuthResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=SocialAuthUser(
+            id=str(user.id),
+            email=user.email,
+            role=payload.role,
+            is_new=is_new,
+            registration_complete=user.registration_complete,
+        ),
+    )
 
 
 def check_email(
@@ -215,6 +458,7 @@ def login_user(
         user is None
         or not user.is_active
         or user.role.value != payload.role.value
+        or user.password_hash is None
         or not verify_password(payload.password, user.password_hash)
     ):
         raise invalid_credentials()
@@ -273,11 +517,16 @@ def delete_account(
     payload: DeleteAccountRequest | None = None,
 ) -> OkResponse:
     if payload and payload.password is not None:
-        if not verify_password(payload.password, user.password_hash):
+        if user.password_hash is None or not verify_password(
+            payload.password, user.password_hash
+        ):
             raise invalid_credentials()
 
     user.deleted_at = datetime.now(timezone.utc)
     user.is_active = False
+    db.query(AuthIdentity).filter(AuthIdentity.user_id == user.id).delete(
+        synchronize_session=False
+    )
     _revoke_all_refresh_tokens(db, user.id)
     db.commit()
     return OkResponse(ok=True)
@@ -288,6 +537,9 @@ def change_password(
     user: User,
     payload: ChangePasswordRequest,
 ) -> OkResponse:
+    if user.password_hash is None:
+        raise password_not_set()
+
     if not verify_password(payload.current_password, user.password_hash):
         raise invalid_credentials()
 

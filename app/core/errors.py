@@ -238,3 +238,120 @@ def rate_limited() -> MainAPIException:
         },
         http_status=status.HTTP_429_TOO_MANY_REQUESTS,
     )
+
+
+def invalid_social_auth_request() -> MainAPIException:
+    return MainAPIException(
+        type="validation",
+        code=120,
+        message="Invalid social auth request",
+        localized_message={
+            "en": "Invalid provider, token, or role",
+            "ar": "مزود أو رمز أو دور غير صالح",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def invalid_social_token() -> MainAPIException:
+    return MainAPIException(
+        type="auth",
+        code=121,
+        message="Invalid social ID token",
+        localized_message={
+            "en": "Sign-in token is invalid or expired",
+            "ar": "رمز تسجيل الدخول غير صالح أو منتهي الصلاحية",
+        },
+        http_status=status.HTTP_401_UNAUTHORIZED,
+    )
+
+
+def social_nonce_mismatch() -> MainAPIException:
+    return MainAPIException(
+        type="auth",
+        code=122,
+        message="Apple nonce mismatch",
+        localized_message={
+            "en": "Sign-in verification failed. Please try again.",
+            "ar": "فشل التحقق من تسجيل الدخول. يرجى المحاولة مرة أخرى.",
+        },
+        http_status=status.HTTP_401_UNAUTHORIZED,
+    )
+
+
+def social_email_unavailable() -> MainAPIException:
+    return MainAPIException(
+        type="auth",
+        code=123,
+        message="Email unavailable from provider",
+        localized_message={
+            "en": "Email unavailable; use the same Apple ID or continue with email",
+            "ar": "البريد الإلكتروني غير متاح؛ استخدم نفس Apple ID أو تابع بالبريد",
+        },
+        http_status=status.HTTP_401_UNAUTHORIZED,
+    )
+
+
+def social_role_mismatch() -> MainAPIException:
+    return MainAPIException(
+        type="auth",
+        code=124,
+        message="Role mismatch",
+        localized_message={
+            "en": "This email is registered with a different account type",
+            "ar": "هذا البريد مسجل بنوع حساب مختلف",
+        },
+        http_status=status.HTTP_409_CONFLICT,
+    )
+
+
+def social_identity_conflict() -> MainAPIException:
+    return MainAPIException(
+        type="auth",
+        code=125,
+        message="Social identity conflict",
+        localized_message={
+            "en": "This account is already linked to a different sign-in method",
+            "ar": "هذا الحساب مرتبط بالفعل بطريقة تسجيل دخول مختلفة",
+        },
+        http_status=status.HTTP_409_CONFLICT,
+    )
+
+
+def social_account_disabled() -> MainAPIException:
+    return MainAPIException(
+        type="auth",
+        code=126,
+        message="Account disabled",
+        localized_message={
+            "en": "This account is disabled or unavailable",
+            "ar": "هذا الحساب معطل أو غير متاح",
+        },
+        http_status=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def social_provider_unavailable() -> MainAPIException:
+    return MainAPIException(
+        type="auth",
+        code=127,
+        message="Social sign-in provider unavailable",
+        localized_message={
+            "en": "Sign-in service is temporarily unavailable. Please try again later.",
+            "ar": "خدمة تسجيل الدخول غير متاحة مؤقتاً. يرجى المحاولة لاحقاً.",
+        },
+        http_status=status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+
+
+def password_not_set() -> MainAPIException:
+    return MainAPIException(
+        type="auth",
+        code=128,
+        message="Password not set",
+        localized_message={
+            "en": "Set a password first before changing it",
+            "ar": "قم بتعيين كلمة مرور أولاً قبل تغييرها",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )

@@ -3,22 +3,32 @@
 Tables:
   - users
   - refresh_tokens
+  - auth_identities
 """
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Index, String
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db.base import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
-from app.models.enums import UserRole
+from app.models.enums import AuthProvider, UserRole
 
 
 class User(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "users"
 
     email = Column(String(255), nullable=False, unique=True)
-    password_hash = Column(String(255), nullable=False)
+    password_hash = Column(String(255), nullable=True)
     role = Column(Enum(UserRole, name="user_role", create_type=True), nullable=False)
     is_active = Column(Boolean, nullable=False, server_default="true")
     registration_complete = Column(Boolean, nullable=False, server_default="false")
@@ -26,6 +36,11 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     suspended_until = Column(DateTime(timezone=True), nullable=True)
 
     refresh_tokens = relationship("RefreshToken", back_populates="user")
+    auth_identities = relationship(
+        "AuthIdentity",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     ventor_profile = relationship(
         "VentorProfile", back_populates="user", uselist=False
     )
@@ -60,3 +75,28 @@ class RefreshToken(Base, UUIDPrimaryKeyMixin):
     user = relationship("User", back_populates="refresh_tokens")
 
     __table_args__ = (Index("ix_refresh_tokens_user_id", "user_id"),)
+
+
+class AuthIdentity(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    __tablename__ = "auth_identities"
+
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    provider = Column(
+        Enum(AuthProvider, name="auth_provider", create_type=True),
+        nullable=False,
+    )
+    provider_user_id = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=True)
+    raw_profile = Column(JSONB, nullable=True)
+
+    user = relationship("User", back_populates="auth_identities")
+
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_user_id", name="uq_auth_identities_provider_sub"),
+        UniqueConstraint("user_id", "provider", name="uq_auth_identities_user_provider"),
+        Index("ix_auth_identities_user_id", "user_id"),
+    )

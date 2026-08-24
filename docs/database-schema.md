@@ -171,7 +171,7 @@ Core login identity. One row per account.
 |--------|------|-------|
 | `id` | UUID | **PK** |
 | `email` | VARCHAR(255) | **UQ**, lowercased |
-| `password_hash` | VARCHAR(255) | |
+| `password_hash` | VARCHAR(255) | ? nullable for social-only accounts |
 | `role` | `user_role` | ventor \| listener |
 | `is_active` | BOOLEAN | default true |
 | `registration_complete` | BOOLEAN | default false |
@@ -197,6 +197,27 @@ Core login identity. One row per account.
 | `created_at` | TIMESTAMPTZ | |
 
 **Indexes:** `IDX(user_id)`, `UQ(token_hash)`
+
+---
+
+### 3. `auth_identities`
+
+Links a user to Google or Apple (`provider` + token `sub`).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | **PK** |
+| `user_id` | UUID | **FK → users** ON DELETE CASCADE |
+| `provider` | `auth_provider` | google \| apple |
+| `provider_user_id` | VARCHAR(255) | token `sub` |
+| `email` | VARCHAR(255) | ? last known provider email |
+| `raw_profile` | JSONB | ? non-secret claims / Apple name snapshot |
+| `created_at` | TIMESTAMPTZ | |
+| `updated_at` | TIMESTAMPTZ | |
+
+**Constraints:** `UQ(provider, provider_user_id)`, `UQ(user_id, provider)`
+
+**Indexes:** `IDX(user_id)`
 
 ---
 
