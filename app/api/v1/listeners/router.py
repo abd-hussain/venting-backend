@@ -1,6 +1,8 @@
 from uuid import UUID
 
-from fastapi import APIRouter, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, File, Form, Query, Request, UploadFile, status
+
+from app.api.v1.listeners.parse import parse_register_form
 
 from app.api.deps import (
     CurrentListener,
@@ -70,71 +72,18 @@ router = APIRouter()
     summary="Complete listener registration (steps 1–9)",
 )
 async def register(
+    request: Request,
     current_user: CurrentListener,
     db: DbSession,
     settings: SettingsDep,
-    full_name: str = Form(...),
-    phone: str | None = Form(None),
-    phone_country: str | None = Form(None),
-    agreed_to_terms: str = Form(...),
-    date_of_birth: str | None = Form(None),
-    country_iso: str | None = Form(None),
-    city: str | None = Form(None),
-    language_ids: str = Form(..., description='JSON array, e.g. ["en","ar"]'),
-    life_experience_ids: str | None = Form(None),
-    custom_experiences: str | None = Form(None),
-    comfort_area_ids: str = Form(...),
-    custom_comfort_area_text: str | None = Form(None),
-    boundary_ids: str | None = Form(None),
-    custom_boundary_text: str | None = Form(None),
-    availability: str | None = Form(None, description="JSON availability object (#37)"),
-    accept_instant_calls: str | None = Form("true"),
-    session_minutes: int | None = Form(None),
-    notifications_enabled: str | None = Form("true"),
-    fcm_token: str | None = Form(None),
-    voice_intro_seconds: int | None = Form(None),
-    avatar: UploadFile | None = File(None),
-    document_front: UploadFile | None = File(None),
-    document_back: UploadFile | None = File(None),
-    identity_document: UploadFile | None = File(
-        None, description="Legacy alias for document_front"
-    ),
-    identity_document_front: UploadFile | None = File(None),
-    identity_document_back: UploadFile | None = File(None),
-    selfie: UploadFile | None = File(None),
-    voice_intro: UploadFile | None = File(None),
 ):
+    form = await request.form()
+    fields = parse_register_form(form)
     data = await register_listener(
         db,
         current_user,
         settings=settings,
-        full_name=full_name,
-        phone=phone,
-        phone_country=phone_country,
-        agreed_to_terms=agreed_to_terms,
-        date_of_birth=date_of_birth,
-        country_iso=country_iso,
-        city=city,
-        language_ids_raw=language_ids,
-        life_experience_ids_raw=life_experience_ids,
-        custom_experiences_raw=custom_experiences,
-        comfort_area_ids_raw=comfort_area_ids,
-        custom_comfort_area_text=custom_comfort_area_text,
-        boundary_ids_raw=boundary_ids,
-        custom_boundary_text=custom_boundary_text,
-        availability_raw=availability,
-        accept_instant_calls=accept_instant_calls,
-        session_minutes=session_minutes,
-        notifications_enabled=notifications_enabled,
-        fcm_token=fcm_token,
-        avatar=avatar,
-        document_front=document_front or identity_document_front or identity_document,
-        document_back=document_back or identity_document_back,
-        identity_document_front=identity_document_front or identity_document,
-        identity_document_back=identity_document_back,
-        selfie=selfie,
-        voice_intro=voice_intro,
-        voice_intro_seconds=voice_intro_seconds,
+        **fields,
     )
     return success_response(data.model_dump(mode="json"), status_code=status.HTTP_201_CREATED)
 

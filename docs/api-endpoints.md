@@ -662,8 +662,24 @@ Form fields (repeat `language_ids` / `interest_ids` once per value):
 | `comfort_area_ids`, `custom_comfort_area_text?` | 5 | string[] / string |
 | `boundary_ids`, `custom_boundary_text?` | 6 | string[] / string |
 | `voice_intro`, `voice_intro_seconds?` | 7 | audio multipart / int |
-| `availability` (JSON — `#37` days/slots shape), `accept_instant_calls`, `session_minutes` | 8 | object / bool / int[] |
+| `availability` (JSON — `#37` days/slots shape), `accept_instant_calls`, `session_minutes` | 8 | object / bool / **int** (preferred session length in minutes; if UI allows 30+60, send shortest selected, e.g. `30`) |
 | `notifications_enabled`, `fcm_token?` | 9 | bool / string \| null — **`fcm_token` omitted or `null` when permission denied**; registration must still succeed |
+
+#### Multipart encoding (`#22`)
+
+When using `multipart/form-data` (required for file uploads), **array and object fields must be JSON-encoded strings** — do **not** repeat the same field name per item (Heroku returns `422` for repeated `language_ids`).
+
+| Field | Multipart value example |
+|-------|-------------------------|
+| `language_ids` | `["en","ar"]` |
+| `life_experience_ids` | `["single","parent","stress_anxiety"]` |
+| `custom_experiences` | `["Career change"]` |
+| `comfort_area_ids` | `["relationships","other"]` |
+| `boundary_ids` | `["suicide_self_harm"]` |
+| `session_minutes` | `30` (integer string, not JSON array) |
+| `availability` | `{"time_zone_id":"America/Chicago","days":[...]}` |
+
+Scalars (`agreed_to_terms`, `accept_instant_calls`, `notifications_enabled`) are sent as `"true"` / `"false"` strings. `fcm_token` is omitted when null.
 
 **Efficiency note:** Prefer one submit at end (`POST`) + optional `PATCH /v1/listeners/me/registration/{step}` for resume. If you split by step, keep the same field names.
 
