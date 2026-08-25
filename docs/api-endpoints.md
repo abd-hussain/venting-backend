@@ -63,7 +63,7 @@ List responses may include:
 
 | Domain | Count | Master list # |
 |--------|------:|---------------|
-| Auth & account | 9 | 0–7, 1b |
+| Auth & account | 11 | 0–7, 1b, 2b–2c |
 | Ventor profile / home / wellness | 14 | 8–21 |
 | Listener profile / onboarding / dashboard | 15 | 22–36 |
 | Listener availability | 3 | 37–39 |
@@ -75,7 +75,7 @@ List responses may include:
 | Training | 2 | 71–72 |
 | Promo | 1 | 73 |
 | Catalog / categories | 2 | 74–75 |
-| **Total** | **77** | |
+| **Total** | **79** | |
 
 ---
 
@@ -203,6 +203,120 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 | **Screen** | Email registration (sign-in path) |
 | **Body** | `email`, `password`, `role` (`ventor` \| `listener`) |
 | **Response** | `access_token`, `refresh_token`, `user` `{ id, email, role, registration_complete }` |
+
+---
+
+### 2b. `POST /v1/auth/forgot-password`
+
+> **Status:** Implemented on backend.  
+> **Purpose:** Start a **secure password reset**. Sends an email with a one-time link to a branded reset page.  
+> **Does not** authenticate the user or reveal whether the email exists.
+
+| | |
+|--|--|
+| **Auth** | Public |
+| **Screen** | Forgot password confirmation (after wrong credentials on email login) |
+| **When** | User confirms email and taps Continue |
+| **Body** | `email` (string, required), `role` (`ventor` \| `listener`, required), optional `locale` (`en` \| `ar`) |
+| **Response** | Always `{ email, sent: true }` on HTTP 200 when request is well-formed (anti-enumeration) |
+
+#### Request
+
+```json
+{
+  "email": "user@example.com",
+  "role": "ventor",
+  "locale": "en"
+}
+```
+
+#### Success
+
+```json
+{
+  "status": "success",
+  "data": {
+    "email": "user@example.com",
+    "sent": true
+  }
+}
+```
+
+#### Security rules (required)
+
+- Generate a **cryptographically random** token (≥ 32 bytes), store only a **hash** (e.g. SHA-256) in `password_reset_tokens`.
+- Token TTL: **60 minutes**, single-use. Invalidate previous unused tokens for the same user on new request.
+- Email link: `{webContentBaseUrl}/auth/{locale}/reset-password.html?token={rawToken}`  
+  Shared host: `https://venting-3a5ebaed4621.herokuapp.com`
+- Rate-limit by IP + email (e.g. 5 / hour).
+- Do **not** return different errors for unknown emails (always same success shape).
+- Reset emails are for **email/password accounts only** (skip send quietly for social-only accounts, still return success).
+
+#### Errors
+
+| HTTP | type | code | When |
+|------|------|------|------|
+| 400 | validation | 210 | Invalid email / role / locale |
+| 429 | rate_limit | 211 | Too many requests |
+| 500 | server | 500 | Unexpected failure |
+
+#### Acceptance
+
+- [x] Public endpoint; no Bearer required
+- [x] Email contains branded HTML (Venting dark/purple) + clear CTA button
+- [x] Link opens locale-matched static reset page with token query param
+- [ ] Mobile shows success after Continue without leaking account existence
+
+---
+
+### 2c. `POST /v1/auth/reset-password`
+
+> **Status:** Implemented on backend.  
+> **Purpose:** Set a new password using a valid one-time token from the email link.
+
+| | |
+|--|--|
+| **Auth** | Public (token in body) |
+| **Caller** | Reset password HTML page (`/auth/{locale}/reset-password.html`) |
+| **Body** | `token` (string), `password` (string) |
+| **Password rules** | Same as register: min 8, 1 uppercase, 1 number |
+
+#### Request
+
+```json
+{
+  "token": "raw-token-from-email-link",
+  "password": "NewPass1"
+}
+```
+
+#### Success
+
+```json
+{
+  "status": "success",
+  "data": {
+    "email": "user@example.com",
+    "reset": true
+  }
+}
+```
+
+#### Security rules
+
+- Look up by **hash(token)**; reject if missing, expired, or already used.
+- Mark token used in the same DB transaction as password update.
+- Invalidate all refresh sessions for that user after reset (force re-login).
+- Do not leak whether token was invalid vs expired in a way that aids attacks — use generic “invalid or expired link”.
+
+#### Errors
+
+| HTTP | type | code | When |
+|------|------|------|------|
+| 400 | validation | 220 | Weak password / missing fields |
+| 400 | auth | 221 | Invalid or expired token |
+| 429 | rate_limit | 222 | Too many attempts |
+| 500 | server | 500 | Unexpected failure |
 
 ---
 
@@ -1489,7 +1603,11 @@ Empty → `200` + `items: []`.
 
 ### Static legal & help pages *(not REST — no server API round-trip for metadata)*
 
-Ship **6** static files under a single `webContentBaseUrl` (same for all flavors): `https://venting-3a5ebaed4621.herokuapp.com`. Source HTML lives in [`docs/static-web/`](./static-web/README.md) and is served by this API at `/legal/…` and `/help/…`.
+Ship **6** static files under one shared `webContentBaseUrl` for both flavors:
+
+`https://venting-3a5ebaed4621.herokuapp.com`
+
+Source HTML lives in [`docs/static-web/`](./static-web/README.md).
 
 | Page | EN | AR |
 |------|----|----|
@@ -1498,6 +1616,11 @@ Ship **6** static files under a single `webContentBaseUrl` (same for all flavors
 | Help & Support | `/help/en/index.html` | `/help/ar/index.html` |
 
 Mobile picks locale from the app language and opens the matching URL (Help tiles append `#fragment` anchors on the same help page). **No** `GET /v1/legal/*` or `GET /v1/help/*` endpoints.
+
+| Reset password (EN) | `/auth/en/reset-password.html?token=…` |
+| Reset password (AR) | `/auth/ar/reset-password.html?token=…` |
+
+Password reset pages are opened from the **email link** (browser / OS), not from an in-app REST metadata call. APIs: `#2b` forgot-password · `#2c` reset-password.
 
 ---
 
@@ -1517,7 +1640,7 @@ Mobile picks locale from the app language and opens the matching URL (Help tiles
 | Training | 2 |
 | Promo | 1 |
 | Catalog / categories | 2 |
-| **Total unique API endpoints** | **77** |
+| **Total unique API endpoints** | **79** |
 
 ### Master checklist (method + path)
 
@@ -1526,6 +1649,8 @@ Mobile picks locale from the app language and opens the matching URL (Help tiles
 | 0 | POST | `/v1/auth/check-email` *(proposed)* |
 | 1 | POST | `/v1/auth/register` |
 | 2 | POST | `/v1/auth/login` |
+| 2b | POST | `/v1/auth/forgot-password` |
+| 2c | POST | `/v1/auth/reset-password` |
 | 1b | POST | `/v1/auth/social` *(proposed)* |
 | 3 | POST | `/v1/auth/refresh` |
 | 4 | POST | `/v1/auth/logout` |
@@ -1605,7 +1730,7 @@ Mobile picks locale from the app language and opens the matching URL (Help tiles
 
 ## Final count
 
-**Total unique API endpoints: 77**
+**Total unique API endpoints: 79**
 
 **Live / wired in the mobile app today: 0** (auth + catalog clients exist; backend contracts still proposed where marked). Static legal/help HTML is separate from this REST count.
 

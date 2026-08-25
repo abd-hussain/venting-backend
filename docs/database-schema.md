@@ -32,7 +32,8 @@
 |--:|-------|--------|
 | 1 | `users` | Auth |
 | 2 | `refresh_tokens` | Auth |
-| 2b | `auth_identities` | Auth (social — proposed) |
+| 2b | `auth_identities` | Auth — social |
+| 2c | `password_reset_tokens` | Auth — forgot-password one-time links |
 | 3 | `ventor_profiles` | Ventor |
 | 4 | `listener_profiles` | Listener |
 | 5 | `listener_identity_verifications` | Listener onboarding |
@@ -225,6 +226,23 @@ Links a Venting user to a Google or Apple identity (`sub`).
 | `updated_at` | TIMESTAMPTZ | |
 
 **Indexes:** `UQ(provider, provider_user_id)`, `UQ(user_id, provider)`
+
+### 2c. `password_reset_tokens`
+
+Used by `#2b forgot-password` / `#2c reset-password`. Store **hash only**, never the raw email token.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | **PK** |
+| `user_id` | UUID | **FK → users** |
+| `token_hash` | VARCHAR(128) | **UQ** — SHA-256 (or stronger) of raw token |
+| `expires_at` | TIMESTAMPTZ | typically now + 60 minutes |
+| `used_at` | TIMESTAMPTZ | ? set on successful reset |
+| `requested_ip` | VARCHAR(64) | ? |
+| `locale` | VARCHAR(8) | `en` \| `ar` — for email + link |
+| `created_at` | TIMESTAMPTZ | |
+
+**Indexes:** `UQ(token_hash)`, `IDX(user_id)`, `IDX(expires_at)`
 
 ---
 
@@ -950,7 +968,7 @@ Append-only money movement (earnings chart + audit).
 
 | API area | Primary tables |
 |----------|----------------|
-| Auth 0–7, 1b | `users`, `refresh_tokens`, `auth_identities` *(proposed)* |
+| Auth 0–7, 1b, 2b–2c | `users`, `refresh_tokens`, `auth_identities` *(proposed)*, `password_reset_tokens` |
 | Catalog 74–75 | `comfort_areas` (`icon_emoji` / `icon_url`), `languages` (`flag_emoji` / `flag_url`) — portal-managed; one languages table for all speaking-language UIs |
 | Ventor profile / home | `ventor_profiles`, `mood_checkins`, `ventor_favorites`, `sessions` |
 | Listener profile / setup | `listener_profiles`, identity, tag junctions, training |

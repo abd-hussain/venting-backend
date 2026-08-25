@@ -4,6 +4,7 @@ Tables:
   - users
   - refresh_tokens
   - auth_identities
+  - password_reset_tokens
 """
 
 from sqlalchemy import (
@@ -99,4 +100,29 @@ class AuthIdentity(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         UniqueConstraint("provider", "provider_user_id", name="uq_auth_identities_provider_sub"),
         UniqueConstraint("user_id", "provider", name="uq_auth_identities_user_provider"),
         Index("ix_auth_identities_user_id", "user_id"),
+    )
+
+
+class PasswordResetToken(Base, UUIDPrimaryKeyMixin):
+    __tablename__ = "password_reset_tokens"
+
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    token_hash = Column(String(128), nullable=False, unique=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+    requested_ip = Column(String(64), nullable=True)
+    locale = Column(String(8), nullable=False, server_default="en")
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_password_reset_tokens_user_id", "user_id"),
+        Index("ix_password_reset_tokens_expires_at", "expires_at"),
     )

@@ -368,3 +368,68 @@ def invalid_catalog_audience() -> MainAPIException:
         },
         http_status=status.HTTP_400_BAD_REQUEST,
     )
+
+
+def invalid_forgot_password_request() -> MainAPIException:
+    return MainAPIException(
+        type="validation",
+        code=210,
+        message="Invalid email, role, or locale",
+        localized_message={
+            "en": "Invalid email, role, or locale",
+            "ar": "البريد أو الدور أو اللغة غير صالحة",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def forgot_password_rate_limited() -> MainAPIException:
+    return MainAPIException(
+        type="rate_limit",
+        code=211,
+        message="Too many password reset requests",
+        localized_message={
+            "en": "Too many password reset requests. Please try again later.",
+            "ar": "محاولات كثيرة لإعادة تعيين كلمة المرور. حاول لاحقاً.",
+        },
+        http_status=status.HTTP_429_TOO_MANY_REQUESTS,
+    )
+
+
+def invalid_reset_password() -> MainAPIException:
+    return MainAPIException(
+        type="validation",
+        code=220,
+        message="Weak or missing password",
+        localized_message={
+            "en": "Password must be at least 8 characters and include 1 uppercase letter and 1 number",
+            "ar": "يجب أن تكون كلمة المرور 8 أحرف على الأقل وتحتوي على حرف كبير ورقم",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def invalid_or_expired_reset_token() -> MainAPIException:
+    return MainAPIException(
+        type="auth",
+        code=221,
+        message="Invalid or expired reset link",
+        localized_message={
+            "en": "This reset link is invalid or has expired",
+            "ar": "رابط إعادة التعيين غير صالح أو منتهي الصلاحية",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def reset_password_rate_limited() -> MainAPIException:
+    return MainAPIException(
+        type="rate_limit",
+        code=222,
+        message="Too many reset attempts",
+        localized_message={
+            "en": "Too many reset attempts. Please try again later.",
+            "ar": "محاولات كثيرة لإعادة التعيين. حاول لاحقاً.",
+        },
+        http_status=status.HTTP_429_TOO_MANY_REQUESTS,
+    )

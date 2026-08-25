@@ -163,3 +163,39 @@ class SocialAuthResponse(BaseModel):
     access_token: str
     refresh_token: str
     user: SocialAuthUser
+
+
+class ForgotPasswordLocale(str, Enum):
+    en = "en"
+    ar = "ar"
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+    role: AuthRole
+    locale: ForgotPasswordLocale = ForgotPasswordLocale.en
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
+
+
+class ForgotPasswordResponse(BaseModel):
+    email: str
+    sent: bool = True
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=512)
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_rules(cls, value: str) -> str:
+        return _validate_password_strength(value)
+
+
+class ResetPasswordResponse(BaseModel):
+    email: str
+    reset: bool = True

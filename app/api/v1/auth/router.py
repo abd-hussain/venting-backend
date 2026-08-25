@@ -6,6 +6,8 @@ from app.api.v1.auth.schemas import (
     CheckEmailRequest,
     CheckEmailResponse,
     DeleteAccountRequest,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     LoginRequest,
     LoginResponse,
     LogoutRequest,
@@ -15,6 +17,8 @@ from app.api.v1.auth.schemas import (
     RefreshResponse,
     RegisterRequest,
     RegisterResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
     SocialAuthRequest,
     SocialAuthResponse,
 )
@@ -27,6 +31,8 @@ from app.api.v1.auth.service import (
     logout_user,
     refresh_tokens,
     register_user,
+    request_password_reset,
+    reset_password_with_token,
     social_login,
 )
 from app.core.responses import success_response
@@ -127,6 +133,47 @@ def login(
     settings: SettingsDep,
 ):
     data = login_user(db, body, settings)
+    return success_response(data.model_dump())
+
+
+@router.post(
+    "/forgot-password",
+    response_model=APISuccessResponse[ForgotPasswordResponse],
+    responses={
+        400: {"model": APIErrorResponse},
+        429: {"model": APIErrorResponse},
+    },
+    summary="Start password reset (always returns sent=true)",
+)
+def forgot_password(
+    body: ForgotPasswordRequest,
+    request: Request,
+    db: DbSession,
+    settings: SettingsDep,
+):
+    client_ip = request.client.host if request.client else None
+    data = request_password_reset(
+        db, body, settings, client_ip=client_ip
+    )
+    return success_response(data.model_dump())
+
+
+@router.post(
+    "/reset-password",
+    response_model=APISuccessResponse[ResetPasswordResponse],
+    responses={
+        400: {"model": APIErrorResponse},
+        429: {"model": APIErrorResponse},
+    },
+    summary="Set a new password using an email reset token",
+)
+def reset_password(
+    body: ResetPasswordRequest,
+    request: Request,
+    db: DbSession,
+):
+    client_ip = request.client.host if request.client else None
+    data = reset_password_with_token(db, body, client_ip=client_ip)
     return success_response(data.model_dump())
 
 

@@ -39,6 +39,15 @@ class Settings(BaseSettings):
     support_email: str = "support@venting.app"
     support_whatsapp: str = ""
 
+    # Outbound email (password reset). Leave SMTP_HOST empty to log links in debug.
+    mail_from: str = "noreply@venting.app"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
+
     # Admin portal / GA4 embed (A97)
     ga4_measurement_id: str = ""
 

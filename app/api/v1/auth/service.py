@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
@@ -12,6 +13,8 @@ from app.api.v1.auth.schemas import (
     CheckEmailRequest,
     CheckEmailResponse,
     DeleteAccountRequest,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     LoggedInUser,
     LoginRequest,
     LoginResponse,
@@ -23,6 +26,8 @@ from app.api.v1.auth.schemas import (
     RegisterRequest,
     RegisterResponse,
     RegisteredUser,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
     SocialAuthRequest,
     SocialAuthResponse,
     SocialAuthUser,
@@ -33,10 +38,13 @@ from app.core.errors import (
     account_disabled,
     auth_role_mismatch,
     email_already_registered,
+    forgot_password_rate_limited,
     invalid_credentials,
+    invalid_or_expired_reset_token,
     invalid_social_token,
     password_not_set,
     rate_limited,
+    reset_password_rate_limited,
     social_account_disabled,
     social_email_unavailable,
     social_identity_conflict,
@@ -45,7 +53,12 @@ from app.core.errors import (
     social_role_mismatch,
     unauthorized,
 )
-from app.core.rate_limit import check_email_limiter, social_auth_limiter
+from app.core.rate_limit import (
+    check_email_limiter,
+    forgot_password_limiter,
+    reset_password_limiter,
+    social_auth_limiter,
+)
 from app.core.security import (
     create_access_token,
     generate_refresh_token,
@@ -53,7 +66,8 @@ from app.core.security import (
     hash_token,
     verify_password,
 )
-from app.models.auth import AuthIdentity, RefreshToken, User
+from app.models.auth import AuthIdentity, PasswordResetToken, RefreshToken, User
+from app.services.email import send_password_reset_email
 from app.models.enums import AuthProvider, ProfileStatus, UserRole
 from app.models.profiles import ListenerProfile, VentorProfile
 from app.services.social_tokens import (
@@ -585,3 +599,108 @@ def get_me(db: Session, user: User) -> MeResponse:
         registration_complete=user.registration_complete,
         listener_profile_status=listener_profile_status,
     )
+
+
+PASSWORD_RESET_TTL = timedelta(minutes=60)
+
+
+def request_password_reset(
+    db: Session,
+    payload: ForgotPasswordRequest,
+    settings: Settings,
+    *,
+    client_ip: str | None = None,
+) -> ForgotPasswordResponse:
+    email = payload.email
+    if client_ip and not forgot_password_limiter.allow(f"ip:{client_ip}"):
+        raise forgot_password_rate_limited()
+    if not forgot_password_limiter.allow(f"email:{email}"):
+        raise forgot_password_rate_limited()
+
+    locale = payload.locale.value
+    response = ForgotPasswordResponse(email=email, sent=True)
+
+    user = (
+        db.query(User)
+        .filter(User.email == email, User.deleted_at.is_(None))
+        .one_or_none()
+    )
+    # Anti-enumeration: same response for unknown / wrong role / social-only.
+    if (
+        user is None
+        or not user.is_active
+        or user.role.value != payload.role.value
+        or user.password_hash is None
+    ):
+        return response
+
+    now = datetime.now(timezone.utc)
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.used_at.is_(None),
+    ).update(
+        {PasswordResetToken.used_at: now},
+        synchronize_session=False,
+    )
+
+    raw_token = secrets.token_urlsafe(32)
+    db.add(
+        PasswordResetToken(
+            user_id=user.id,
+            token_hash=hash_token(raw_token),
+            expires_at=now + PASSWORD_RESET_TTL,
+            requested_ip=client_ip,
+            locale=locale,
+        )
+    )
+    db.commit()
+
+    reset_url = (
+        f"{settings.web_content_base_url.rstrip('/')}"
+        f"/auth/{locale}/reset-password.html?token={raw_token}"
+    )
+    send_password_reset_email(
+        settings=settings,
+        to_email=user.email,
+        locale=locale,
+        reset_url=reset_url,
+    )
+    return response
+
+
+def reset_password_with_token(
+    db: Session,
+    payload: ResetPasswordRequest,
+    *,
+    client_ip: str | None = None,
+) -> ResetPasswordResponse:
+    if client_ip and not reset_password_limiter.allow(f"ip:{client_ip}"):
+        raise reset_password_rate_limited()
+
+    token_hash = hash_token(payload.token.strip())
+    now = datetime.now(timezone.utc)
+    row = (
+        db.query(PasswordResetToken)
+        .filter(PasswordResetToken.token_hash == token_hash)
+        .one_or_none()
+    )
+    if (
+        row is None
+        or row.used_at is not None
+        or row.expires_at <= now
+    ):
+        raise invalid_or_expired_reset_token()
+
+    user = (
+        db.query(User)
+        .filter(User.id == row.user_id, User.deleted_at.is_(None))
+        .one_or_none()
+    )
+    if user is None or not user.is_active:
+        raise invalid_or_expired_reset_token()
+
+    user.password_hash = hash_password(payload.password)
+    row.used_at = now
+    _revoke_all_refresh_tokens(db, user.id)
+    db.commit()
+    return ResetPasswordResponse(email=user.email, reset=True)

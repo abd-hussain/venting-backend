@@ -42,6 +42,11 @@ def create_app() -> FastAPI:
         StaticFiles(directory=str(web_content / "help")),
         name="help-web",
     )
+    app.mount(
+        "/auth",
+        StaticFiles(directory=str(web_content / "auth")),
+        name="auth-web",
+    )
 
     # Platform / local probes at `/`; versioned API under `/v1`.
     app.include_router(health_router)
