@@ -78,6 +78,7 @@ from app.models.admin import (
     CmsPage,
     ModerationAction,
 )
+from app.models.legal import LegalDocument
 
 DEMO_PASSWORD = "Password123!"
 DEMO_ADMIN_PASSWORD = "Admin123!"
@@ -765,6 +766,53 @@ def seed_admin_cms(db: Session, mobile_ids: dict[str, uuid.UUID] | None = None) 
             existing.body_markdown = page["body_markdown"]
             existing.status = page["status"]
             existing.updated_by = content_id
+
+    # Legal document links (terms / privacy per locale)
+    legal_rows = [
+        {
+            "document": "terms",
+            "locale": "en",
+            "title": "Terms of Service",
+            "url": "https://cdn.venting.app/legal/en/terms.html",
+            "is_published": True,
+        },
+        {
+            "document": "terms",
+            "locale": "ar",
+            "title": "شروط الخدمة",
+            "url": "https://cdn.venting.app/legal/ar/terms.html",
+            "is_published": True,
+        },
+        {
+            "document": "privacy",
+            "locale": "en",
+            "title": "Privacy Policy",
+            "url": "https://cdn.venting.app/legal/en/privacy.html",
+            "is_published": True,
+        },
+        {
+            "document": "privacy",
+            "locale": "ar",
+            "title": "سياسة الخصوصية",
+            "url": "https://cdn.venting.app/legal/ar/privacy.html",
+            "is_published": True,
+        },
+    ]
+    for legal in legal_rows:
+        existing = (
+            db.query(LegalDocument)
+            .filter(
+                LegalDocument.document == legal["document"],
+                LegalDocument.locale == legal["locale"],
+            )
+            .one_or_none()
+        )
+        if existing is None:
+            db.add(LegalDocument(**legal))
+        else:
+            existing.title = legal["title"]
+            existing.url = legal["url"]
+            existing.is_published = legal["is_published"]
 
     # Banners — skip duplicates by title+placement
     banners = [

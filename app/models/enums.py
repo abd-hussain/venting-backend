@@ -155,7 +155,7 @@ class MoodKind(str, enum.Enum):
     angry = "angry"
 
 
-# --- Admin portal / CMS (docs/admin-portal-cms.md) ---
+# --- Admin portal / CMS ---
 
 
 class AdminStatus(str, enum.Enum):

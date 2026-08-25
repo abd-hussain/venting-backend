@@ -75,6 +75,7 @@
 | 41 | `listener_training_progress` | Training |
 | 42 | `promo_codes` | Promo |
 | 43 | `promo_redemptions` | Promo |
+| 43b | `legal_documents` | Legal — terms / privacy per locale (portal-editable) |
 
 | Band | Count |
 |------|------:|
@@ -90,7 +91,8 @@
 | Notifications | 1 |
 | Training | 2 |
 | Promo | 2 |
-| **Total** | **43** |
+| Legal | 1 |
+| **Total** | **44** |
 
 ---
 
@@ -909,6 +911,24 @@ Append-only money movement (earnings chart + audit).
 | `created_at` | TIMESTAMPTZ | |
 | | | **UQ (promo_code_id, ventor_id, session_id)** optional |
 
+### 43b. `legal_documents`
+
+Portal-editable Terms of Service / Privacy Policy links per locale. Mobile: `#76 GET /v1/legal/links`.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | **PK** |
+| `document` | VARCHAR(16) | `terms` \| `privacy` |
+| `locale` | VARCHAR(8) | `en` \| `ar` |
+| `title` | VARCHAR(128) | Localized display title |
+| `url` | TEXT | Absolute HTTPS URL for WebView |
+| `is_published` | BOOLEAN | default false — only published rows returned publicly |
+| `updated_at` | TIMESTAMPTZ | |
+| `created_at` | TIMESTAMPTZ | |
+| | | **UQ (document, locale)** |
+
+Seed both locales for `terms` and `privacy` before launch. Prefer this over storing legal URLs only in `app_config_kv`.
+
 ---
 
 ## Design choices (performance & efficiency)
@@ -929,7 +949,7 @@ Append-only money movement (earnings chart + audit).
 | Store privacy + notification prefs as JSONB on profiles | 4 | Harder to enforce bool columns / migrate |
 | Skip `promo_redemptions` (log only on `session_payments`) | 1 | Weaker promo abuse control |
 
-**Recommended production set: keep all 44.**
+**Recommended production set: keep all 44** (includes `legal_documents`).
 
 ---
 
@@ -963,6 +983,7 @@ Append-only money movement (earnings chart + audit).
 | Rewards / invites | `reward_offers`, `reward_trades`, `invite_codes`, `invite_events` |
 | Notifications | `notifications` |
 | Promo | `promo_codes`, `promo_redemptions` |
+| Legal `#76` | `legal_documents` (portal CMS `/cms/legal`) |
 
 ---
 

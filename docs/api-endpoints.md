@@ -75,7 +75,8 @@ List responses may include:
 | Training | 2 | 71–72 |
 | Promo | 1 | 73 |
 | Catalog / categories | 2 | 74–75 |
-| **Total** | **77** | |
+| Legal (terms / privacy) | 1 | 76 |
+| **Total** | **78** | |
 
 ---
 
@@ -1106,7 +1107,7 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 
 ---
 
-## 12. Catalog / categories
+## 12. Catalog / categories *(proposed)*
 
 > Shared lookup lists for registration and filters. Seeded in DB (`comfort_areas`, `languages`, …).  
 > Mobile **must not** hardcode category labels long-term — fetch from here.
@@ -1118,9 +1119,9 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 > - `#75` `GET /v1/catalog/languages`
 > (Listener registration may later add focused endpoints for life experiences / boundaries — never the mega dump.)
 
-### 74. `GET /v1/catalog/categories`
+### 74. `GET /v1/catalog/categories` *(proposed)*
 
-> **Status:** Implemented on backend.  
+> **Status:** Proposed — ventor registration interests from portal-managed `comfort_areas`.  
 > **Purpose:** Return active interest / comfort categories for ventor (and optionally listener) registration.  
 > **DB source:** `comfort_areas` (ids also used as `interest_ids` on `#8 POST /v1/ventors/register`).  
 > **Icons:** `icon_emoji` (like language `flag_emoji`) plus optional `icon_url` (CDN). Mobile does **not** map Material `icon_key`s.
@@ -1317,13 +1318,13 @@ Empty active catalog → still `200` with `"items": []` (mobile shows empty + re
 
 #### Acceptance criteria
 
-- [x] `GET /v1/catalog/categories?audience=ventor` returns active rows with `icon_emoji`
-- [x] Standard `{ status, data: { items } }` envelope
-- [x] Both `name_en` and `name_ar` present
-- [x] `other` has `allows_custom_text: true`
-- [x] Inactive rows omitted
-- [x] Same `id` values accepted by `#8` `interest_ids`
-- [x] Portal can create/update categories, set `icon_emoji`, and optionally upload/replace `icon_url`
+- [ ] `GET /v1/catalog/categories?audience=ventor` returns active rows with `icon_emoji`
+- [ ] Standard `{ status, data: { items } }` envelope
+- [ ] Both `name_en` and `name_ar` present
+- [ ] `other` has `allows_custom_text: true`
+- [ ] Inactive rows omitted
+- [ ] Same `id` values accepted by `#8` `interest_ids`
+- [ ] Portal can create/update categories, set `icon_emoji`, and optionally upload/replace `icon_url`
 #### Link to register
 
 | Step | API |
@@ -1346,9 +1347,9 @@ Optional body extension on `#8` when `other` selected:
 
 ---
 
-### 75. `GET /v1/catalog/languages`
+### 75. `GET /v1/catalog/languages` *(proposed)*
 
-> **Status:** Implemented on backend.  
+> **Status:** Proposed — ventor (and listener) speaking-language picker.  
 > **Purpose:** Return active spoken languages from the **single** `languages` table.  
 > **DB source:** `languages` only — there is **no** separate speaking-languages catalog.  
 > **Managed by:** Admin portal `/catalogs` → Languages (`A48`/`A49`).
@@ -1458,12 +1459,103 @@ Empty → `200` + `items: []`.
 
 #### Acceptance
 
-- [x] Public `GET /v1/catalog/languages` reads **only** from `languages`
-- [x] Each active item has a non-empty `flag_url` (HTTPS CDN)
-- [x] Seed includes en, hi, es, ar, bn, tr (minimum)
-- [x] `#8` accepts `language_ids` subset of active language ids → writes `ventor_languages`
-- [x] Portal can upsert languages and upload/replace flag images
+- [ ] Public `GET /v1/catalog/languages` reads **only** from `languages`
+- [ ] Each active item has a non-empty `flag_url` (HTTPS CDN)
+- [ ] Seed includes en, hi, es, ar, bn, tr (minimum)
+- [ ] `#8` accepts `language_ids` subset of active language ids → writes `ventor_languages`
+- [ ] Portal can upsert languages and upload/replace flag images
 - [ ] Search `q` filters server-side **or** mobile filters client-side (either OK for v1; prefer client filter for small lists)
+
+---
+
+## 13. Legal documents
+
+### 76. `GET /v1/legal/links`
+
+> **Status:** Implemented on backend.  
+> **Purpose:** Return **locale-specific** Terms of Service and Privacy Policy links for in-app WebViews.  
+> **Managed by:** Admin portal CMS (`/cms/legal`) — content role can edit title + URL per language.  
+> **Multi-language:** One row per `(document, locale)`; mobile sends app locale.
+
+| | |
+|--|--|
+| **Auth** | Public (Bearer accepted if present) |
+| **Screens** | Auth (Terms · Privacy), listener registration, About screens |
+| **When** | On tap (or prefetch at auth/welcome open) |
+| **Query** | `locale` = `en` \| `ar` (default from `Accept-Language` / `skel-accept-language`) |
+| **Response** | `{ locale, terms, privacy }` |
+
+#### `LegalDocumentLink` object
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `document` | string | yes | `terms` \| `privacy` |
+| `locale` | string | yes | Resolved locale (`en` / `ar`) |
+| `title` | string | yes | Localized display title |
+| `url` | string | yes | Absolute HTTPS URL opened in WebView |
+| `updated_at` | string | yes | ISO-8601 — for client cache invalidation |
+
+#### Success example
+
+```http
+GET /v1/legal/links?locale=ar
+Accept-Language: ar
+```
+
+```json
+{
+  "status": "success",
+  "data": {
+    "locale": "ar",
+    "terms": {
+      "document": "terms",
+      "locale": "ar",
+      "title": "شروط الخدمة",
+      "url": "https://cdn.venting.app/legal/ar/terms.html",
+      "updated_at": "2026-08-20T10:00:00Z"
+    },
+    "privacy": {
+      "document": "privacy",
+      "locale": "ar",
+      "title": "سياسة الخصوصية",
+      "url": "https://cdn.venting.app/legal/ar/privacy.html",
+      "updated_at": "2026-08-20T10:00:00Z"
+    }
+  }
+}
+```
+
+#### Rules
+
+- Only return **published** rows (`is_published = true`).
+- If `locale=ar` is missing a document, **fall back to `en`** for that document (still report resolved `locale` on the object).
+- URLs must be absolute HTTPS. Portal stores the URL (hosted page or CDN HTML).
+- Mobile may keep build-time `AppConfig` URLs as **offline fallback** only when this API fails.
+- Cache-friendly: `Cache-Control: public, max-age=300` recommended.
+
+#### Errors
+
+| HTTP | type | code | When |
+|------|------|------|------|
+| 400 | validation | 760 | Invalid `locale` |
+| 503 | server | 503 | No published legal docs at all |
+| 500 | server | 500 | Unexpected failure |
+
+#### Acceptance
+
+- [x] Public `GET /v1/legal/links?locale=en` and `?locale=ar`
+- [x] Both `terms` and `privacy` present when published
+- [x] Portal can edit title + URL per locale without an app release
+- [ ] Mobile auth footer Terms / Privacy open the locale-matched URL
+
+#### Portal admin APIs *(CMS — not mobile)*
+
+| Method | Path | Use |
+|--------|------|-----|
+| `GET` | `/v1/admin/legal/documents` | List all locales × documents |
+| `PUT` | `/v1/admin/legal/documents/{document}/{locale}` | Upsert title, url, is_published |
+
+`document` ∈ `terms` \| `privacy`; `locale` ∈ `en` \| `ar`.
 
 ---
 ## Efficiency guidelines (for implementers)
@@ -1481,11 +1573,12 @@ Empty → `200` + `items: []`.
 
 | URL | Use | 
 |-----|-----|
-| `{termsUrl}` | Terms WebView |
-| `{privacyUrl}` | Privacy WebView |
+| **Prefer `#76`** `GET /v1/legal/links` | Terms + Privacy (locale-aware, portal-editable) |
 | `{helpCenterBaseUrl}/…` | Help articles |
 | `mailto:support@venting.app` | Support email |
 | WhatsApp `wa.me` | Support / share |
+
+> Hardcoded `termsUrl` / `privacyUrl` in app flavors are **fallback only** until `#76` is live.
 
 ---
 
@@ -1505,7 +1598,8 @@ Empty → `200` + `items: []`.
 | Training | 2 |
 | Promo | 1 |
 | Catalog / categories | 2 |
-| **Total unique API endpoints** | **77** |
+| Legal links | 1 |
+| **Total unique API endpoints** | **78** |
 
 ### Master checklist (method + path)
 
@@ -1586,16 +1680,17 @@ Empty → `200` + `items: []`.
 | 71 | GET | `/v1/listeners/me/training` |
 | 72 | POST | `/v1/listeners/me/training/{moduleId}/complete` |
 | 73 | POST | `/v1/promo/validate` |
-| 74 | GET | `/v1/catalog/categories` |
-| 75 | GET | `/v1/catalog/languages` |
+| 74 | GET | `/v1/catalog/categories` *(proposed)* |
+| 75 | GET | `/v1/catalog/languages` *(proposed)* |
+| 76 | GET | `/v1/legal/links` |
 
 ---
 
 ## Final count
 
-**Total unique API endpoints: 73**
+**Total unique API endpoints: 78**
 
-**Live / wired in the mobile app today: 0**
+**Live / wired in the mobile app today: 0** (auth + catalog + legal clients exist; backend contracts still proposed where marked)
 
 ---
 

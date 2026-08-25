@@ -368,3 +368,42 @@ def invalid_catalog_audience() -> MainAPIException:
         },
         http_status=status.HTTP_400_BAD_REQUEST,
     )
+
+
+def invalid_legal_locale() -> MainAPIException:
+    return MainAPIException(
+        type="validation",
+        code=760,
+        message="Invalid locale",
+        localized_message={
+            "en": "locale must be en or ar",
+            "ar": "يجب أن تكون locale هي en أو ar",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def invalid_legal_document() -> MainAPIException:
+    return MainAPIException(
+        type="validation",
+        code=761,
+        message="Invalid document",
+        localized_message={
+            "en": "document must be terms or privacy",
+            "ar": "يجب أن يكون document هو terms أو privacy",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def legal_documents_unavailable() -> MainAPIException:
+    return MainAPIException(
+        type="server",
+        code=503,
+        message="Legal documents unavailable",
+        localized_message={
+            "en": "Legal documents are temporarily unavailable",
+            "ar": "المستندات القانونية غير متاحة مؤقتاً",
+        },
+        http_status=status.HTTP_503_SERVICE_UNAVAILABLE,
+    )

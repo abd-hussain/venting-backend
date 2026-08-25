@@ -1,4 +1,4 @@
-"""Admin portal API package — docs/admin-portal-cms.md."""
+"""Admin portal API package."""
 
 from app.api.v1.admin.router import router
 

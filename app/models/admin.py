@@ -1,12 +1,7 @@
-"""Admin portal / CMS tables — docs/admin-portal-cms.md § 4–5.
+"""Admin portal / CMS tables.
 
-Tables 44–55:
-  - admin_users, admin_roles, admin_user_roles
-  - admin_permissions, admin_role_permissions
-  - admin_audit_logs, admin_notes
-  - app_feature_flags, app_config_kv
-  - cms_pages, cms_banners
-  - moderation_actions
+Tables: admin_users, RBAC, audit, notes, feature flags, app_config_kv,
+cms_pages, cms_banners, moderation_actions.
 """
 
 from sqlalchemy import (

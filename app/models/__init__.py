@@ -1,7 +1,7 @@
 """
 Import all ORM models so Alembic autogenerate sees Base.metadata.
 
-See docs/database-schema.md (43 mobile) + docs/admin-portal-cms.md (12 CMS).
+See docs/database-schema.md.
 """
 
 from app.models import (  # noqa: F401
@@ -9,6 +9,7 @@ from app.models import (  # noqa: F401
     auth,
     availability,
     earnings,
+    legal,
     lookups,
     notifications,
     profiles,
@@ -25,6 +26,7 @@ __all__ = [
     "auth",
     "availability",
     "earnings",
+    "legal",
     "lookups",
     "notifications",
     "profiles",
