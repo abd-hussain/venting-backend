@@ -43,6 +43,7 @@ from app.models.profiles import ListenerProfile, VentorProfile
 from app.models.rewards import RewardOffer
 from app.models.sessions import Session as VentingSession
 from app.models.settings import VentorNotificationPreferences, VentorPrivacySettings
+from app.services.push_tokens import upsert_push_token
 from app.services.reward_offers import is_offer_expired
 from app.models.ventor_wellness import (
     Achievement,
@@ -270,6 +271,8 @@ async def register_ventor(
     other_interest_text: str | None,
     avatar: UploadFile | None,
     avatar_preset_index: int | None,
+    notifications_enabled: bool,
+    fcm_token: str | None,
     settings: Settings,
 ) -> VentorProfileResponse:
     if user.role != UserRole.ventor:
@@ -350,7 +353,13 @@ async def register_ventor(
             )
         )
     db.add(VentorPrivacySettings(ventor_id=user.id))
-    db.add(VentorNotificationPreferences(ventor_id=user.id))
+    db.add(
+        VentorNotificationPreferences(
+            ventor_id=user.id,
+            push_enabled=notifications_enabled,
+        )
+    )
+    upsert_push_token(db, user.id, fcm_token)
     user.registration_complete = True
     db.commit()
     db.refresh(profile)

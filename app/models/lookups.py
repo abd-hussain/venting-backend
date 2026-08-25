@@ -118,6 +118,7 @@ class ListenerComfortArea(Base):
         ForeignKey("comfort_areas.id", ondelete="CASCADE"),
         primary_key=True,
     )
+    custom_text = Column(Text, nullable=True)
 
 
 class ListenerLifeExperience(Base):
@@ -149,3 +150,4 @@ class ListenerBoundary(Base):
         ForeignKey("boundaries.id", ondelete="CASCADE"),
         primary_key=True,
     )
+    custom_text = Column(Text, nullable=True)

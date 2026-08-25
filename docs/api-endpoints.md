@@ -431,8 +431,8 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 | | |
 |--|--|
 | **Auth** | Bearer (user already authenticated via `#1` / `#1b` / `#2`; `registration_complete` still `false`) |
-| **Screen** | Ventor registration — **final step** (after profile → languages → interests) |
-| **When** | User taps Finish / “Go to Dashboard” on the interests step |
+| **Screen** | Ventor registration — **final step** (after profile → languages → interests → **notifications**) |
+| **When** | User taps **Enable Notifications** on the notifications step (submits `#8` immediately after) |
 | **Content-Type** | `application/json` **or** `multipart/form-data` (required when uploading `avatar` file) |
 | **Response** | Ventor profile object (same shape as #9), wrapped in `{ status, data }` |
 
@@ -447,6 +447,8 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 | `other_interest_text` | string | conditional | **Required** when `interest_ids` contains a category with `allows_custom_text: true` (typically `other`). Trimmed free text; omit or `null` otherwise. Stored on `ventor_interests.custom_text`. |
 | `avatar_preset_index` | number | no* | 0-based preset index when user picks a built-in avatar |
 | `avatar` | file | no* | Multipart image file when user picks from gallery |
+| `notifications_enabled` | boolean | yes | Whether the user granted push permission on the final notifications step |
+| `fcm_token` | string \| null | no | Firebase device token — **`null` or omitted** when permission denied or token unavailable. Never required for registration to succeed. |
 
 \* Provide **either** `avatar` **or** `avatar_preset_index`, or neither (backend may assign a default). Do not send both.
 
@@ -480,6 +482,8 @@ Form fields (repeat `language_ids` / `interest_ids` once per value):
 | `language_ids` | `en` (repeat for each) |
 | `interest_ids` | `relationships` (repeat for each) |
 | `other_interest_text` | *(omit unless Other selected)* |
+| `notifications_enabled` | `true` or `false` |
+| `fcm_token` | *(omit when null / permission denied)* |
 | `avatar` | image file |
 
 #### Rules
@@ -652,14 +656,14 @@ Form fields (repeat `language_ids` / `interest_ids` once per value):
 | Field | From step | Type |
 |-------|-----------|------|
 | `full_name`, `phone`, `phone_country`, `avatar`, `agreed_to_terms` | 1 | string / file / bool |
-| `identity_document` (front/back), `selfie` | 2 | multipart |
+| `document_front`, `selfie` | 2 | multipart (`document_back` optional if UI captures one ID image) |
 | `date_of_birth`, `country_iso`, `city`, `language_ids` | 3 | date / string / string[] |
-| `life_experience_ids`, `custom_experiences?` | 4 | string[] |
-| `comfort_area_ids` | 5 | string[] |
-| `boundary_ids` | 6 | string[] |
-| `voice_intro` | 7 | audio multipart |
-| `availability` (see #37 shape), `accept_instant_calls`, `session_minutes` | 8 | object |
-| `notifications_enabled` | 9 | bool |
+| `life_experience_ids`, `custom_experiences?` | 4 | string[] (includes client-local relationship/family slugs + catalog ids) |
+| `comfort_area_ids`, `custom_comfort_area_text?` | 5 | string[] / string |
+| `boundary_ids`, `custom_boundary_text?` | 6 | string[] / string |
+| `voice_intro`, `voice_intro_seconds?` | 7 | audio multipart / int |
+| `availability` (JSON — `#37` days/slots shape), `accept_instant_calls`, `session_minutes` | 8 | object / bool / int[] |
+| `notifications_enabled`, `fcm_token?` | 9 | bool / string \| null — **`fcm_token` omitted or `null` when permission denied**; registration must still succeed |
 
 **Efficiency note:** Prefer one submit at end (`POST`) + optional `PATCH /v1/listeners/me/registration/{step}` for resume. If you split by step, keep the same field names.
 

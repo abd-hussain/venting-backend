@@ -75,6 +75,7 @@ from app.models.settings import (
 )
 from app.models.settings import ListenerPrivacySettings as ListenerPrivacySettingsRow
 from app.models.ventor_wellness import VentorFavorite
+from app.services.push_tokens import upsert_push_token
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 AUDIO_SUFFIXES = {".m4a", ".aac", ".mp3", ".wav", ".caf"}
@@ -230,6 +231,55 @@ def _validate_ids(db: Session, model, ids: list[str], *, field: str) -> None:
         )
 
 
+def _validate_custom_text_ids(
+    db: Session,
+    model,
+    ids: list[str],
+    *,
+    field: str,
+    custom_text: str | None,
+) -> dict[str, ComfortArea | Boundary]:
+    if not ids:
+        return {}
+    rows = (
+        db.query(model)
+        .filter(model.id.in_(ids), model.is_active.is_(True))
+        .all()
+    )
+    found = {row.id: row for row in rows}
+    missing = [item_id for item_id in ids if item_id not in found]
+    if missing:
+        raise validation_error(
+            f"Unknown {field}: {', '.join(missing)}",
+            ar=f"{field} غير معروف",
+        )
+    if any(row.allows_custom_text for row in rows):
+        text = (custom_text or "").strip()
+        if len(text) < 2:
+            raise validation_error(
+                f"{field} custom text is required (min 2 characters)",
+                ar="يجب إدخال نص مخصص (حرفان على الأقل)",
+            )
+    return found
+
+
+def _ensure_life_experience_ids(db: Session, ids: list[str]) -> None:
+    for exp_id in ids:
+        if db.get(LifeExperience, exp_id) is not None:
+            continue
+        label = exp_id.replace("_", " ").title()[:120]
+        db.add(
+            LifeExperience(
+                id=exp_id,
+                name_en=label,
+                name_ar=label,
+                is_active=False,
+            )
+        )
+    if ids:
+        db.flush()
+
+
 def _replace_tags(
     db: Session,
     *,
@@ -238,19 +288,37 @@ def _replace_tags(
     comfort_area_ids: list[str] | None = None,
     life_experience_ids: list[str] | None = None,
     boundary_ids: list[str] | None = None,
+    custom_comfort_area_text: str | None = None,
+    custom_boundary_text: str | None = None,
 ) -> None:
+    comfort_custom = (custom_comfort_area_text or "").strip() or None
+    boundary_custom = (custom_boundary_text or "").strip() or None
+
     if language_ids is not None:
         _validate_ids(db, Language, language_ids, field="language_ids")
         db.query(ListenerLanguage).filter(ListenerLanguage.listener_id == listener_id).delete()
         for lang_id in language_ids:
             db.add(ListenerLanguage(listener_id=listener_id, language_id=lang_id))
     if comfort_area_ids is not None:
-        _validate_ids(db, ComfortArea, comfort_area_ids, field="comfort_area_ids")
+        comfort_rows = _validate_custom_text_ids(
+            db,
+            ComfortArea,
+            comfort_area_ids,
+            field="comfort_area_ids",
+            custom_text=custom_comfort_area_text,
+        )
         db.query(ListenerComfortArea).filter(ListenerComfortArea.listener_id == listener_id).delete()
         for area_id in comfort_area_ids:
-            db.add(ListenerComfortArea(listener_id=listener_id, comfort_area_id=area_id))
+            row = comfort_rows[area_id]
+            db.add(
+                ListenerComfortArea(
+                    listener_id=listener_id,
+                    comfort_area_id=area_id,
+                    custom_text=comfort_custom if row.allows_custom_text else None,
+                )
+            )
     if life_experience_ids is not None:
-        _validate_ids(db, LifeExperience, life_experience_ids, field="life_experience_ids")
+        _ensure_life_experience_ids(db, life_experience_ids)
         db.query(ListenerLifeExperience).filter(
             ListenerLifeExperience.listener_id == listener_id,
             ListenerLifeExperience.custom_label.is_(None),
@@ -260,10 +328,23 @@ def _replace_tags(
                 ListenerLifeExperience(listener_id=listener_id, life_experience_id=exp_id)
             )
     if boundary_ids is not None:
-        _validate_ids(db, Boundary, boundary_ids, field="boundary_ids")
+        boundary_rows = _validate_custom_text_ids(
+            db,
+            Boundary,
+            boundary_ids,
+            field="boundary_ids",
+            custom_text=custom_boundary_text,
+        )
         db.query(ListenerBoundary).filter(ListenerBoundary.listener_id == listener_id).delete()
         for boundary_id in boundary_ids:
-            db.add(ListenerBoundary(listener_id=listener_id, boundary_id=boundary_id))
+            row = boundary_rows[boundary_id]
+            db.add(
+                ListenerBoundary(
+                    listener_id=listener_id,
+                    boundary_id=boundary_id,
+                    custom_text=boundary_custom if row.allows_custom_text else None,
+                )
+            )
 
 
 def _apply_availability(
@@ -514,12 +595,17 @@ async def register_listener(
     life_experience_ids_raw: str | None,
     custom_experiences_raw: str | None,
     comfort_area_ids_raw: str | None,
+    custom_comfort_area_text: str | None,
     boundary_ids_raw: str | None,
+    custom_boundary_text: str | None,
     availability_raw: str | None,
     accept_instant_calls: str | bool | None,
     session_minutes: int | None,
     notifications_enabled: str | bool | None,
+    fcm_token: str | None,
     avatar: UploadFile | None,
+    document_front: UploadFile | None,
+    document_back: UploadFile | None,
     identity_document_front: UploadFile | None,
     identity_document_back: UploadFile | None,
     selfie: UploadFile | None,
@@ -564,6 +650,9 @@ async def register_listener(
     )
     dob = _parse_date(date_of_birth)
 
+    front_upload = document_front or identity_document_front
+    back_upload = document_back or identity_document_back
+
     avatar_url = None
     if avatar is not None and avatar.filename:
         avatar_url = await _save_upload(
@@ -574,25 +663,25 @@ async def register_listener(
             max_bytes=5 * 1024 * 1024,
         )
 
-    if identity_document_front is None or not identity_document_front.filename:
+    if front_upload is None or not front_upload.filename:
         raise validation_error(
-            "identity_document_front is required",
+            "document_front is required",
             ar="صورة الوجه الأمامي للمستند مطلوبة",
         )
     if selfie is None or not selfie.filename:
         raise validation_error("selfie is required", ar="صورة السيلفي مطلوبة")
 
     front_url = await _save_upload(
-        identity_document_front,
+        front_upload,
         dest_dir=_static_url(settings, "uploads", "identity", str(user.id)),
         filename="document_front",
         allowed=IMAGE_SUFFIXES,
         max_bytes=10 * 1024 * 1024,
     )
     back_url = None
-    if identity_document_back is not None and identity_document_back.filename:
+    if back_upload is not None and back_upload.filename:
         back_url = await _save_upload(
-            identity_document_back,
+            back_upload,
             dest_dir=_static_url(settings, "uploads", "identity", str(user.id)),
             filename="document_back",
             allowed=IMAGE_SUFFIXES,
@@ -661,6 +750,8 @@ async def register_listener(
         comfort_area_ids=comfort_area_ids,
         life_experience_ids=life_experience_ids,
         boundary_ids=boundary_ids,
+        custom_comfort_area_text=custom_comfort_area_text,
+        custom_boundary_text=custom_boundary_text,
     )
     for index, label in enumerate(custom_experiences):
         slug = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")[:40] or "custom"
@@ -699,6 +790,7 @@ async def register_listener(
         )
     )
     db.add(ListenerWallet(listener_id=user.id))
+    upsert_push_token(db, user.id, fcm_token)
     user.registration_complete = True
     db.commit()
 

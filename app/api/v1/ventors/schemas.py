@@ -26,6 +26,8 @@ class VentorRegisterRequest(BaseModel):
     interest_ids: list[str] = Field(min_length=1)
     other_interest_text: str | None = None
     avatar_preset_index: int | None = None
+    notifications_enabled: bool
+    fcm_token: str | None = None
 
 
 class VentorStats(BaseModel):

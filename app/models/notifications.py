@@ -40,3 +40,27 @@ class Notification(Base, UUIDPrimaryKeyMixin, SoftDeleteMixin):
         ),
         Index("ix_notifications_user_deleted", "user_id", "deleted_at"),
     )
+
+
+class UserPushToken(Base, UUIDPrimaryKeyMixin):
+    __tablename__ = "user_push_tokens"
+
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    token = Column(String(512), nullable=False, unique=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (Index("ix_user_push_tokens_user_id", "user_id"),)

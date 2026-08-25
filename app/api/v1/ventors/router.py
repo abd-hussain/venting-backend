@@ -83,6 +83,8 @@ async def register(
             other_interest_text=body.other_interest_text,
             avatar=None,
             avatar_preset_index=body.avatar_preset_index,
+            notifications_enabled=body.notifications_enabled,
+            fcm_token=body.fcm_token,
             settings=settings,
         )
     else:
@@ -116,6 +118,16 @@ async def register(
         if isinstance(avatar_field, UploadFile) and avatar_field.filename:
             avatar = avatar_field
 
+        notif_raw = form.get("notifications_enabled")
+        if notif_raw in (None, ""):
+            raise validation_error(
+                "notifications_enabled is required",
+                ar="يجب تحديد تفعيل الإشعارات",
+            )
+        notifications_enabled = str(notif_raw).strip().lower() in {"true", "1", "yes"}
+        fcm_raw = form.get("fcm_token")
+        fcm_token = str(fcm_raw).strip() if fcm_raw not in (None, "") else None
+
         data = await register_ventor(
             db,
             current_user,
@@ -126,6 +138,8 @@ async def register(
             other_interest_text=other_interest_text,
             avatar=avatar,
             avatar_preset_index=avatar_preset_index,
+            notifications_enabled=notifications_enabled,
+            fcm_token=fcm_token,
             settings=settings,
         )
     return success_response(data.model_dump(mode="json"), status_code=status.HTTP_201_CREATED)

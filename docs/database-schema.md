@@ -244,6 +244,20 @@ Used by `#2b forgot-password` / `#2c reset-password`. Store **hash only**, never
 
 **Indexes:** `UQ(token_hash)`, `IDX(user_id)`, `IDX(expires_at)`
 
+### 2d. `user_push_tokens`
+
+Optional FCM device tokens from `#8` / `#22` registration (`fcm_token`). Registration succeeds without a token.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | **PK** |
+| `user_id` | UUID | **FK → users** |
+| `token` | VARCHAR(512) | **UQ** — raw FCM token |
+| `created_at` | TIMESTAMPTZ | |
+| `updated_at` | TIMESTAMPTZ | |
+
+**Indexes:** `UQ(token)`, `IDX(user_id)`
+
 ---
 
 ## 2. Profiles
@@ -438,6 +452,7 @@ Written from `#8 POST /v1/ventors/register` (`language_ids`). Same `languages` c
 |--------|------|-------|
 | `listener_id` | UUID | **FK** |
 | `comfort_area_id` | VARCHAR(64) | **FK** |
+| `custom_text` | TEXT | ? when category `allows_custom_text` — from `#22` `custom_comfort_area_text` |
 | | | **PK (listener_id, comfort_area_id)** |
 
 **Extra:** store custom free-text experiences on listener if needed:
@@ -457,6 +472,7 @@ Written from `#8 POST /v1/ventors/register` (`language_ids`). Same `languages` c
 |--------|------|-------|
 | `listener_id` | UUID | **FK** |
 | `boundary_id` | VARCHAR(64) | **FK** |
+| `custom_text` | TEXT | ? when boundary `allows_custom_text` — from `#22` `custom_boundary_text` |
 | | | **PK (listener_id, boundary_id)** |
 
 ---
