@@ -9,7 +9,6 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import UploadFile
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.v1.ventors.schemas import (
@@ -198,10 +197,6 @@ def _validate_interest_ids(
         .filter(
             ComfortArea.id.in_(interest_ids),
             ComfortArea.is_active.is_(True),
-            or_(
-                ComfortArea.audience == "ventor",
-                ComfortArea.audience == "all",
-            ),
         )
         .all()
     )

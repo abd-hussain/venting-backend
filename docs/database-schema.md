@@ -32,7 +32,7 @@
 |--:|-------|--------|
 | 1 | `users` | Auth |
 | 2 | `refresh_tokens` | Auth |
-| 2b | `auth_identities` | Auth — social |
+| 2b | `auth_identities` | Auth — social *(proposed)* |
 | 2c | `password_reset_tokens` | Auth — forgot-password one-time links |
 | 3 | `ventor_profiles` | Ventor |
 | 4 | `listener_profiles` | Listener |
@@ -374,7 +374,7 @@ Stable catalogs (seed once). App uses string ids like `anxiety_stress`, `en`, `p
 | `icon_url` | TEXT | ? optional CDN image URL; mobile prefers `icon_url` when set, else `icon_emoji` |
 | `sort_order` | INT | default 0 — ascending display order |
 | `allows_custom_text` | BOOLEAN | default false — e.g. `other` shows free-text field |
-| `audience` | VARCHAR(32) | `ventor` \| `listener` \| `all` — who may select this category |
+| `audience` | VARCHAR(32) | `ventor` \| `listener` \| `all` — optional admin metadata; **mobile `#74` does not filter by this** — both ventor and listener see the same active list |
 | `topic_group` | VARCHAR(64) | ? e.g. anxiety, relationships |
 | `is_active` | BOOLEAN | |
 

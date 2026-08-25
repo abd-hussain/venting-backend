@@ -206,9 +206,9 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 
 ---
 
-### 2b. `POST /v1/auth/forgot-password`
+### 2b. `POST /v1/auth/forgot-password` *(proposed)*
 
-> **Status:** Implemented on backend.  
+> **Status:** Proposed — mobile wires this from Forgot Password confirmation.  
 > **Purpose:** Start a **secure password reset**. Sends an email with a one-time link to a branded reset page.  
 > **Does not** authenticate the user or reveal whether the email exists.
 
@@ -262,16 +262,16 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 
 #### Acceptance
 
-- [x] Public endpoint; no Bearer required
-- [x] Email contains branded HTML (Venting dark/purple) + clear CTA button
-- [x] Link opens locale-matched static reset page with token query param
+- [ ] Public endpoint; no Bearer required
+- [ ] Email contains branded HTML (Venting dark/purple) + clear CTA button
+- [ ] Link opens locale-matched static reset page with token query param
 - [ ] Mobile shows success after Continue without leaking account existence
 
 ---
 
-### 2c. `POST /v1/auth/reset-password`
+### 2c. `POST /v1/auth/reset-password` *(proposed)*
 
-> **Status:** Implemented on backend.  
+> **Status:** Proposed — called by the **static reset-password web page** (not by the mobile app).  
 > **Purpose:** Set a new password using a valid one-time token from the email link.
 
 | | |
@@ -689,9 +689,9 @@ Form fields (repeat `language_ids` / `interest_ids` once per value):
 
 #### Acceptance
 
-- [x] Rejected listeners can resubmit docs without re-entering profile / experiences / voice / availability
-- [x] First-time onboarding never requires `#23`
-- [x] Successful resubmit puts the case back in the admin review queue
+- [ ] Rejected listeners can resubmit docs without re-entering profile / experiences / voice / availability
+- [ ] First-time onboarding never requires `#23`
+- [ ] Successful resubmit puts the case back in the admin review queue
 
 ---
 
@@ -1254,25 +1254,26 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 
 ### 74. `GET /v1/catalog/categories` *(proposed)*
 
-> **Status:** Proposed — ventor registration interests from portal-managed `comfort_areas`.  
-> **Purpose:** Return active interest / comfort categories for ventor (and optionally listener) registration.  
-> **DB source:** `comfort_areas` (ids also used as `interest_ids` on `#8 POST /v1/ventors/register`).  
+> **Status:** Proposed — ventor & listener registration topic picker from portal-managed `comfort_areas`.  
+> **Purpose:** Return active interest / comfort categories for **both** ventor interests and listener comfort areas.  
+> **DB source:** `comfort_areas` (ids used as `interest_ids` on `#8 POST /v1/ventors/register` and `comfort_area_ids` on `#22 POST /v1/listeners/register`).  
 > **Icons:** `icon_emoji` (like language `flag_emoji`) plus optional `icon_url` (CDN). Mobile does **not** map Material `icon_key`s.
 
 | | |
 |--|--|
 | **Auth** | Public (Bearer accepted if present). Catalog is not secret. |
-| **Screen** | Ventor registration → interests step (`VentorRegistrationInterestsStep`) |
-| **When** | When interests step opens (and on pull-to-retry / error retry) |
-| **Query** | See below |
+| **Screen** | Ventor registration → interests step; Listener registration → comfort areas step (step 5) |
+| **When** | When step opens (and on error retry) |
+| **Query** | Optional `locale` only — see below |
 | **Response** | `{ items: Category[] }` |
 
 #### Query parameters
 
 | Param | Type | Required | Default | Notes |
 |-------|------|----------|---------|-------|
-| `audience` | `ventor` \| `listener` \| `all` | no | `all` | Filter by who may select the category. Ventor interests step sends `audience=ventor`. |
 | `locale` | `en` \| `ar` | no | from `Accept-Language` / `skel-accept-language` | Optional hint; response still includes **both** `name_en` and `name_ar` so the client can switch language without re-fetch. |
+
+> **Mobile does not send `audience`.** Ventor and listener registration show the **same** active category list from this endpoint.
 
 #### `Category` object
 
@@ -1290,7 +1291,7 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 #### Success example
 
 ```http
-GET /v1/catalog/categories?audience=ventor
+GET /v1/catalog/categories
 Accept-Language: en
 ```
 
@@ -1423,19 +1424,19 @@ Mobile must **not** hardcode category labels or icons. Prefer `icon_url` when se
 
 #### Mobile usage
 
-1. Open Ventor registration interests step.
-2. `GET /v1/catalog/categories?audience=ventor`.
-3. Render `items` sorted by `sort_order`.
-4. Localized label: `locale == ar ? name_ar : name_en`.
-5. Leading icon: `icon_url` (network image) if non-empty, else `icon_emoji` (same pattern as language `flag_url` / `flag_emoji`).
-6. If item has `allows_custom_text == true` and is selected → show free-text field; require non-empty trim before Finish.
-7. On Finish → collect selected `id`s (+ optional custom text for `other`) → send as `interest_ids` (and optional `other_interest_text`) on `#8 POST /v1/ventors/register`.
+1. Open ventor interests step **or** listener comfort-areas step.
+2. `GET /v1/catalog/categories` (no query params required).
+3. Show shimmer list rows until response arrives.
+4. Render `items` sorted by `sort_order`.
+5. Localized label: `locale == ar ? name_ar : name_en`.
+6. Leading icon: `icon_url` (network image) if non-empty, else `icon_emoji` (same pattern as language `flag_url` / `flag_emoji`).
+7. If item has `allows_custom_text == true` and is selected → show free-text field; require non-empty trim before Continue/Finish.
+8. Ventor Finish → `#8` with `interest_ids` (+ optional `other_interest_text`). Listener Continue → include selected ids in `#22` `comfort_area_ids`.
 
 #### Errors
 
 | HTTP | type | code | When |
 |------|------|------|------|
-| 400 | validation | 740 | Invalid `audience` |
 | 500 | server | 500 | Unexpected failure |
 | 503 | server | 503 | Catalog unavailable |
 
@@ -1451,7 +1452,7 @@ Empty active catalog → still `200` with `"items": []` (mobile shows empty + re
 
 #### Acceptance criteria
 
-- [ ] `GET /v1/catalog/categories?audience=ventor` returns active rows with `icon_emoji`
+- [ ] `GET /v1/catalog/categories` returns active rows with `icon_emoji`
 - [ ] Standard `{ status, data: { items } }` envelope
 - [ ] Both `name_en` and `name_ar` present
 - [ ] `other` has `allows_custom_text: true`
@@ -1462,8 +1463,9 @@ Empty active catalog → still `200` with `"items": []` (mobile shows empty + re
 
 | Step | API |
 |------|-----|
-| Load chips | `#74 GET /v1/catalog/categories?audience=ventor` |
+| Load list | `#74 GET /v1/catalog/categories` |
 | Submit profile + interests | `#8 POST /v1/ventors/register` with `interest_ids: ["relationships", "career_work", …]` |
+| Submit listener registration | `#22 POST /v1/listeners/register` with `comfort_area_ids: ["stress_anxiety", …]` |
 
 Optional body extension on `#8` when `other` selected:
 
@@ -1601,9 +1603,9 @@ Empty → `200` + `items: []`.
 
 ---
 
-### 76. `GET /v1/catalog/life-experiences`
+### 76. `GET /v1/catalog/life-experiences` *(proposed)*
 
-> **Status:** Implemented on backend.  
+> **Status:** Proposed — listener registration life-experience chips.  
 > **Purpose:** Return active life-experience tags from `life_experiences`.  
 > **DB source:** `life_experiences` (`id`, `name_en`, `name_ar`, `sort_order`, `is_active`).  
 > **Managed by:** Admin portal catalogs → Life experiences (`A51`).
@@ -1704,10 +1706,10 @@ Empty → `200` + `items: []`. Do **not** 404.
 
 #### Acceptance
 
-- [x] Public `GET /v1/catalog/life-experiences` returns active rows only
-- [x] Standard `{ status, data: { items } }` envelope
-- [x] Both `name_en` and `name_ar` + `sort_order`
-- [x] Same `id`s accepted by `#22` `life_experience_ids`
+- [ ] Public `GET /v1/catalog/life-experiences` returns active rows only
+- [ ] Standard `{ status, data: { items } }` envelope
+- [ ] Both `name_en` and `name_ar` + `sort_order`
+- [ ] Same `id`s accepted by `#22` `life_experience_ids`
 
 ---
 
@@ -1778,8 +1780,8 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | 0 | POST | `/v1/auth/check-email` *(proposed)* |
 | 1 | POST | `/v1/auth/register` |
 | 2 | POST | `/v1/auth/login` |
-| 2b | POST | `/v1/auth/forgot-password` |
-| 2c | POST | `/v1/auth/reset-password` |
+| 2b | POST | `/v1/auth/forgot-password` *(proposed)* |
+| 2c | POST | `/v1/auth/reset-password` *(proposed)* |
 | 1b | POST | `/v1/auth/social` *(proposed)* |
 | 3 | POST | `/v1/auth/refresh` |
 | 4 | POST | `/v1/auth/logout` |
@@ -1854,7 +1856,7 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | 73 | POST | `/v1/promo/validate` |
 | 74 | GET | `/v1/catalog/categories` *(proposed)* |
 | 75 | GET | `/v1/catalog/languages` *(proposed)* |
-| 76 | GET | `/v1/catalog/life-experiences` |
+| 76 | GET | `/v1/catalog/life-experiences` *(proposed)* |
 
 ---
 

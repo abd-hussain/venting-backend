@@ -9,10 +9,8 @@ from app.api.v1.catalogs.schemas import (
     LanguageResponse,
     LifeExperienceResponse,
 )
-from app.core.errors import invalid_catalog_audience, validation_error
+from app.core.errors import validation_error
 from app.models.lookups import Boundary, ComfortArea, Language, LifeExperience
-
-VALID_CATEGORY_AUDIENCES = {"ventor", "listener", "all"}
 
 
 def _item(row: Boundary) -> CatalogItemResponse:
@@ -111,17 +109,13 @@ def assert_active_languages(db: Session, language_ids: list[str]) -> list[Langua
     return [found[i] for i in language_ids]
 
 
-def list_categories(db: Session, *, audience: str = "all") -> list[CategoryResponse]:
-    if audience not in VALID_CATEGORY_AUDIENCES:
-        raise invalid_catalog_audience()
-
-    query = db.query(ComfortArea).filter(ComfortArea.is_active.is_(True))
-    if audience != "all":
-        query = query.filter(
-            or_(ComfortArea.audience == audience, ComfortArea.audience == "all")
-        )
-
-    rows = query.order_by(ComfortArea.sort_order, ComfortArea.id).all()
+def list_categories(db: Session) -> list[CategoryResponse]:
+    rows = (
+        db.query(ComfortArea)
+        .filter(ComfortArea.is_active.is_(True))
+        .order_by(ComfortArea.sort_order, ComfortArea.id)
+        .all()
+    )
     return [_category_item(row) for row in rows]
 
 

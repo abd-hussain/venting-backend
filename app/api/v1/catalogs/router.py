@@ -25,11 +25,8 @@ router = APIRouter(prefix="/catalog", tags=["catalogs"])
     responses={400: {"model": APIErrorResponse}},
     summary="Interest / comfort categories for ventor or listener pickers",
 )
-def categories_list(
-    db: DbSession,
-    audience: str = Query(default="all", description="ventor | listener | all"),
-):
-    items = list_categories(db, audience=audience)
+def categories_list(db: DbSession):
+    items = list_categories(db)
     return success_response(
         CategoriesListResponse(items=items).model_dump(mode="json")
     )
