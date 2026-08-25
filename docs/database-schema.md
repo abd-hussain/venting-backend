@@ -391,7 +391,7 @@ Written from `#8 POST /v1/ventors/register` (`language_ids`). Same `languages` c
 |--------|------|-------|
 | `ventor_id` | UUID | **FK → ventor_profiles** |
 | `comfort_area_id` | VARCHAR(64) | **FK → comfort_areas** |
-| `custom_text` | TEXT | ? free text when category `allows_custom_text` |
+| `custom_text` | TEXT | ? free text when category `allows_custom_text` — from `#8` `other_interest_text` |
 | | | **PK (`ventor_id`, `comfort_area_id`)** |
 
 ### 11. `listener_languages`

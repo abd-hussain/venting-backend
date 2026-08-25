@@ -318,7 +318,7 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 |--|--|
 | **Auth** | Bearer |
 | **Screen** | Ventor registration (profile + interests) |
-| **Body** | `nickname` (≤20), `gender` (`male` \| `female` \| `prefer_not_to_say`), `avatar` (multipart file **or** `avatar_preset_index`), `language_ids` (string[], ≥1), `interest_ids` (string[]) |
+| **Body** | `nickname` (≤20), `gender` (`male` \| `female` \| `prefer_not_to_say`), `avatar` (multipart file **or** `avatar_preset_index`), `language_ids` (string[], ≥1), `interest_ids` (string[]), optional `other_interest_text` when a custom-text category (e.g. `other`) is selected |
 | **Response** | Ventor profile object (see #9) |
 
 ---
@@ -1038,7 +1038,7 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 
 ---
 
-## 12. Catalog / categories *(proposed)*
+## 12. Catalog / categories
 
 > Shared lookup lists for registration and filters. Seeded in DB (`comfort_areas`, `languages`, …).  
 > Mobile **must not** hardcode category labels long-term — fetch from here.
@@ -1050,9 +1050,9 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 > - `#75` `GET /v1/catalog/languages`
 > (Listener registration may later add focused endpoints for life experiences / boundaries — never the mega dump.)
 
-### 74. `GET /v1/catalog/categories` *(proposed)*
+### 74. `GET /v1/catalog/categories`
 
-> **Status:** Proposed — ventor registration interests from portal-managed `comfort_areas`.  
+> **Status:** Implemented on backend.  
 > **Purpose:** Return active interest / comfort categories for ventor (and optionally listener) registration.  
 > **DB source:** `comfort_areas` (ids also used as `interest_ids` on `#8 POST /v1/ventors/register`).  
 > **Icons:** `icon_url` (CDN) uploaded in admin portal — mobile does not map Material icon keys.
@@ -1230,13 +1230,13 @@ Empty active catalog → still `200` with `"items": []` (mobile shows empty + re
 
 #### Acceptance criteria
 
-- [ ] `GET /v1/catalog/categories?audience=ventor` returns active rows with `icon_url`
-- [ ] Standard `{ status, data: { items } }` envelope
-- [ ] Both `name_en` and `name_ar` present
-- [ ] `other` has `allows_custom_text: true`
-- [ ] Inactive rows omitted
-- [ ] Same `id` values accepted by `#8` `interest_ids`
-- [ ] Portal can create/update categories and upload/replace `icon_url`
+- [x] `GET /v1/catalog/categories?audience=ventor` returns active rows with `icon_url`
+- [x] Standard `{ status, data: { items } }` envelope
+- [x] Both `name_en` and `name_ar` present
+- [x] `other` has `allows_custom_text: true`
+- [x] Inactive rows omitted
+- [x] Same `id` values accepted by `#8` `interest_ids`
+- [x] Portal can create/update categories and upload/replace `icon_url`
 
 #### Link to register
 
@@ -1260,9 +1260,9 @@ Optional body extension on `#8` when `other` selected:
 
 ---
 
-### 75. `GET /v1/catalog/languages` *(proposed)*
+### 75. `GET /v1/catalog/languages`
 
-> **Status:** Proposed — ventor (and listener) speaking-language picker.  
+> **Status:** Implemented on backend.  
 > **Purpose:** Return active spoken languages from the **single** `languages` table.  
 > **DB source:** `languages` only — there is **no** separate speaking-languages catalog.  
 > **Managed by:** Admin portal `/catalogs` → Languages (`A48`/`A49`).
@@ -1372,11 +1372,11 @@ Empty → `200` + `items: []`.
 
 #### Acceptance
 
-- [ ] Public `GET /v1/catalog/languages` reads **only** from `languages`
-- [ ] Each active item has a non-empty `flag_url` (HTTPS CDN)
-- [ ] Seed includes en, hi, es, ar, bn, tr (minimum)
-- [ ] `#8` accepts `language_ids` subset of active language ids → writes `ventor_languages`
-- [ ] Portal can upsert languages and upload/replace flag images
+- [x] Public `GET /v1/catalog/languages` reads **only** from `languages`
+- [x] Each active item has a non-empty `flag_url` (HTTPS CDN)
+- [x] Seed includes en, hi, es, ar, bn, tr (minimum)
+- [x] `#8` accepts `language_ids` subset of active language ids → writes `ventor_languages`
+- [x] Portal can upsert languages and upload/replace flag images
 - [ ] Search `q` filters server-side **or** mobile filters client-side (either OK for v1; prefer client filter for small lists)
 
 ---
@@ -1500,8 +1500,8 @@ Empty → `200` + `items: []`.
 | 71 | GET | `/v1/listeners/me/training` |
 | 72 | POST | `/v1/listeners/me/training/{moduleId}/complete` |
 | 73 | POST | `/v1/promo/validate` |
-| 74 | GET | `/v1/catalog/categories` *(proposed)* |
-| 75 | GET | `/v1/catalog/languages` *(proposed)* |
+| 74 | GET | `/v1/catalog/categories` |
+| 75 | GET | `/v1/catalog/languages` |
 
 ---
 
