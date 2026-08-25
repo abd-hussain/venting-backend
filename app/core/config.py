@@ -31,10 +31,11 @@ class Settings(BaseSettings):
     upload_subdir: str = "uploads"
 
     # Static / non-API content URLs (mobile WebViews & support)
-    # Paths match docs/static-web — host under webContentBaseUrl.
-    terms_url: str = "https://venting.app/legal/en/terms.html"
-    privacy_url: str = "https://venting.app/legal/en/privacy.html"
-    help_center_base_url: str = "https://venting.app/help"
+    # One base for all flavors — pages served from this API at /legal and /help.
+    web_content_base_url: str = "https://venting-3a5ebaed4621.herokuapp.com"
+    terms_url: str = "https://venting-3a5ebaed4621.herokuapp.com/legal/en/terms.html"
+    privacy_url: str = "https://venting-3a5ebaed4621.herokuapp.com/legal/en/privacy.html"
+    help_center_base_url: str = "https://venting-3a5ebaed4621.herokuapp.com/help"
     support_email: str = "support@venting.app"
     support_whatsapp: str = ""
 

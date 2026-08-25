@@ -1,32 +1,23 @@
 # Venting static web content (6 pages)
 
-Source of truth for Terms, Privacy, and Help HTML. Host these files at the
-**site root** of `webContentBaseUrl` (no API required).
+Served by the backend at **one** `webContentBaseUrl` for all app flavors
+(dev + prod). Source: this folder. Live paths: `/legal/…`, `/help/…`.
 
-| Locale | Path | App usage |
-|--------|------|-----------|
-| EN | `legal/en/terms.html` | Terms WebView |
-| AR | `legal/ar/terms.html` | Terms WebView |
-| EN | `legal/en/privacy.html` | Privacy WebView |
-| AR | `legal/ar/privacy.html` | Privacy WebView |
-| EN | `help/en/index.html` | Help & Support (+ `#anchors`) |
-| AR | `help/ar/index.html` | Help & Support (+ `#anchors`) |
+**Base URL:** `https://venting-3a5ebaed4621.herokuapp.com`
 
-## Flavors
+| Locale | Path | Full URL |
+|--------|------|----------|
+| EN | `legal/en/terms.html` | `https://venting-3a5ebaed4621.herokuapp.com/legal/en/terms.html` |
+| AR | `legal/ar/terms.html` | `https://venting-3a5ebaed4621.herokuapp.com/legal/ar/terms.html` |
+| EN | `legal/en/privacy.html` | `https://venting-3a5ebaed4621.herokuapp.com/legal/en/privacy.html` |
+| AR | `legal/ar/privacy.html` | `https://venting-3a5ebaed4621.herokuapp.com/legal/ar/privacy.html` |
+| EN | `help/en/index.html` | `https://venting-3a5ebaed4621.herokuapp.com/help/en/index.html` |
+| AR | `help/ar/index.html` | `https://venting-3a5ebaed4621.herokuapp.com/help/ar/index.html` |
 
-| Flavor | `webContentBaseUrl` | Example Terms EN |
-|--------|---------------------|------------------|
-| Dev | `https://dev.venting.app` | `https://dev.venting.app/legal/en/terms.html` |
-| Prod | `https://venting.app` | `https://venting.app/legal/en/terms.html` |
-
-## Deploy
-
-Copy the `legal/` and `help/` folders from this directory to your static host
-(nginx, CDN, object storage website). Keep paths exactly as above.
-
-Help tiles open the same HTML with fragments, e.g. `help/en/index.html#getting-started`.
+Help tiles append fragments on the same page, e.g.  
+`https://venting-3a5ebaed4621.herokuapp.com/help/en/index.html#getting-started`
 
 ## Editing
 
-Edit the HTML here, redeploy static files — **no mobile app release** and **no
-backend API** for legal/help links.
+Edit HTML here, push/deploy the backend — **no separate static host** and **no
+mobile app release**.

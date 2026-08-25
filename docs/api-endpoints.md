@@ -1489,7 +1489,7 @@ Empty → `200` + `items: []`.
 
 ### Static legal & help pages *(not REST — no server API round-trip for metadata)*
 
-Ship **6** static files under `webContentBaseUrl` (dev: `https://dev.venting.app`, prod: `https://venting.app`). Source HTML lives in [`docs/static-web/`](./static-web/README.md).
+Ship **6** static files under a single `webContentBaseUrl` (same for all flavors): `https://venting-3a5ebaed4621.herokuapp.com`. Source HTML lives in [`docs/static-web/`](./static-web/README.md) and is served by this API at `/legal/…` and `/help/…`.
 
 | Page | EN | AR |
 |------|----|----|
