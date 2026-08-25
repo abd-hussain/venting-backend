@@ -78,8 +78,6 @@ from app.models.admin import (
     CmsPage,
     ModerationAction,
 )
-from app.models.legal import LegalDocument
-from app.models.help import HelpDocument
 
 DEMO_PASSWORD = "Password123!"
 DEMO_ADMIN_PASSWORD = "Admin123!"
@@ -767,128 +765,6 @@ def seed_admin_cms(db: Session, mobile_ids: dict[str, uuid.UUID] | None = None) 
             existing.body_markdown = page["body_markdown"]
             existing.status = page["status"]
             existing.updated_by = content_id
-
-    # Legal document links (terms / privacy per locale)
-    legal_rows = [
-        {
-            "document": "terms",
-            "locale": "en",
-            "title": "Terms of Service",
-            "url": "https://cdn.venting.app/legal/en/terms.html",
-            "is_published": True,
-        },
-        {
-            "document": "terms",
-            "locale": "ar",
-            "title": "شروط الخدمة",
-            "url": "https://cdn.venting.app/legal/ar/terms.html",
-            "is_published": True,
-        },
-        {
-            "document": "privacy",
-            "locale": "en",
-            "title": "Privacy Policy",
-            "url": "https://cdn.venting.app/legal/en/privacy.html",
-            "is_published": True,
-        },
-        {
-            "document": "privacy",
-            "locale": "ar",
-            "title": "سياسة الخصوصية",
-            "url": "https://cdn.venting.app/legal/ar/privacy.html",
-            "is_published": True,
-        },
-    ]
-    for legal in legal_rows:
-        existing = (
-            db.query(LegalDocument)
-            .filter(
-                LegalDocument.document == legal["document"],
-                LegalDocument.locale == legal["locale"],
-            )
-            .one_or_none()
-        )
-        if existing is None:
-            db.add(LegalDocument(**legal))
-        else:
-            existing.title = legal["title"]
-            existing.url = legal["url"]
-            existing.is_published = legal["is_published"]
-
-    # Help document links (topics × locale)
-    help_rows = [
-        {
-            "topic": "getting_started",
-            "locale": "en",
-            "title": "Getting started",
-            "url": "https://cdn.venting.app/help/en/getting-started.html",
-            "is_published": True,
-        },
-        {
-            "topic": "getting_started",
-            "locale": "ar",
-            "title": "البدء",
-            "url": "https://cdn.venting.app/help/ar/getting-started.html",
-            "is_published": True,
-        },
-        {
-            "topic": "faqs",
-            "locale": "en",
-            "title": "FAQs",
-            "url": "https://cdn.venting.app/help/en/faqs.html",
-            "is_published": True,
-        },
-        {
-            "topic": "faqs",
-            "locale": "ar",
-            "title": "الأسئلة الشائعة",
-            "url": "https://cdn.venting.app/help/ar/faqs.html",
-            "is_published": True,
-        },
-        {
-            "topic": "guidelines",
-            "locale": "en",
-            "title": "Community guidelines",
-            "url": "https://cdn.venting.app/help/en/guidelines.html",
-            "is_published": True,
-        },
-        {
-            "topic": "guidelines",
-            "locale": "ar",
-            "title": "إرشادات المجتمع",
-            "url": "https://cdn.venting.app/help/ar/guidelines.html",
-            "is_published": True,
-        },
-        {
-            "topic": "licenses",
-            "locale": "en",
-            "title": "Licenses",
-            "url": "https://cdn.venting.app/help/en/licenses.html",
-            "is_published": True,
-        },
-        {
-            "topic": "licenses",
-            "locale": "ar",
-            "title": "التراخيص",
-            "url": "https://cdn.venting.app/help/ar/licenses.html",
-            "is_published": True,
-        },
-    ]
-    for help_row in help_rows:
-        existing = (
-            db.query(HelpDocument)
-            .filter(
-                HelpDocument.topic == help_row["topic"],
-                HelpDocument.locale == help_row["locale"],
-            )
-            .one_or_none()
-        )
-        if existing is None:
-            db.add(HelpDocument(**help_row))
-        else:
-            existing.title = help_row["title"]
-            existing.url = help_row["url"]
-            existing.is_published = help_row["is_published"]
 
     # Banners — skip duplicates by title+placement
     banners = [

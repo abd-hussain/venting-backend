@@ -31,8 +31,9 @@ class Settings(BaseSettings):
     upload_subdir: str = "uploads"
 
     # Static / non-API content URLs (mobile WebViews & support)
-    terms_url: str = "https://venting.app/terms"
-    privacy_url: str = "https://venting.app/privacy"
+    # Paths match docs/static-web — host under webContentBaseUrl.
+    terms_url: str = "https://venting.app/legal/en/terms.html"
+    privacy_url: str = "https://venting.app/legal/en/privacy.html"
     help_center_base_url: str = "https://venting.app/help"
     support_email: str = "support@venting.app"
     support_whatsapp: str = ""

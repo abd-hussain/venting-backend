@@ -7,8 +7,6 @@ from app.api.v1.admin.auth import router as auth_router
 from app.api.v1.admin.catalogs import router as catalogs_router
 from app.api.v1.admin.cms import router as cms_router
 from app.api.v1.admin.config import router as config_router
-from app.api.v1.admin.help import router as help_router
-from app.api.v1.admin.legal import router as legal_router
 from app.api.v1.admin.listeners import router as listeners_router
 from app.api.v1.admin.notes import router as notes_router
 from app.api.v1.admin.notifications import router as notifications_router
@@ -29,8 +27,6 @@ router.include_router(reports_router)
 router.include_router(notes_router)
 router.include_router(payouts_router)
 router.include_router(catalogs_router)
-router.include_router(legal_router)
-router.include_router(help_router)
 router.include_router(stats_router)
 router.include_router(analytics_router)
 router.include_router(sessions_router)

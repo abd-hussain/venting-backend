@@ -75,9 +75,7 @@ List responses may include:
 | Training | 2 | 71–72 |
 | Promo | 1 | 73 |
 | Catalog / categories | 2 | 74–75 |
-| Legal (terms / privacy) | 1 | 76 |
-| Help (help center topics) | 1 | 77 |
-| **Total** | **79** | |
+| **Total** | **77** | |
 
 ---
 
@@ -1469,188 +1467,7 @@ Empty → `200` + `items: []`.
 
 ---
 
-## 13. Legal documents
 
-### 76. `GET /v1/legal/links`
-
-> **Status:** Implemented on backend.  
-> **Purpose:** Return **locale-specific** Terms of Service and Privacy Policy links for in-app WebViews.  
-> **Managed by:** Admin portal CMS (`/cms/legal`) — content role can edit title + URL per language.  
-> **Multi-language:** One row per `(document, locale)`; mobile sends app locale.
-
-| | |
-|--|--|
-| **Auth** | Public (Bearer accepted if present) |
-| **Screens** | Auth (Terms · Privacy), listener registration, About screens |
-| **When** | On tap (or prefetch at auth/welcome open) |
-| **Query** | `locale` = `en` \| `ar` (default from `Accept-Language` / `skel-accept-language`) |
-| **Response** | `{ locale, terms, privacy }` |
-
-#### `LegalDocumentLink` object
-
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `document` | string | yes | `terms` \| `privacy` |
-| `locale` | string | yes | Resolved locale (`en` / `ar`) |
-| `title` | string | yes | Localized display title |
-| `url` | string | yes | Absolute HTTPS URL opened in WebView |
-| `updated_at` | string | yes | ISO-8601 — for client cache invalidation |
-
-#### Success example
-
-```http
-GET /v1/legal/links?locale=ar
-Accept-Language: ar
-```
-
-```json
-{
-  "status": "success",
-  "data": {
-    "locale": "ar",
-    "terms": {
-      "document": "terms",
-      "locale": "ar",
-      "title": "شروط الخدمة",
-      "url": "https://cdn.venting.app/legal/ar/terms.html",
-      "updated_at": "2026-08-20T10:00:00Z"
-    },
-    "privacy": {
-      "document": "privacy",
-      "locale": "ar",
-      "title": "سياسة الخصوصية",
-      "url": "https://cdn.venting.app/legal/ar/privacy.html",
-      "updated_at": "2026-08-20T10:00:00Z"
-    }
-  }
-}
-```
-
-#### Rules
-
-- Only return **published** rows (`is_published = true`).
-- If `locale=ar` is missing a document, **fall back to `en`** for that document (still report resolved `locale` on the object).
-- URLs must be absolute HTTPS. Portal stores the URL (hosted page or CDN HTML).
-- Mobile may keep build-time `AppConfig` URLs as **offline fallback** only when this API fails.
-- Cache-friendly: `Cache-Control: public, max-age=300` recommended.
-
-#### Errors
-
-| HTTP | type | code | When |
-|------|------|------|------|
-| 400 | validation | 760 | Invalid `locale` |
-| 503 | server | 503 | No published legal docs at all |
-| 500 | server | 500 | Unexpected failure |
-
-#### Acceptance
-
-- [x] Public `GET /v1/legal/links?locale=en` and `?locale=ar`
-- [x] Both `terms` and `privacy` present when published
-- [x] Portal can edit title + URL per locale without an app release
-- [ ] Mobile auth footer Terms / Privacy open the locale-matched URL
-
-#### Portal admin APIs *(CMS — not mobile)*
-
-| Method | Path | Use |
-|--------|------|-----|
-| `GET` | `/v1/admin/legal/documents` | List all locales × documents |
-| `PUT` | `/v1/admin/legal/documents/{document}/{locale}` | Upsert title, url, is_published |
-
-`document` ∈ `terms` \| `privacy`; `locale` ∈ `en` \| `ar`.
-
----
-
-## 14. Help documents
-
-### 77. `GET /v1/help/links`
-
-> **Status:** Implemented on backend.  
-> **Purpose:** Return **locale-specific** Help Center topic links for in-app WebViews.  
-> **Managed by:** Admin portal CMS (`/cms/help`) — content role can edit title + URL per topic × language.  
-> **Multi-language:** One row per `(topic, locale)`; mobile sends app locale.
-
-| | |
-|--|--|
-| **Auth** | Public (Bearer accepted if present) |
-| **Screens** | Help & Support, About (guidelines / licenses) |
-| **When** | On tap (or prefetch) |
-| **Query** | `locale` = `en` \| `ar` (default from `Accept-Language` / `skel-accept-language`); optional `topic` filter |
-| **Response** | `{ locale, items: HelpDocumentLink[] }` |
-
-#### `HelpDocumentLink` object
-
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `topic` | string | yes | e.g. `getting_started`, `faqs`, `guidelines`, `licenses` |
-| `locale` | string | yes | Resolved locale on the row (`en` / `ar`) |
-| `title` | string | yes | Localized display title |
-| `url` | string | yes | Absolute HTTPS URL opened in WebView |
-| `updated_at` | string | yes | ISO-8601 — for client cache invalidation |
-
-#### Success example
-
-```http
-GET /v1/help/links?locale=ar
-```
-
-```json
-{
-  "status": "success",
-  "data": {
-    "locale": "ar",
-    "items": [
-      {
-        "topic": "faqs",
-        "locale": "ar",
-        "title": "الأسئلة الشائعة",
-        "url": "https://cdn.venting.app/help/ar/faqs.html",
-        "updated_at": "2026-08-20T10:00:00Z"
-      },
-      {
-        "topic": "getting_started",
-        "locale": "ar",
-        "title": "البدء",
-        "url": "https://cdn.venting.app/help/ar/getting-started.html",
-        "updated_at": "2026-08-20T10:00:00Z"
-      }
-    ]
-  }
-}
-```
-
-#### Rules
-
-- Only return **published** rows (`is_published = true`).
-- If `locale=ar` is missing a topic, **fall back to `en`** for that topic (still report the row’s locale).
-- Optional `topic` query returns only that topic (after locale resolution / fallback).
-- URLs must be absolute HTTPS. No app-side help base URL.
-- Cache-friendly: `Cache-Control: public, max-age=300` recommended.
-
-#### Errors
-
-| HTTP | type | code | When |
-|------|------|------|------|
-| 400 | validation | 770 | Invalid `locale` |
-| 503 | server | 503 | No published help docs (for locale / topic) |
-| 500 | server | 500 | Unexpected failure |
-
-#### Acceptance
-
-- [x] Public `GET /v1/help/links?locale=en` and `?locale=ar`
-- [x] Seeded topics include `getting_started`, `faqs`, `guidelines`, `licenses`
-- [x] Portal can edit title + URL per topic × locale without an app release
-- [ ] Mobile Help & Support opens the locale-matched URL by topic
-
-#### Portal admin APIs *(CMS — not mobile)*
-
-| Method | Path | Use |
-|--------|------|-----|
-| `GET` | `/v1/admin/help/documents` | List all topics × locales |
-| `PUT` | `/v1/admin/help/documents/{topic}/{locale}` | Upsert title, url, is_published |
-
-`locale` ∈ `en` \| `ar`; `topic` is a lowercase slug.
-
----
 ## Efficiency guidelines (for implementers)
 
 1. **Prefer aggregates** — `#11` ventor home and `#30` listener dashboard load one screen in one round-trip.
@@ -1666,12 +1483,21 @@ GET /v1/help/links?locale=ar
 
 | URL | Use | 
 |-----|-----|
-| **Prefer `#76`** `GET /v1/legal/links` | Terms + Privacy (locale-aware, portal-editable) |
-| **Prefer `#77`** `GET /v1/help/links` | Help Center topics (locale-aware, portal-editable) |
+| Static HTML (see below) | Terms / Privacy / Help (EN + AR) — opened in WebView |
 | `mailto:support@venting.app` | Support email |
 | WhatsApp `wa.me` | Support / share |
 
-> Hardcoded `termsUrl` / `privacyUrl` / help base URLs in app flavors are **fallback only**.
+### Static legal & help pages *(not REST — no server API round-trip for metadata)*
+
+Ship **6** static files under `webContentBaseUrl` (dev: `https://dev.venting.app`, prod: `https://venting.app`). Source HTML lives in [`docs/static-web/`](./static-web/README.md).
+
+| Page | EN | AR |
+|------|----|----|
+| Terms of Service | `/legal/en/terms.html` | `/legal/ar/terms.html` |
+| Privacy Policy | `/legal/en/privacy.html` | `/legal/ar/privacy.html` |
+| Help & Support | `/help/en/index.html` | `/help/ar/index.html` |
+
+Mobile picks locale from the app language and opens the matching URL (Help tiles append `#fragment` anchors on the same help page). **No** `GET /v1/legal/*` or `GET /v1/help/*` endpoints.
 
 ---
 
@@ -1691,9 +1517,7 @@ GET /v1/help/links?locale=ar
 | Training | 2 |
 | Promo | 1 |
 | Catalog / categories | 2 |
-| Legal links | 1 |
-| Help links | 1 |
-| **Total unique API endpoints** | **79** |
+| **Total unique API endpoints** | **77** |
 
 ### Master checklist (method + path)
 
@@ -1776,16 +1600,14 @@ GET /v1/help/links?locale=ar
 | 73 | POST | `/v1/promo/validate` |
 | 74 | GET | `/v1/catalog/categories` *(proposed)* |
 | 75 | GET | `/v1/catalog/languages` *(proposed)* |
-| 76 | GET | `/v1/legal/links` |
-| 77 | GET | `/v1/help/links` |
 
 ---
 
 ## Final count
 
-**Total unique API endpoints: 79**
+**Total unique API endpoints: 77**
 
-**Live / wired in the mobile app today: 0** (auth + catalog + legal/help clients exist; backend contracts still proposed where marked)
+**Live / wired in the mobile app today: 0** (auth + catalog clients exist; backend contracts still proposed where marked). Static legal/help HTML is separate from this REST count.
 
 ---
 
