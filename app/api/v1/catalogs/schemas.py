@@ -48,3 +48,17 @@ class LifeExperienceResponse(BaseModel):
 
 class LifeExperiencesListResponse(BaseModel):
     items: list[LifeExperienceResponse]
+
+
+class BoundaryResponse(BaseModel):
+    id: str
+    name_en: str
+    name_ar: str
+    icon_emoji: str
+    icon_url: str | None = None
+    sort_order: int
+    allows_custom_text: bool = False
+
+
+class BoundariesListResponse(BaseModel):
+    items: list[BoundaryResponse]

@@ -44,6 +44,23 @@ class LifeExperienceUpsertRequest(CatalogUpsertRequest):
     sort_order: int = Field(default=0, ge=0)
 
 
+class BoundaryUpsertRequest(CatalogUpsertRequest):
+    icon_emoji: str = Field(default="🛡️", min_length=1, max_length=16)
+    sort_order: int = Field(default=0, ge=0)
+    allows_custom_text: bool = False
+
+
+class BoundaryResponse(BaseModel):
+    id: str
+    name_en: str
+    name_ar: str
+    icon_emoji: str = "🛡️"
+    icon_url: str | None = None
+    sort_order: int = 0
+    allows_custom_text: bool = False
+    is_active: bool
+
+
 class LanguageUpsertRequest(CatalogUpsertRequest):
     name_native: str = Field(min_length=1, max_length=64)
     flag_emoji: str | None = Field(default=None, max_length=16)

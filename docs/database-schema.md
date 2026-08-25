@@ -397,7 +397,13 @@ Exposed publicly via `#76 GET /v1/catalog/life-experiences` (active rows only).
 | `id` | VARCHAR(64) | **PK** |
 | `name_en` | VARCHAR(120) | |
 | `name_ar` | VARCHAR(120) | |
+| `icon_emoji` | VARCHAR(16) | Unicode emoji — same pattern as `comfort_areas.icon_emoji` |
+| `icon_url` | TEXT | ? optional CDN image URL |
+| `sort_order` | INT | Ascending — portal-managed |
+| `allows_custom_text` | BOOLEAN | default false — e.g. optional “Other” |
 | `is_active` | BOOLEAN | |
+
+Exposed publicly via `#77 GET /v1/catalog/boundaries` (active rows only).
 
 ### 10. `ventor_languages`
 

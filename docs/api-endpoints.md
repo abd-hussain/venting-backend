@@ -74,8 +74,8 @@ List responses may include:
 | Notifications | 3 | 68–70 |
 | Training | 2 | 71–72 |
 | Promo | 1 | 73 |
-| Catalog / categories | 3 | 74–76 |
-| **Total** | **80** | |
+| Catalog / categories | 4 | 74–77 |
+| **Total** | **81** | |
 
 ---
 
@@ -1250,7 +1250,8 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 > - `#74` `GET /v1/catalog/categories`
 > - `#75` `GET /v1/catalog/languages`
 > - `#76` `GET /v1/catalog/life-experiences`
-> (Boundaries may later get a focused endpoint — never the mega dump.)
+> - `#77` `GET /v1/catalog/boundaries`
+> (Never use the mega dump.)
 
 ### 74. `GET /v1/catalog/categories` *(proposed)*
 
@@ -1713,6 +1714,155 @@ Empty → `200` + `items: []`. Do **not** 404.
 
 ---
 
+### 77. `GET /v1/catalog/boundaries` *(proposed)*
+
+> **Status:** Proposed — listener registration boundary picker.  
+> **Purpose:** Return active boundary tags from `boundaries`.  
+> **DB source:** `boundaries` (`id`, `name_en`, `name_ar`, `icon_emoji`, optional `icon_url`, `sort_order`, `is_active`).  
+> **Managed by:** Admin portal catalogs → Boundaries (`A52`).
+
+| | |
+|--|--|
+| **Auth** | Public (Bearer accepted if present) |
+| **Screen** | Listener registration → **Select your Boundaries** (step 6) |
+| **When** | Step open / retry after error |
+| **Query** | Optional `locale` (`en` \| `ar`) — hint only; response includes both names |
+| **Response** | `{ items: Boundary[] }` — see legacy note below |
+
+> **Legacy shape (current Heroku):** `{ status, data: Boundary[] }` (array directly under `data`). Mobile accepts **both** `{ data: { items } }` and `{ data: [...] }`. New backends should use the standard `{ data: { items } }` envelope.
+
+#### `Boundary` object
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `id` | string | yes | Stable slug PK — sent later in `#22` `boundary_ids` |
+| `name_en` | string | yes | English label |
+| `name_ar` | string | yes | Arabic label |
+| `icon_emoji` | string | yes | Unicode emoji for the leading icon (e.g. `🛡️`) — same pattern as `#74` categories |
+| `icon_url` | string \| null | no | Optional CDN image URL; mobile **prefers `icon_url` when non-empty**, else shows `icon_emoji`. Legacy field name `image_url` is accepted. |
+| `sort_order` | number | yes | Ascending |
+| `allows_custom_text` | boolean | no | default `false` — `true` for optional “Other” row with free text |
+
+#### Success example
+
+```http
+GET /v1/catalog/boundaries
+Accept-Language: en
+```
+
+```json
+{
+  "status": "success",
+  "data": {
+    "items": [
+      {
+        "id": "suicide_self_harm",
+        "name_en": "Suicide / Self-harm",
+        "name_ar": "الانتحار / إيذاء النفس",
+        "icon_emoji": "🛡️",
+        "icon_url": null,
+        "sort_order": 10,
+        "allows_custom_text": false
+      },
+      {
+        "id": "domestic_violence",
+        "name_en": "Domestic violence",
+        "name_ar": "العنف الأسري",
+        "icon_emoji": "🏠",
+        "icon_url": null,
+        "sort_order": 20,
+        "allows_custom_text": false
+      },
+      {
+        "id": "sexual_topics",
+        "name_en": "Sexual topics",
+        "name_ar": "مواضيع جنسية",
+        "icon_emoji": "👁️",
+        "icon_url": null,
+        "sort_order": 30,
+        "allows_custom_text": false
+      },
+      {
+        "id": "addiction",
+        "name_en": "Addiction",
+        "name_ar": "الإدمان",
+        "icon_emoji": "💊",
+        "icon_url": null,
+        "sort_order": 40,
+        "allows_custom_text": false
+      },
+      {
+        "id": "politics",
+        "name_en": "Politics",
+        "name_ar": "السياسة",
+        "icon_emoji": "🏛️",
+        "icon_url": null,
+        "sort_order": 50,
+        "allows_custom_text": false
+      },
+      {
+        "id": "religion",
+        "name_en": "Religion",
+        "name_ar": "الدين",
+        "icon_emoji": "📖",
+        "icon_url": null,
+        "sort_order": 60,
+        "allows_custom_text": false
+      },
+      {
+        "id": "illegal_activities",
+        "name_en": "Illegal activities",
+        "name_ar": "أنشطة غير قانونية",
+        "icon_emoji": "🚫",
+        "icon_url": null,
+        "sort_order": 70,
+        "allows_custom_text": false
+      }
+    ]
+  }
+}
+```
+
+#### Seed notes
+
+| `id` | `icon_emoji` |
+|------|--------------|
+| `suicide_self_harm` | 🛡️ |
+| `domestic_violence` | 🏠 |
+| `sexual_topics` | 👁️ |
+| `addiction` | 💊 |
+| `politics` | 🏛️ |
+| `religion` | 📖 |
+| `illegal_activities` | 🚫 |
+
+Mobile must **not** hardcode boundary labels or icons. Prefer `icon_url` when set; otherwise show `icon_emoji`.
+
+#### Mobile usage
+
+1. Open listener registration step 6.
+2. `GET /v1/catalog/boundaries`.
+3. Show shimmer list rows until response arrives.
+4. Render `items` sorted by `sort_order`; label = `ar ? name_ar : name_en`.
+5. Multi-select optional (0+ boundaries) → `#22` `boundary_ids`.
+6. If `allows_custom_text` item selected → require non-empty custom text before Continue.
+
+#### Errors
+
+| HTTP | type | code | When |
+|------|------|------|------|
+| 500 / 503 | server | … | Failure |
+
+Empty → `200` + `items: []`. Do **not** 404.
+
+#### Acceptance
+
+- [ ] Public `GET /v1/catalog/boundaries` returns active rows only
+- [ ] Standard `{ status, data: { items } }` envelope (or legacy array under `data` during migration)
+- [ ] Both `name_en` and `name_ar` + non-empty `icon_emoji` per row
+- [ ] Same `id`s accepted by `#22` `boundary_ids`
+
+---
+
 ## Efficiency guidelines (for implementers)
 
 1. **Prefer aggregates** — `#11` ventor home and `#30` listener dashboard load one screen in one round-trip.
@@ -1770,8 +1920,8 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | Notifications | 3 |
 | Training | 2 |
 | Promo | 1 |
-| Catalog / categories | 3 |
-| **Total unique API endpoints** | **80** |
+| Catalog / categories | 4 |
+| **Total unique API endpoints** | **81** |
 
 ### Master checklist (method + path)
 
@@ -1857,12 +2007,13 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | 74 | GET | `/v1/catalog/categories` *(proposed)* |
 | 75 | GET | `/v1/catalog/languages` *(proposed)* |
 | 76 | GET | `/v1/catalog/life-experiences` *(proposed)* |
+| 77 | GET | `/v1/catalog/boundaries` *(proposed)* |
 
 ---
 
 ## Final count
 
-**Total unique API endpoints: 80**
+**Total unique API endpoints: 81**
 
 **Live / wired in the mobile app today: 0** (auth + catalog clients exist; backend contracts still proposed where marked). Static legal/help HTML is separate from this REST count.
 

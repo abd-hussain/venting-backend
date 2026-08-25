@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from app.api.v1.admin.catalogs.schemas import (
     CatalogUpsertRequest,
+    BoundaryUpsertRequest,
     ComfortAreaUpsertRequest,
     LanguageUpsertRequest,
     LifeExperienceUpsertRequest,
@@ -160,6 +161,38 @@ async def parse_comfort_area_upsert(
 
     try:
         payload = ComfortAreaUpsertRequest.model_validate(await request.json())
+    except ValidationError as exc:
+        raise validation_error(str(exc.errors()[0]["msg"])) from exc
+    return payload, None
+
+
+async def parse_boundary_upsert(
+    request: Request,
+) -> tuple[BoundaryUpsertRequest, UploadFile | None]:
+    content_type = request.headers.get("content-type", "")
+    if content_type.startswith("multipart/form-data"):
+        form = await request.form()
+        image = form.get("image")
+        upload: UploadFile | None = None
+        if isinstance(image, UploadFile) and image.filename:
+            upload = image
+        try:
+            payload = BoundaryUpsertRequest(
+                name_en=str(form.get("name_en", "")),
+                name_ar=str(form.get("name_ar", "")),
+                icon_emoji=str(form.get("icon_emoji") or "🛡️"),
+                sort_order=int(form.get("sort_order") or 0),
+                allows_custom_text=_parse_bool(
+                    form.get("allows_custom_text"), default=False
+                ),
+                is_active=_parse_bool(form.get("is_active")),
+            )
+        except ValidationError as exc:
+            raise validation_error(str(exc.errors()[0]["msg"])) from exc
+        return payload, upload
+
+    try:
+        payload = BoundaryUpsertRequest.model_validate(await request.json())
     except ValidationError as exc:
         raise validation_error(str(exc.errors()[0]["msg"])) from exc
     return payload, None

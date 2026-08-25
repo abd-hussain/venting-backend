@@ -4,7 +4,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.v1.catalogs.schemas import (
-    CatalogItemResponse,
+    BoundaryResponse,
     CategoryResponse,
     LanguageResponse,
     LifeExperienceResponse,
@@ -13,12 +13,19 @@ from app.core.errors import validation_error
 from app.models.lookups import Boundary, ComfortArea, Language, LifeExperience
 
 
-def _item(row: Boundary) -> CatalogItemResponse:
-    return CatalogItemResponse(
+def _boundary_icon_url(row: Boundary) -> str | None:
+    return row.icon_url or row.image_url
+
+
+def _boundary_item(row: Boundary) -> BoundaryResponse:
+    return BoundaryResponse(
         id=row.id,
         name_en=row.name_en,
         name_ar=row.name_ar,
-        image_url=row.image_url,
+        icon_emoji=row.icon_emoji,
+        icon_url=_boundary_icon_url(row),
+        sort_order=row.sort_order,
+        allows_custom_text=row.allows_custom_text,
     )
 
 
@@ -129,11 +136,11 @@ def list_life_experiences(db: Session) -> list[LifeExperienceResponse]:
     return [_life_experience_item(row) for row in rows]
 
 
-def list_boundaries(db: Session) -> list[CatalogItemResponse]:
+def list_boundaries(db: Session) -> list[BoundaryResponse]:
     rows = (
         db.query(Boundary)
         .filter(Boundary.is_active.is_(True))
-        .order_by(Boundary.id)
+        .order_by(Boundary.sort_order, Boundary.id)
         .all()
     )
-    return [_item(row) for row in rows]
+    return [_boundary_item(row) for row in rows]

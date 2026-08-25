@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query
 
 from app.api.deps import DbSession
 from app.api.v1.catalogs.schemas import (
-    CatalogItemResponse,
+    BoundariesListResponse,
     CategoriesListResponse,
     LanguagesListResponse,
     LifeExperiencesListResponse,
@@ -64,10 +64,13 @@ def life_experiences_list(db: DbSession):
 
 @router.get(
     "/boundaries",
-    response_model=APISuccessResponse[list[CatalogItemResponse]],
+    response_model=APISuccessResponse[BoundariesListResponse],
     summary="Listener boundary tags (focused catalog)",
 )
 def boundaries_list(db: DbSession):
-    return success_response(
-        [item.model_dump(mode="json") for item in list_boundaries(db)]
+    items = list_boundaries(db)
+    response = success_response(
+        BoundariesListResponse(items=items).model_dump(mode="json")
     )
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return response

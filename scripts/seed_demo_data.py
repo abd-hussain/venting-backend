@@ -160,13 +160,13 @@ def seed_catalogs(db: Session) -> None:
         db,
         Boundary,
         [
-            {"id": "suicide_self_harm", "name_en": "Suicide / Self-harm", "name_ar": "الانتحار / إيذاء النفس", "is_active": True},
-            {"id": "domestic_violence", "name_en": "Domestic violence", "name_ar": "العنف الأسري", "is_active": True},
-            {"id": "sexual_topics", "name_en": "Sexual topics", "name_ar": "مواضيع جنسية", "is_active": True},
-            {"id": "addiction", "name_en": "Addiction", "name_ar": "الإدمان", "is_active": True},
-            {"id": "politics", "name_en": "Politics", "name_ar": "السياسة", "is_active": True},
-            {"id": "religion", "name_en": "Religion", "name_ar": "الدين", "is_active": True},
-            {"id": "illegal_activities", "name_en": "Illegal activities", "name_ar": "أنشطة غير قانونية", "is_active": True},
+            {"id": "suicide_self_harm", "name_en": "Suicide / Self-harm", "name_ar": "الانتحار / إيذاء النفس", "icon_emoji": "🛡️", "icon_url": None, "sort_order": 10, "allows_custom_text": False, "is_active": True},
+            {"id": "domestic_violence", "name_en": "Domestic violence", "name_ar": "العنف الأسري", "icon_emoji": "🏠", "icon_url": None, "sort_order": 20, "allows_custom_text": False, "is_active": True},
+            {"id": "sexual_topics", "name_en": "Sexual topics", "name_ar": "مواضيع جنسية", "icon_emoji": "👁️", "icon_url": None, "sort_order": 30, "allows_custom_text": False, "is_active": True},
+            {"id": "addiction", "name_en": "Addiction", "name_ar": "الإدمان", "icon_emoji": "💊", "icon_url": None, "sort_order": 40, "allows_custom_text": False, "is_active": True},
+            {"id": "politics", "name_en": "Politics", "name_ar": "السياسة", "icon_emoji": "🏛️", "icon_url": None, "sort_order": 50, "allows_custom_text": False, "is_active": True},
+            {"id": "religion", "name_en": "Religion", "name_ar": "الدين", "icon_emoji": "📖", "icon_url": None, "sort_order": 60, "allows_custom_text": False, "is_active": True},
+            {"id": "illegal_activities", "name_en": "Illegal activities", "name_ar": "أنشطة غير قانونية", "icon_emoji": "🚫", "icon_url": None, "sort_order": 70, "allows_custom_text": False, "is_active": True},
         ],
     )
 

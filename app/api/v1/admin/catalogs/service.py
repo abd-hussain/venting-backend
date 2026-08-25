@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.admin.audit import write_audit
 from app.api.v1.admin.catalogs.schemas import (
+    BoundaryResponse,
+    BoundaryUpsertRequest,
     CatalogItemResponse,
     CatalogUpsertRequest,
     ComfortAreaResponse,
@@ -30,14 +32,31 @@ CatalogModel = TypeVar(
 )
 
 
-def _item(row: LifeExperience | Boundary) -> CatalogItemResponse:
+def _item(row: LifeExperience) -> CatalogItemResponse:
     return CatalogItemResponse(
         id=row.id,
         name_en=row.name_en,
         name_ar=row.name_ar,
         is_active=row.is_active,
         image_url=row.image_url,
-        sort_order=getattr(row, "sort_order", 0) or 0,
+        sort_order=row.sort_order,
+    )
+
+
+def _boundary_icon_url(row: Boundary) -> str | None:
+    return row.icon_url or row.image_url
+
+
+def _boundary_item(row: Boundary) -> BoundaryResponse:
+    return BoundaryResponse(
+        id=row.id,
+        name_en=row.name_en,
+        name_ar=row.name_ar,
+        icon_emoji=row.icon_emoji,
+        icon_url=_boundary_icon_url(row),
+        sort_order=row.sort_order,
+        allows_custom_text=row.allows_custom_text,
+        is_active=row.is_active,
     )
 
 
@@ -94,8 +113,13 @@ def list_life_experiences(db: Session) -> list[CatalogItemResponse]:
     ]
 
 
-def list_boundaries(db: Session) -> list[CatalogItemResponse]:
-    return [_item(row) for row in db.query(Boundary).order_by(Boundary.id).all()]
+def list_boundaries(db: Session) -> list[BoundaryResponse]:
+    return [
+        _boundary_item(row)
+        for row in db.query(Boundary)
+        .order_by(Boundary.sort_order, Boundary.id)
+        .all()
+    ]
 
 
 def _audit_snapshot(row: CatalogModel) -> dict[str, object]:
@@ -131,6 +155,15 @@ def _audit_snapshot(row: CatalogModel) -> dict[str, object]:
                 "sort_order": row.sort_order,
             }
         )
+    elif isinstance(row, Boundary):
+        data.update(
+            {
+                "icon_emoji": row.icon_emoji,
+                "icon_url": _boundary_icon_url(row),
+                "sort_order": row.sort_order,
+                "allows_custom_text": row.allows_custom_text,
+            }
+        )
     else:
         data["image_url"] = row.image_url
     return data
@@ -160,7 +193,7 @@ async def _apply_image_field(
 async def _upsert_tagged(
     db: Session,
     *,
-    model: type[LifeExperience] | type[Boundary],
+    model: type[LifeExperience],
     item_id: str,
     payload: CatalogUpsertRequest,
     admin: AdminPrincipal,
@@ -168,7 +201,7 @@ async def _upsert_tagged(
     catalog_type: str,
     image: UploadFile | None,
     settings: Settings,
-) -> LifeExperience | Boundary:
+) -> LifeExperience:
     row = db.get(model, item_id)
     is_new = row is None
     before = None
@@ -276,25 +309,45 @@ async def upsert_language(
 async def upsert_boundary(
     db: Session,
     item_id: str,
-    payload: CatalogUpsertRequest,
+    payload: BoundaryUpsertRequest,
     admin: AdminPrincipal,
     *,
     image: UploadFile | None,
     settings: Settings,
-) -> CatalogItemResponse:
-    return _item(
-        await _upsert_tagged(
-            db,
-            model=Boundary,
-            item_id=item_id,
-            payload=payload,
-            admin=admin,
-            entity_type="boundary",
+) -> BoundaryResponse:
+    row = db.get(Boundary, item_id)
+    is_new = row is None
+    before = None
+    if is_new:
+        row = Boundary(id=item_id)
+        db.add(row)
+    else:
+        before = _audit_snapshot(row)
+    row.name_en = payload.name_en
+    row.name_ar = payload.name_ar
+    row.icon_emoji = payload.icon_emoji
+    row.sort_order = payload.sort_order
+    row.allows_custom_text = payload.allows_custom_text
+    row.is_active = payload.is_active
+    if image is not None:
+        row.icon_url = await save_catalog_image(
+            image,
             catalog_type="boundaries",
-            image=image,
+            item_id=item_id,
             settings=settings,
         )
+    write_audit(
+        db,
+        admin_user_id=admin.id,
+        action="catalog.upsert",
+        entity_type="boundary",
+        entity_id=item_id,
+        before=before,
+        after=_audit_snapshot(row),
     )
+    db.commit()
+    db.refresh(row)
+    return _boundary_item(row)
 
 
 async def upsert_comfort_area(

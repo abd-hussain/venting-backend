@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request
 
 from app.api.deps import DbSession, SettingsDep
 from app.api.v1.admin.catalogs.parse import (
+    parse_boundary_upsert,
     parse_catalog_upsert,
     parse_comfort_area_upsert,
     parse_language_upsert,
@@ -11,6 +12,7 @@ from app.api.v1.admin.catalogs.parse import (
     validate_catalog_id,
 )
 from app.api.v1.admin.catalogs.schemas import (
+    BoundaryResponse,
     CatalogItemResponse,
     ComfortAreaResponse,
     LanguageResponse,
@@ -175,7 +177,7 @@ async def life_experience_upsert(
 
 @router.get(
     "/boundaries",
-    response_model=APISuccessResponse[list[CatalogItemResponse]],
+    response_model=APISuccessResponse[list[BoundaryResponse]],
     responses={401: {"model": APIErrorResponse}, 403: {"model": APIErrorResponse}},
 )
 def boundaries_list(db: DbSession, _admin: CatalogReader):
@@ -186,7 +188,7 @@ def boundaries_list(db: DbSession, _admin: CatalogReader):
 
 @router.put(
     "/boundaries/{item_id}",
-    response_model=APISuccessResponse[CatalogItemResponse],
+    response_model=APISuccessResponse[BoundaryResponse],
     responses={
         400: {"model": APIErrorResponse},
         401: {"model": APIErrorResponse},
@@ -201,7 +203,7 @@ async def boundary_upsert(
     settings: SettingsDep,
 ):
     validate_catalog_id(item_id)
-    payload, image = await parse_catalog_upsert(request)
+    payload, image = await parse_boundary_upsert(request)
     return success_response(
         (
             await upsert_boundary(
