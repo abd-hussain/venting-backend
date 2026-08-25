@@ -6,6 +6,7 @@ from app.api.deps import DbSession, SettingsDep
 from app.api.v1.admin.catalogs.parse import (
     parse_catalog_upsert,
     parse_comfort_area_upsert,
+    parse_language_upsert,
     validate_catalog_id,
 )
 from app.api.v1.admin.catalogs.schemas import (
@@ -69,7 +70,7 @@ async def language_upsert(
     settings: SettingsDep,
 ):
     validate_catalog_id(item_id, max_length=16)
-    payload, image = await parse_catalog_upsert(request)
+    payload, image = await parse_language_upsert(request)
     return success_response(
         (
             await upsert_language(

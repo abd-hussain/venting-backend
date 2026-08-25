@@ -286,8 +286,10 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 |--|--|
 | **Auth** | Bearer |
 | **Screen** | Ventor registration (profile + interests) |
-| **Body** | `nickname` (≤20), `gender` (`male` \| `female` \| `prefer_not_to_say`), `avatar` (multipart file **or** `avatar_preset_index`), `interest_ids` (string[]) |
+| **Body** | `nickname` (≤20), `gender` (`male` \| `female` \| `prefer_not_to_say`), `avatar` (multipart file **or** `avatar_preset_index`), `interest_ids` (JSON string[] of catalog category ids), optional `other_interest_text` (required min 2 chars when an `allows_custom_text` category such as `other` is selected) |
 | **Response** | Ventor profile object (see #9) |
+
+`interest_ids` must be active catalog categories with `audience` = `ventor` or `all` (see `#74`).
 
 ---
 
@@ -1006,6 +1008,33 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 
 ---
 
+## 12. Catalog
+
+### 74. `GET /v1/catalog/categories`
+
+| | |
+|--|--|
+| **Auth** | Public (Bearer optional) |
+| **Screen** | Ventor registration interests step |
+| **Query** | `audience` = `ventor` \| `listener` \| `all` (default `all`) |
+| **Response** | `{ items: [{ id, name_en, name_ar, icon_key, sort_order, allows_custom_text, topic_group? }] }` |
+
+Filter: active rows where `audience` matches the query **or** `audience = all`. Sorted by `sort_order`. Invalid `audience` → `400` code `740`.
+
+`icon_key` maps to Material icons on mobile (e.g. `favorite`, `work_outline`, `add_circle_outline`).
+
+### 75. `GET /v1/catalog/languages`
+
+| | |
+|--|--|
+| **Auth** | Public (Bearer optional) |
+| **Screen** | Listener languages picker · session booking `speech_language` |
+| **Response** | `{ items: [{ id, name_en, name_ar, sort_order, image_url? }] }` |
+
+Active speaking languages sorted by `sort_order`. Use `id` as `language_ids[]` / `speech_language` values (e.g. `en`, `ar`).
+
+---
+
 ## Efficiency guidelines (for implementers)
 
 1. **Prefer aggregates** — `#11` ventor home and `#30` listener dashboard load one screen in one round-trip.
@@ -1044,7 +1073,8 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 | Notifications | 3 |
 | Training | 2 |
 | Promo | 1 |
-| **Total unique API endpoints** | **75** |
+| Catalog | 2 |
+| **Total unique API endpoints** | **77** |
 
 ### Master checklist (method + path)
 
@@ -1125,12 +1155,14 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 | 71 | GET | `/v1/listeners/me/training` |
 | 72 | POST | `/v1/listeners/me/training/{moduleId}/complete` |
 | 73 | POST | `/v1/promo/validate` |
+| 74 | GET | `/v1/catalog/categories` |
+| 75 | GET | `/v1/catalog/languages` |
 
 ---
 
 ## Final count
 
-**Total unique API endpoints: 73**
+**Total unique API endpoints: 77**
 
 **Live / wired in the mobile app today: 0**
 

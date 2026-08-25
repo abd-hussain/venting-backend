@@ -32,6 +32,7 @@
 |--:|-------|--------|
 | 1 | `users` | Auth |
 | 2 | `refresh_tokens` | Auth |
+| 2b | `auth_identities` | Auth (social — proposed) |
 | 3 | `ventor_profiles` | Ventor |
 | 4 | `listener_profiles` | Listener |
 | 5 | `listener_identity_verifications` | Listener onboarding |
@@ -171,7 +172,7 @@ Core login identity. One row per account.
 |--------|------|-------|
 | `id` | UUID | **PK** |
 | `email` | VARCHAR(255) | **UQ**, lowercased |
-| `password_hash` | VARCHAR(255) | ? nullable for social-only accounts |
+| `password_hash` | VARCHAR(255) | Nullable for social-only accounts — see [`social-auth-backend-requirements.md`](./social-auth-backend-requirements.md) |
 | `role` | `user_role` | ventor \| listener |
 | `is_active` | BOOLEAN | default true |
 | `registration_complete` | BOOLEAN | default false |
@@ -200,24 +201,24 @@ Core login identity. One row per account.
 
 ---
 
-### 3. `auth_identities`
+### 2b. `auth_identities` *(proposed — social auth)*
 
-Links a user to Google or Apple (`provider` + token `sub`).
+> Full requirements: [`social-auth-backend-requirements.md`](./social-auth-backend-requirements.md)
+
+Links a Venting user to a Google or Apple identity (`sub`).
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | UUID | **PK** |
-| `user_id` | UUID | **FK → users** ON DELETE CASCADE |
-| `provider` | `auth_provider` | google \| apple |
-| `provider_user_id` | VARCHAR(255) | token `sub` |
-| `email` | VARCHAR(255) | ? last known provider email |
-| `raw_profile` | JSONB | ? non-secret claims / Apple name snapshot |
+| `user_id` | UUID | **FK → users** |
+| `provider` | VARCHAR(16) | `google` \| `apple` |
+| `provider_user_id` | VARCHAR(255) | Provider `sub` |
+| `email` | VARCHAR(255) | ? last known email from provider |
+| `raw_profile` | JSONB | ? non-secret claims |
 | `created_at` | TIMESTAMPTZ | |
 | `updated_at` | TIMESTAMPTZ | |
 
-**Constraints:** `UQ(provider, provider_user_id)`, `UQ(user_id, provider)`
-
-**Indexes:** `IDX(user_id)`
+**Indexes:** `UQ(provider, provider_user_id)`, `UQ(user_id, provider)`
 
 ---
 
@@ -314,11 +315,12 @@ Stable catalogs (seed once). App uses string ids like `anxiety_stress`, `en`, `p
 
 | Column | Type | Notes |
 |--------|------|-------|
-| `id` | VARCHAR(16) | **PK** e. and `en`, `ar` |
+| `id` | VARCHAR(16) | **PK** e.g. `en`, `ar` |
 | `name_en` | VARCHAR(64) | |
 | `name_ar` | VARCHAR(64) | |
+| `sort_order` | INT | default 0 — ascending display order |
 | `is_active` | BOOLEAN | default true |
-| `image_url` | TEXT | HTTPS URL to category image |
+| `image_url` | TEXT | ? flag / icon image |
 
 ### 7. `comfort_areas`
 
@@ -327,9 +329,12 @@ Stable catalogs (seed once). App uses string ids like `anxiety_stress`, `en`, `p
 | `id` | VARCHAR(64) | **PK** |
 | `name_en` | VARCHAR(120) | |
 | `name_ar` | VARCHAR(120) | |
+| `icon_key` | VARCHAR(64) | e.g. `favorite`, `work` — mobile maps to Material icon |
+| `sort_order` | INT | default 0 — ascending display order |
+| `allows_custom_text` | BOOLEAN | default false — e.g. `other` shows free-text field |
+| `audience` | VARCHAR(32) | `ventor` \| `listener` \| `all` — who may select this category |
 | `topic_group` | VARCHAR(64) | ? e.g. anxiety, relationships |
 | `is_active` | BOOLEAN | |
-| `image_url` | TEXT | HTTPS URL to category image |
 
 ### 8. `life_experiences`
 
@@ -339,7 +344,6 @@ Stable catalogs (seed once). App uses string ids like `anxiety_stress`, `en`, `p
 | `name_en` | VARCHAR(120) | |
 | `name_ar` | VARCHAR(120) | |
 | `is_active` | BOOLEAN | |
-| `image_url` | TEXT | HTTPS URL to category image |
 
 ### 9. `boundaries`
 
@@ -349,7 +353,6 @@ Stable catalogs (seed once). App uses string ids like `anxiety_stress`, `en`, `p
 | `name_en` | VARCHAR(120) | |
 | `name_ar` | VARCHAR(120) | |
 | `is_active` | BOOLEAN | |
-| `image_url` | TEXT | HTTPS URL to category image |
 
 ### 10. `ventor_interests`
 
@@ -357,6 +360,7 @@ Stable catalogs (seed once). App uses string ids like `anxiety_stress`, `en`, `p
 |--------|------|-------|
 | `ventor_id` | UUID | **FK → ventor_profiles** |
 | `comfort_area_id` | VARCHAR(64) | **FK → comfort_areas** |
+| `custom_text` | VARCHAR(280) | ? free text when category `allows_custom_text` |
 | | | **PK (`ventor_id`, `comfort_area_id`)** |
 
 ### 11. `listener_languages`
@@ -758,7 +762,6 @@ Append-only money movement (earnings chart + audit).
 | `max_tier` | `earnings_tier` | ? |
 | `is_welcome_gift` | BOOLEAN | default false |
 | `is_active` | BOOLEAN | |
-| `expires_at` | TIMESTAMPTZ | ? when set, offer cannot be redeemed after this instant (UTC) |
 | `created_at` | TIMESTAMPTZ | |
 
 ### 36. `reward_trades`
@@ -916,7 +919,8 @@ Append-only money movement (earnings chart + audit).
 
 | API area | Primary tables |
 |----------|----------------|
-| Auth 1–7 | `users`, `refresh_tokens` |
+| Auth 0–7, 1b | `users`, `refresh_tokens`, `auth_identities` *(proposed)* |
+| Catalog 74 | `comfort_areas` *(categories)* |
 | Ventor profile / home | `ventor_profiles`, `mood_checkins`, `ventor_favorites`, `sessions` |
 | Listener profile / setup | `listener_profiles`, identity, tag junctions, training |
 | Availability | settings + `listener_availability_slots` |

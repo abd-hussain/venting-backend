@@ -1,6 +1,6 @@
 """Lookup & tag-link tables — docs/database-schema.md § 3."""
 
-from sqlalchemy import Boolean, Column, ForeignKey, String, Text
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.db.base import Base
@@ -12,6 +12,7 @@ class Language(Base):
     id = Column(String(16), primary_key=True)
     name_en = Column(String(64), nullable=False)
     name_ar = Column(String(64), nullable=False)
+    sort_order = Column(Integer, nullable=False, server_default="0")
     is_active = Column(Boolean, nullable=False, server_default="true")
     image_url = Column(Text, nullable=True)
 
@@ -22,6 +23,10 @@ class ComfortArea(Base):
     id = Column(String(64), primary_key=True)
     name_en = Column(String(120), nullable=False)
     name_ar = Column(String(120), nullable=False)
+    icon_key = Column(String(64), nullable=False, server_default="category")
+    sort_order = Column(Integer, nullable=False, server_default="0")
+    allows_custom_text = Column(Boolean, nullable=False, server_default="false")
+    audience = Column(String(32), nullable=False, server_default="all")
     topic_group = Column(String(64), nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="true")
     image_url = Column(Text, nullable=True)
@@ -60,6 +65,7 @@ class VentorInterest(Base):
         ForeignKey("comfort_areas.id", ondelete="CASCADE"),
         primary_key=True,
     )
+    custom_text = Column(String(280), nullable=True)
 
 
 class ListenerLanguage(Base):

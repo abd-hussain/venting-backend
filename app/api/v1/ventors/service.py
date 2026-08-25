@@ -9,6 +9,7 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import UploadFile
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.v1.ventors.schemas import (
@@ -164,19 +165,41 @@ def _parse_interest_ids(raw: str | None) -> list[str]:
     return result
 
 
-def _validate_interest_ids(db: Session, interest_ids: list[str]) -> None:
-    found = {
-        row.id
-        for row in db.query(ComfortArea)
-        .filter(ComfortArea.id.in_(interest_ids), ComfortArea.is_active.is_(True))
+def _validate_interest_ids(
+    db: Session,
+    interest_ids: list[str],
+    *,
+    other_interest_text: str | None = None,
+) -> dict[str, ComfortArea]:
+    rows = (
+        db.query(ComfortArea)
+        .filter(
+            ComfortArea.id.in_(interest_ids),
+            ComfortArea.is_active.is_(True),
+            or_(
+                ComfortArea.audience == "ventor",
+                ComfortArea.audience == "all",
+            ),
+        )
         .all()
-    }
+    )
+    found = {row.id: row for row in rows}
     missing = [i for i in interest_ids if i not in found]
     if missing:
         raise validation_error(
             f"Unknown interest_ids: {', '.join(missing)}",
             ar="مجالات اهتمام غير معروفة",
         )
+
+    custom_required = [row for row in rows if row.allows_custom_text]
+    if custom_required:
+        text = (other_interest_text or "").strip()
+        if len(text) < 2:
+            raise validation_error(
+                "other_interest_text is required (min 2 characters) when selecting Other",
+                ar="يجب إدخال نص الاهتمام الآخر (حرفان على الأقل)",
+            )
+    return found
 
 
 async def _save_avatar(
@@ -226,6 +249,7 @@ async def register_ventor(
     nickname: str,
     gender: Gender,
     interest_ids_raw: str,
+    other_interest_text: str | None,
     avatar: UploadFile | None,
     avatar_preset_index: int | None,
     settings: Settings,
@@ -252,7 +276,12 @@ async def register_ventor(
         )
 
     interest_ids = _parse_interest_ids(interest_ids_raw)
-    _validate_interest_ids(db, interest_ids)
+    interest_rows = _validate_interest_ids(
+        db,
+        interest_ids,
+        other_interest_text=other_interest_text,
+    )
+    custom_text = (other_interest_text or "").strip() or None
 
     if avatar is not None and avatar.filename and avatar_preset_index is not None:
         raise validation_error(
@@ -284,7 +313,14 @@ async def register_ventor(
     db.add(profile)
     db.flush()
     for interest_id in interest_ids:
-        db.add(VentorInterest(ventor_id=user.id, comfort_area_id=interest_id))
+        row = interest_rows[interest_id]
+        db.add(
+            VentorInterest(
+                ventor_id=user.id,
+                comfort_area_id=interest_id,
+                custom_text=custom_text if row.allows_custom_text else None,
+            )
+        )
     db.add(VentorPrivacySettings(ventor_id=user.id))
     db.add(VentorNotificationPreferences(ventor_id=user.id))
     user.registration_complete = True

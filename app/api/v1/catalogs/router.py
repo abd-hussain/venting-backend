@@ -1,20 +1,23 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.api.deps import DbSession
 from app.api.v1.catalogs.schemas import (
     CatalogBundleResponse,
     CatalogItemResponse,
+    CategoriesListResponse,
     ComfortAreaResponse,
+    LanguagesListResponse,
 )
 from app.api.v1.catalogs.service import (
     list_all_catalogs,
     list_boundaries,
+    list_categories,
     list_comfort_areas,
     list_languages,
     list_life_experiences,
 )
 from app.core.responses import success_response
-from app.schemas.envelope import APISuccessResponse
+from app.schemas.envelope import APIErrorResponse, APISuccessResponse
 
 router = APIRouter(prefix="/catalog", tags=["catalogs"])
 
@@ -29,12 +32,30 @@ def catalog_bundle(db: DbSession):
 
 
 @router.get(
+    "/categories",
+    response_model=APISuccessResponse[CategoriesListResponse],
+    responses={400: {"model": APIErrorResponse}},
+    summary="Interest / comfort categories for ventor or listener pickers",
+)
+def categories_list(
+    db: DbSession,
+    audience: str = Query(default="all", description="ventor | listener | all"),
+):
+    items = list_categories(db, audience=audience)
+    return success_response(
+        CategoriesListResponse(items=items).model_dump(mode="json")
+    )
+
+
+@router.get(
     "/languages",
-    response_model=APISuccessResponse[list[CatalogItemResponse]],
+    response_model=APISuccessResponse[LanguagesListResponse],
+    summary="Speaking-language lookup (listener languages + session speech_language)",
 )
 def languages_list(db: DbSession):
+    items = list_languages(db)
     return success_response(
-        [item.model_dump(mode="json") for item in list_languages(db)]
+        LanguagesListResponse(items=items).model_dump(mode="json")
     )
 
 

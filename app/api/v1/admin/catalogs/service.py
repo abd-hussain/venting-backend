@@ -11,6 +11,7 @@ from app.api.v1.admin.catalogs.schemas import (
     CatalogUpsertRequest,
     ComfortAreaResponse,
     ComfortAreaUpsertRequest,
+    LanguageUpsertRequest,
 )
 from app.api.v1.admin.deps import AdminPrincipal
 from app.core.config import Settings
@@ -28,13 +29,16 @@ CatalogModel = TypeVar(
 
 
 def _item(row: Language | LifeExperience | Boundary) -> CatalogItemResponse:
-    return CatalogItemResponse(
+    data = CatalogItemResponse(
         id=row.id,
         name_en=row.name_en,
         name_ar=row.name_ar,
         is_active=row.is_active,
         image_url=row.image_url,
     )
+    if isinstance(row, Language):
+        data.sort_order = row.sort_order
+    return data
 
 
 def _comfort_item(row: ComfortArea) -> ComfortAreaResponse:
@@ -45,17 +49,26 @@ def _comfort_item(row: ComfortArea) -> ComfortAreaResponse:
         topic_group=row.topic_group,
         is_active=row.is_active,
         image_url=row.image_url,
+        icon_key=row.icon_key,
+        sort_order=row.sort_order,
+        allows_custom_text=row.allows_custom_text,
+        audience=row.audience,
     )
 
 
 def list_languages(db: Session) -> list[CatalogItemResponse]:
-    return [_item(row) for row in db.query(Language).order_by(Language.id).all()]
+    return [
+        _item(row)
+        for row in db.query(Language).order_by(Language.sort_order, Language.id).all()
+    ]
 
 
 def list_comfort_areas(db: Session) -> list[ComfortAreaResponse]:
     return [
         _comfort_item(row)
-        for row in db.query(ComfortArea).order_by(ComfortArea.id).all()
+        for row in db.query(ComfortArea)
+        .order_by(ComfortArea.sort_order, ComfortArea.id)
+        .all()
     ]
 
 
@@ -77,8 +90,14 @@ def _audit_snapshot(row: CatalogModel) -> dict[str, object]:
         "is_active": row.is_active,
         "image_url": row.image_url,
     }
+    if isinstance(row, Language):
+        data["sort_order"] = row.sort_order
     if isinstance(row, ComfortArea):
         data["topic_group"] = row.topic_group
+        data["icon_key"] = row.icon_key
+        data["sort_order"] = row.sort_order
+        data["allows_custom_text"] = row.allows_custom_text
+        data["audience"] = row.audience
     return data
 
 
@@ -149,25 +168,43 @@ async def _upsert(
 async def upsert_language(
     db: Session,
     item_id: str,
-    payload: CatalogUpsertRequest,
+    payload: LanguageUpsertRequest,
     admin: AdminPrincipal,
     *,
     image: UploadFile | None,
     settings: Settings,
 ) -> CatalogItemResponse:
-    return _item(
-        await _upsert(
-            db,
-            model=Language,
-            item_id=item_id,
-            payload=payload,
-            admin=admin,
-            entity_type="language",
-            catalog_type="languages",
-            image=image,
-            settings=settings,
-        )
+    row = db.get(Language, item_id)
+    is_new = row is None
+    before = None
+    if is_new:
+        row = Language(id=item_id)
+        db.add(row)
+    else:
+        before = _audit_snapshot(row)
+    row.name_en = payload.name_en
+    row.name_ar = payload.name_ar
+    row.sort_order = payload.sort_order
+    row.is_active = payload.is_active
+    await _apply_image(
+        row=row,
+        is_new=is_new,
+        image=image,
+        catalog_type="languages",
+        settings=settings,
     )
+    write_audit(
+        db,
+        admin_user_id=admin.id,
+        action="catalog.upsert",
+        entity_type="language",
+        entity_id=item_id,
+        before=before,
+        after=_audit_snapshot(row),
+    )
+    db.commit()
+    db.refresh(row)
+    return _item(row)
 
 
 async def upsert_life_experience(
@@ -238,6 +275,10 @@ async def upsert_comfort_area(
     row.name_en = payload.name_en
     row.name_ar = payload.name_ar
     row.topic_group = payload.topic_group
+    row.icon_key = payload.icon_key
+    row.sort_order = payload.sort_order
+    row.allows_custom_text = payload.allows_custom_text
+    row.audience = payload.audience
     row.is_active = payload.is_active
     await _apply_image(
         row=row,

@@ -64,6 +64,10 @@ async def register(
     nickname: str = Form(...),
     gender: Gender = Form(...),
     interest_ids: str = Form(..., description='JSON array of comfort area ids, e.g. ["stress_anxiety"]'),
+    other_interest_text: str | None = Form(
+        None,
+        description="Required (min 2 chars) when interest_ids includes a category with allows_custom_text",
+    ),
     avatar_preset_index: int | None = Form(None),
     avatar: UploadFile | None = File(None),
 ):
@@ -73,6 +77,7 @@ async def register(
         nickname=nickname,
         gender=gender,
         interest_ids_raw=interest_ids,
+        other_interest_text=other_interest_text,
         avatar=avatar,
         avatar_preset_index=avatar_preset_index,
         settings=settings,

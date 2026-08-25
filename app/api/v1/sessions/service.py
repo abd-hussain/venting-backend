@@ -12,6 +12,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.v1.listeners.discovery import list_listeners
+from app.api.v1.catalogs.service import assert_active_language
 from app.api.v1.sessions.schemas import (
     AcceptRequestResponse,
     BookSessionRequest,
@@ -218,6 +219,8 @@ def book_session(
     listener = db.get(ListenerProfile, listener_id)
     if listener is None:
         raise not_found("Listener")
+
+    assert_active_language(db, payload.speech_language)
 
     scheduled_at = _parse_scheduled_at(payload.scheduled_at)
     if payload.time_mode == SessionTimeMode.scheduled and scheduled_at is None:

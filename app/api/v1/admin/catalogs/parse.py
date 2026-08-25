@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from app.api.v1.admin.catalogs.schemas import (
     CatalogUpsertRequest,
     ComfortAreaUpsertRequest,
+    LanguageUpsertRequest,
 )
 from app.core.errors import validation_error
 
@@ -71,6 +72,34 @@ async def parse_catalog_upsert(
     return payload, None
 
 
+async def parse_language_upsert(
+    request: Request,
+) -> tuple[LanguageUpsertRequest, UploadFile | None]:
+    content_type = request.headers.get("content-type", "")
+    if content_type.startswith("multipart/form-data"):
+        form = await request.form()
+        image = form.get("image")
+        upload: UploadFile | None = None
+        if isinstance(image, UploadFile) and image.filename:
+            upload = image
+        try:
+            payload = LanguageUpsertRequest(
+                name_en=str(form.get("name_en", "")),
+                name_ar=str(form.get("name_ar", "")),
+                sort_order=int(form.get("sort_order") or 0),
+                is_active=_parse_bool(form.get("is_active")),
+            )
+        except ValidationError as exc:
+            raise validation_error(str(exc.errors()[0]["msg"])) from exc
+        return payload, upload
+
+    try:
+        payload = LanguageUpsertRequest.model_validate(await request.json())
+    except ValidationError as exc:
+        raise validation_error(str(exc.errors()[0]["msg"])) from exc
+    return payload, None
+
+
 async def parse_comfort_area_upsert(
     request: Request,
 ) -> tuple[ComfortAreaUpsertRequest, UploadFile | None]:
@@ -86,6 +115,12 @@ async def parse_comfort_area_upsert(
                 name_en=str(form.get("name_en", "")),
                 name_ar=str(form.get("name_ar", "")),
                 topic_group=_optional_str(form.get("topic_group")),
+                icon_key=str(form.get("icon_key") or "category"),
+                sort_order=int(form.get("sort_order") or 0),
+                allows_custom_text=_parse_bool(
+                    form.get("allows_custom_text"), default=False
+                ),
+                audience=str(form.get("audience") or "all"),
                 is_active=_parse_bool(form.get("is_active")),
             )
         except ValidationError as exc:

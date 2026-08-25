@@ -355,3 +355,16 @@ def password_not_set() -> MainAPIException:
         },
         http_status=status.HTTP_400_BAD_REQUEST,
     )
+
+
+def invalid_catalog_audience() -> MainAPIException:
+    return MainAPIException(
+        type="validation",
+        code=740,
+        message="Invalid audience",
+        localized_message={
+            "en": "audience must be ventor, listener, or all",
+            "ar": "يجب أن يكون audience هو ventor أو listener أو all",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )
