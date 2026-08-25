@@ -315,6 +315,8 @@ Used by `#2b forgot-password` / `#2c reset-password`. Store **hash only**, never
 
 ### 5. `listener_identity_verifications`
 
+Used for listener KYC documents. **First upload** is created from `#22 listeners/register`. **Resubmit** after admin rejection uses `#23 identity-verification` (new row or superseding pending attempt — do not require full re-registration).
+
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | UUID | **PK** |
@@ -383,7 +385,10 @@ Stable catalogs (seed once). App uses string ids like `anxiety_stress`, `en`, `p
 | `id` | VARCHAR(64) | **PK** |
 | `name_en` | VARCHAR(120) | |
 | `name_ar` | VARCHAR(120) | |
+| `sort_order` | INT | Ascending — portal-managed |
 | `is_active` | BOOLEAN | |
+
+Exposed publicly via `#76 GET /v1/catalog/life-experiences` (active rows only).
 
 ### 9. `boundaries`
 

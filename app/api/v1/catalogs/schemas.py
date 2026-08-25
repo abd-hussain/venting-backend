@@ -37,3 +37,14 @@ class CategoryResponse(BaseModel):
 
 class CategoriesListResponse(BaseModel):
     items: list[CategoryResponse]
+
+
+class LifeExperienceResponse(BaseModel):
+    id: str
+    name_en: str
+    name_ar: str
+    sort_order: int
+
+
+class LifeExperiencesListResponse(BaseModel):
+    items: list[LifeExperienceResponse]

@@ -135,9 +135,10 @@ async def register(
     responses={
         401: {"model": APIErrorResponse},
         403: {"model": APIErrorResponse},
+        409: {"model": APIErrorResponse},
         422: {"model": APIErrorResponse},
     },
-    summary="Submit or re-submit identity verification",
+    summary="Resubmit identity documents after admin rejection",
 )
 async def identity_verification(
     profile: CurrentListenerProfile,

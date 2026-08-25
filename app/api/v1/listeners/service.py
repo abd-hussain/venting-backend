@@ -717,6 +717,23 @@ async def submit_identity_verification(
     document_back: UploadFile | None,
     selfie: UploadFile,
 ) -> IdentityVerificationResponse:
+    """Resubmit KYC after admin rejection — not for first-time registration (#22)."""
+    latest = (
+        db.query(ListenerIdentityVerification)
+        .filter(ListenerIdentityVerification.listener_id == profile.user_id)
+        .order_by(ListenerIdentityVerification.created_at.desc())
+        .first()
+    )
+    rejected = profile.profile_status == ProfileStatus.rejected or (
+        latest is not None and latest.status == ProfileStatus.rejected
+    )
+    if not rejected:
+        raise conflict(
+            "Identity resubmit is only allowed after a rejected verification",
+            en="Identity resubmit is only allowed after a rejected verification",
+            ar="إعادة إرسال الهوية متاحة فقط بعد رفض التحقق السابق",
+        )
+
     if document_front.filename is None:
         raise validation_error("document_front is required", ar="صورة المستند مطلوبة")
     if selfie.filename is None:
@@ -754,8 +771,8 @@ async def submit_identity_verification(
     )
     db.add(row)
     profile.setup_identity_status = SetupStepStatus.in_progress
-    if profile.profile_status == ProfileStatus.incomplete:
-        profile.profile_status = ProfileStatus.under_review
+    profile.profile_status = ProfileStatus.under_review
+    profile.is_verified = False
     db.commit()
     return IdentityVerificationResponse(status=IdentityStatusOut.pending)
 

@@ -13,6 +13,7 @@ from app.api.v1.admin.catalogs.schemas import (
     ComfortAreaUpsertRequest,
     LanguageResponse,
     LanguageUpsertRequest,
+    LifeExperienceUpsertRequest,
 )
 from app.api.v1.admin.deps import AdminPrincipal
 from app.core.config import Settings
@@ -36,6 +37,7 @@ def _item(row: LifeExperience | Boundary) -> CatalogItemResponse:
         name_ar=row.name_ar,
         is_active=row.is_active,
         image_url=row.image_url,
+        sort_order=getattr(row, "sort_order", 0) or 0,
     )
 
 
@@ -86,7 +88,9 @@ def list_comfort_areas(db: Session) -> list[ComfortAreaResponse]:
 def list_life_experiences(db: Session) -> list[CatalogItemResponse]:
     return [
         _item(row)
-        for row in db.query(LifeExperience).order_by(LifeExperience.id).all()
+        for row in db.query(LifeExperience)
+        .order_by(LifeExperience.sort_order, LifeExperience.id)
+        .all()
     ]
 
 
@@ -118,6 +122,13 @@ def _audit_snapshot(row: CatalogModel) -> dict[str, object]:
                 "sort_order": row.sort_order,
                 "allows_custom_text": row.allows_custom_text,
                 "audience": row.audience,
+            }
+        )
+    elif isinstance(row, LifeExperience):
+        data.update(
+            {
+                "image_url": row.image_url,
+                "sort_order": row.sort_order,
             }
         )
     else:
@@ -169,6 +180,8 @@ async def _upsert_tagged(
     row.name_en = payload.name_en
     row.name_ar = payload.name_ar
     row.is_active = payload.is_active
+    if isinstance(payload, LifeExperienceUpsertRequest) and hasattr(row, "sort_order"):
+        row.sort_order = payload.sort_order
     row.image_url = await _apply_image_field(
         current_url=row.image_url,
         is_new=is_new,
@@ -189,6 +202,30 @@ async def _upsert_tagged(
     db.commit()
     db.refresh(row)
     return row
+
+
+async def upsert_life_experience(
+    db: Session,
+    item_id: str,
+    payload: LifeExperienceUpsertRequest,
+    admin: AdminPrincipal,
+    *,
+    image: UploadFile | None,
+    settings: Settings,
+) -> CatalogItemResponse:
+    return _item(
+        await _upsert_tagged(
+            db,
+            model=LifeExperience,
+            item_id=item_id,
+            payload=payload,
+            admin=admin,
+            entity_type="life_experience",
+            catalog_type="life_experiences",
+            image=image,
+            settings=settings,
+        )
+    )
 
 
 async def upsert_language(
@@ -234,30 +271,6 @@ async def upsert_language(
     db.commit()
     db.refresh(row)
     return _language_item(row)
-
-
-async def upsert_life_experience(
-    db: Session,
-    item_id: str,
-    payload: CatalogUpsertRequest,
-    admin: AdminPrincipal,
-    *,
-    image: UploadFile | None,
-    settings: Settings,
-) -> CatalogItemResponse:
-    return _item(
-        await _upsert_tagged(
-            db,
-            model=LifeExperience,
-            item_id=item_id,
-            payload=payload,
-            admin=admin,
-            entity_type="life_experience",
-            catalog_type="life_experiences",
-            image=image,
-            settings=settings,
-        )
-    )
 
 
 async def upsert_boundary(

@@ -7,6 +7,7 @@ class CatalogItemResponse(BaseModel):
     name_ar: str
     is_active: bool
     image_url: str | None = None
+    sort_order: int = 0
 
 
 class LanguageResponse(BaseModel):
@@ -37,6 +38,10 @@ class CatalogUpsertRequest(BaseModel):
     name_en: str = Field(min_length=1, max_length=120)
     name_ar: str = Field(min_length=1, max_length=120)
     is_active: bool = True
+
+
+class LifeExperienceUpsertRequest(CatalogUpsertRequest):
+    sort_order: int = Field(default=0, ge=0)
 
 
 class LanguageUpsertRequest(CatalogUpsertRequest):

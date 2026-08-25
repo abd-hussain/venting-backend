@@ -10,6 +10,7 @@ from app.api.v1.admin.catalogs.schemas import (
     CatalogUpsertRequest,
     ComfortAreaUpsertRequest,
     LanguageUpsertRequest,
+    LifeExperienceUpsertRequest,
 )
 from app.core.errors import validation_error
 
@@ -67,6 +68,34 @@ async def parse_catalog_upsert(
 
     try:
         payload = CatalogUpsertRequest.model_validate(await request.json())
+    except ValidationError as exc:
+        raise validation_error(str(exc.errors()[0]["msg"])) from exc
+    return payload, None
+
+
+async def parse_life_experience_upsert(
+    request: Request,
+) -> tuple[LifeExperienceUpsertRequest, UploadFile | None]:
+    content_type = request.headers.get("content-type", "")
+    if content_type.startswith("multipart/form-data"):
+        form = await request.form()
+        image = form.get("image")
+        upload: UploadFile | None = None
+        if isinstance(image, UploadFile) and image.filename:
+            upload = image
+        try:
+            payload = LifeExperienceUpsertRequest(
+                name_en=str(form.get("name_en", "")),
+                name_ar=str(form.get("name_ar", "")),
+                sort_order=int(form.get("sort_order") or 0),
+                is_active=_parse_bool(form.get("is_active")),
+            )
+        except ValidationError as exc:
+            raise validation_error(str(exc.errors()[0]["msg"])) from exc
+        return payload, upload
+
+    try:
+        payload = LifeExperienceUpsertRequest.model_validate(await request.json())
     except ValidationError as exc:
         raise validation_error(str(exc.errors()[0]["msg"])) from exc
     return payload, None

@@ -5,6 +5,7 @@ from app.api.v1.catalogs.schemas import (
     CatalogItemResponse,
     CategoriesListResponse,
     LanguagesListResponse,
+    LifeExperiencesListResponse,
 )
 from app.api.v1.catalogs.service import (
     list_boundaries,
@@ -52,13 +53,16 @@ def languages_list(
 
 @router.get(
     "/life-experiences",
-    response_model=APISuccessResponse[list[CatalogItemResponse]],
+    response_model=APISuccessResponse[LifeExperiencesListResponse],
     summary="Listener life-experience tags (focused catalog)",
 )
 def life_experiences_list(db: DbSession):
-    return success_response(
-        [item.model_dump(mode="json") for item in list_life_experiences(db)]
+    items = list_life_experiences(db)
+    response = success_response(
+        LifeExperiencesListResponse(items=items).model_dump(mode="json")
     )
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return response
 
 
 @router.get(

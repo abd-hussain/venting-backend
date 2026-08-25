@@ -134,23 +134,25 @@ def seed_catalogs(db: Session) -> None:
         db,
         LifeExperience,
         [
-            {"id": "single", "name_en": "Single", "name_ar": "أعزب / عزباء", "is_active": True},
-            {"id": "in_relationship", "name_en": "In a relationship", "name_ar": "في علاقة", "is_active": True},
-            {"id": "married", "name_en": "Married", "name_ar": "متزوج / متزوجة", "is_active": True},
-            {"id": "divorced", "name_en": "Divorced", "name_ar": "مطلق / مطلقة", "is_active": True},
-            {"id": "widowed", "name_en": "Widowed", "name_ar": "أرمل / أرملة", "is_active": True},
-            {"id": "parent", "name_en": "Parent", "name_ar": "والد / والدة", "is_active": True},
-            {"id": "single_parent", "name_en": "Single parent", "name_ar": "والد / والدة وحيد/ة", "is_active": True},
-            {"id": "caregiver", "name_en": "Caregiver", "name_ar": "مقدّم رعاية", "is_active": True},
-            {"id": "career_change", "name_en": "Career change", "name_ar": "تغيير مسار مهني", "is_active": True},
-            {"id": "job_loss", "name_en": "Job loss", "name_ar": "فقدان العمل", "is_active": True},
-            {"id": "startup_founder", "name_en": "Startup founder", "name_ar": "مؤسس شركة ناشئة", "is_active": True},
-            {"id": "financial_struggle", "name_en": "Financial struggle", "name_ar": "صعوبات مالية", "is_active": True},
-            {"id": "life_stages", "name_en": "Life stages", "name_ar": "مراحل الحياة", "is_active": True},
-            {"id": "grief_loss", "name_en": "Grief / Loss", "name_ar": "الحزن / الفقد", "is_active": True},
-            {"id": "anxiety_stress", "name_en": "Anxiety / Stress", "name_ar": "القلق / التوتر", "is_active": True},
-            {"id": "health_challenge", "name_en": "Health challenge", "name_ar": "تحدي صحي", "is_active": True},
-            {"id": "addiction_recovery", "name_en": "Addiction recovery", "name_ar": "التعافي من الإدمان", "is_active": True},
+            {"id": "career_change", "name_en": "Career Change", "name_ar": "تغيير المسار المهني", "sort_order": 10, "is_active": True},
+            {"id": "job_loss", "name_en": "Jobless", "name_ar": "بلا عمل", "sort_order": 20, "is_active": True},
+            {"id": "grief_loss", "name_en": "Grief/Loss", "name_ar": "الفقدان / الحزن", "sort_order": 30, "is_active": True},
+            {"id": "anxiety_stress", "name_en": "Anxiety/Stress", "name_ar": "القلق / التوتر", "sort_order": 40, "is_active": True},
+            {"id": "financial_stress", "name_en": "Financial Stress", "name_ar": "ضغط مالي", "sort_order": 50, "is_active": True},
+            {"id": "life_stages", "name_en": "Life Stages", "name_ar": "مراحل الحياة", "sort_order": 60, "is_active": True},
+            {"id": "health_challenge", "name_en": "Health Challenge", "name_ar": "تحدٍ صحي", "sort_order": 70, "is_active": True},
+            # Legacy relationship/family enums — inactive (client-local now)
+            {"id": "single", "name_en": "Single", "name_ar": "أعزب / عزباء", "sort_order": 1000, "is_active": False},
+            {"id": "in_relationship", "name_en": "In a relationship", "name_ar": "في علاقة", "sort_order": 1010, "is_active": False},
+            {"id": "married", "name_en": "Married", "name_ar": "متزوج / متزوجة", "sort_order": 1020, "is_active": False},
+            {"id": "divorced", "name_en": "Divorced", "name_ar": "مطلق / مطلقة", "sort_order": 1030, "is_active": False},
+            {"id": "widowed", "name_en": "Widowed", "name_ar": "أرمل / أرملة", "sort_order": 1040, "is_active": False},
+            {"id": "parent", "name_en": "Parent", "name_ar": "والد / والدة", "sort_order": 1050, "is_active": False},
+            {"id": "single_parent", "name_en": "Single parent", "name_ar": "والد / والدة وحيد/ة", "sort_order": 1060, "is_active": False},
+            {"id": "caregiver", "name_en": "Caregiver", "name_ar": "مقدّم رعاية", "sort_order": 1070, "is_active": False},
+            {"id": "startup_founder", "name_en": "Startup founder", "name_ar": "مؤسس شركة ناشئة", "sort_order": 1080, "is_active": False},
+            {"id": "financial_struggle", "name_en": "Financial struggle", "name_ar": "صعوبات مالية", "sort_order": 1090, "is_active": False},
+            {"id": "addiction_recovery", "name_en": "Addiction recovery", "name_ar": "التعافي من الإدمان", "sort_order": 1100, "is_active": False},
         ],
     )
 
@@ -408,7 +410,7 @@ def seed_demo_users(db: Session) -> dict[str, uuid.UUID]:
             db.add(ListenerLanguage(listener_id=listener.id, language_id=lang))
         for area in ("stress_anxiety", "relationships", "parenting"):
             db.add(ListenerComfortArea(listener_id=listener.id, comfort_area_id=area))
-        for exp in ("anxiety_stress", "life_stages", "in_relationship"):
+        for exp in ("anxiety_stress", "life_stages", "career_change"):
             db.add(ListenerLifeExperience(listener_id=listener.id, life_experience_id=exp))
         for boundary in ("politics", "illegal_activities"):
             db.add(ListenerBoundary(listener_id=listener.id, boundary_id=boundary))

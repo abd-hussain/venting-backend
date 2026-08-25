@@ -7,6 +7,7 @@ from app.api.v1.catalogs.schemas import (
     CatalogItemResponse,
     CategoryResponse,
     LanguageResponse,
+    LifeExperienceResponse,
 )
 from app.core.errors import invalid_catalog_audience, validation_error
 from app.models.lookups import Boundary, ComfortArea, Language, LifeExperience
@@ -14,12 +15,21 @@ from app.models.lookups import Boundary, ComfortArea, Language, LifeExperience
 VALID_CATEGORY_AUDIENCES = {"ventor", "listener", "all"}
 
 
-def _item(row: LifeExperience | Boundary) -> CatalogItemResponse:
+def _item(row: Boundary) -> CatalogItemResponse:
     return CatalogItemResponse(
         id=row.id,
         name_en=row.name_en,
         name_ar=row.name_ar,
         image_url=row.image_url,
+    )
+
+
+def _life_experience_item(row: LifeExperience) -> LifeExperienceResponse:
+    return LifeExperienceResponse(
+        id=row.id,
+        name_en=row.name_en,
+        name_ar=row.name_ar,
+        sort_order=row.sort_order,
     )
 
 
@@ -115,14 +125,14 @@ def list_categories(db: Session, *, audience: str = "all") -> list[CategoryRespo
     return [_category_item(row) for row in rows]
 
 
-def list_life_experiences(db: Session) -> list[CatalogItemResponse]:
+def list_life_experiences(db: Session) -> list[LifeExperienceResponse]:
     rows = (
         db.query(LifeExperience)
         .filter(LifeExperience.is_active.is_(True))
-        .order_by(LifeExperience.id)
+        .order_by(LifeExperience.sort_order, LifeExperience.id)
         .all()
     )
-    return [_item(row) for row in rows]
+    return [_life_experience_item(row) for row in rows]
 
 
 def list_boundaries(db: Session) -> list[CatalogItemResponse]:

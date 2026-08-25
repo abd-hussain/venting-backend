@@ -7,6 +7,7 @@ from app.api.v1.admin.catalogs.parse import (
     parse_catalog_upsert,
     parse_comfort_area_upsert,
     parse_language_upsert,
+    parse_life_experience_upsert,
     validate_catalog_id,
 )
 from app.api.v1.admin.catalogs.schemas import (
@@ -157,7 +158,7 @@ async def life_experience_upsert(
     settings: SettingsDep,
 ):
     validate_catalog_id(item_id)
-    payload, image = await parse_catalog_upsert(request)
+    payload, image = await parse_life_experience_upsert(request)
     return success_response(
         (
             await upsert_life_experience(

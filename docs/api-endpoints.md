@@ -74,8 +74,8 @@ List responses may include:
 | Notifications | 3 | 68–70 |
 | Training | 2 | 71–72 |
 | Promo | 1 | 73 |
-| Catalog / categories | 2 | 74–75 |
-| **Total** | **79** | |
+| Catalog / categories | 3 | 74–76 |
+| **Total** | **80** | |
 
 ---
 
@@ -663,16 +663,35 @@ Form fields (repeat `language_ids` / `interest_ids` once per value):
 
 **Efficiency note:** Prefer one submit at end (`POST`) + optional `PATCH /v1/listeners/me/registration/{step}` for resume. If you split by step, keep the same field names.
 
+**Identity documents:** Include front/back + selfie on **this** `#22` call for first-time registration. Do **not** also call `#23` during initial onboarding.
+
 ---
 
 ### 23. `POST /v1/listeners/me/identity-verification`
 
+> **Purpose:** Resubmit KYC / identity documents **after an admin rejects** the listener’s previous verification.  
+> **Not for first-time registration** — first upload is part of `#22 POST /v1/listeners/register`.
+
 | | |
 |--|--|
-| **Auth** | Bearer |
-| **Screen** | Registration step 2 / re-verify |
+| **Auth** | Bearer (listener) |
+| **When** | Listener `profile_status` (or identity verification status) is **`rejected`** and the user taps resubmit / re-verify |
+| **Screen** | KYC rejected / resubmit identity screen (not the initial registration step 2 submit) |
 | **Body** | multipart: `document_front`, `document_back?`, `selfie` |
-| **Response** | `{ status: "pending" \| "approved" \| "rejected" }` |
+| **Response** | `{ status: "pending" }` — returns to admin review queue |
+
+#### Rules
+
+- Call **only** when prior KYC was **rejected by admin** (or an explicit re-verify flow after rejection).
+- Do **not** call during first registration — identity files belong on `#22`.
+- On success: set verification status back to **pending** / `under_review`; clear or archive the rejected attempt as needed.
+- Listener does **not** redo full `#22` registration for a KYC-only rejection.
+
+#### Acceptance
+
+- [x] Rejected listeners can resubmit docs without re-entering profile / experiences / voice / availability
+- [x] First-time onboarding never requires `#23`
+- [x] Successful resubmit puts the case back in the admin review queue
 
 ---
 
@@ -1230,7 +1249,8 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 > Mobile and other clients must call the focused endpoints only:
 > - `#74` `GET /v1/catalog/categories`
 > - `#75` `GET /v1/catalog/languages`
-> (Listener registration may later add focused endpoints for life experiences / boundaries — never the mega dump.)
+> - `#76` `GET /v1/catalog/life-experiences`
+> (Boundaries may later get a focused endpoint — never the mega dump.)
 
 ### 74. `GET /v1/catalog/categories` *(proposed)*
 
@@ -1581,6 +1601,115 @@ Empty → `200` + `items: []`.
 
 ---
 
+### 76. `GET /v1/catalog/life-experiences`
+
+> **Status:** Implemented on backend.  
+> **Purpose:** Return active life-experience tags from `life_experiences`.  
+> **DB source:** `life_experiences` (`id`, `name_en`, `name_ar`, `sort_order`, `is_active`).  
+> **Managed by:** Admin portal catalogs → Life experiences (`A51`).
+
+| | |
+|--|--|
+| **Auth** | Public (Bearer accepted if present) |
+| **Screen** | Listener registration → **Share your life experiences** (step 4) |
+| **When** | Step open / retry after error |
+| **Query** | `locale` optional (`en` \| `ar`) — hint only; response always includes both names |
+| **Response** | `{ items: LifeExperience[] }` |
+
+#### `LifeExperience` object
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `id` | string | yes | Stable slug PK — sent later in `#22` `life_experience_ids` |
+| `name_en` | string | yes | English label |
+| `name_ar` | string | yes | Arabic label |
+| `sort_order` | number | yes | Ascending |
+
+#### Success example
+
+```json
+{
+  "status": "success",
+  "data": {
+    "items": [
+      {
+        "id": "career_change",
+        "name_en": "Career Change",
+        "name_ar": "تغيير المسار المهني",
+        "sort_order": 10
+      },
+      {
+        "id": "job_loss",
+        "name_en": "Jobless",
+        "name_ar": "بلا عمل",
+        "sort_order": 20
+      },
+      {
+        "id": "grief_loss",
+        "name_en": "Grief/Loss",
+        "name_ar": "الفقدان / الحزن",
+        "sort_order": 30
+      },
+      {
+        "id": "anxiety_stress",
+        "name_en": "Anxiety/Stress",
+        "name_ar": "القلق / التوتر",
+        "sort_order": 40
+      },
+      {
+        "id": "financial_stress",
+        "name_en": "Financial Stress",
+        "name_ar": "ضغط مالي",
+        "sort_order": 50
+      },
+      {
+        "id": "life_stages",
+        "name_en": "Life Stages",
+        "name_ar": "مراحل الحياة",
+        "sort_order": 60
+      },
+      {
+        "id": "health_challenge",
+        "name_en": "Health Challenge",
+        "name_ar": "تحدٍ صحي",
+        "sort_order": 70
+      }
+    ]
+  }
+}
+```
+
+#### Mobile usage
+
+1. Open listener registration step 4.
+2. `GET /v1/catalog/life-experiences`.
+3. Show shimmer chips until response arrives.
+4. Render `items` sorted by `sort_order`; label = `ar ? name_ar : name_en`.
+5. Multi-select + optional custom free-text experiences (client-side) → `#22` `life_experience_ids` / `custom_experiences`.
+
+#### Errors
+
+| HTTP | type | code | When |
+|------|------|------|------|
+| 500 / 503 | server | … | Failure |
+
+Empty → `200` + `items: []`. Do **not** 404.
+
+#### Rules
+
+- Only `is_active = true` rows.
+- IDs immutable once shipped (breaks `listener_life_experiences`).
+- Relationship status / family role remain **client-local** enums — not this catalog.
+- `Cache-Control: public, max-age=300` recommended.
+
+#### Acceptance
+
+- [x] Public `GET /v1/catalog/life-experiences` returns active rows only
+- [x] Standard `{ status, data: { items } }` envelope
+- [x] Both `name_en` and `name_ar` + `sort_order`
+- [x] Same `id`s accepted by `#22` `life_experience_ids`
+
+---
 
 ## Efficiency guidelines (for implementers)
 
@@ -1639,8 +1768,8 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | Notifications | 3 |
 | Training | 2 |
 | Promo | 1 |
-| Catalog / categories | 2 |
-| **Total unique API endpoints** | **79** |
+| Catalog / categories | 3 |
+| **Total unique API endpoints** | **80** |
 
 ### Master checklist (method + path)
 
@@ -1725,12 +1854,13 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | 73 | POST | `/v1/promo/validate` |
 | 74 | GET | `/v1/catalog/categories` *(proposed)* |
 | 75 | GET | `/v1/catalog/languages` *(proposed)* |
+| 76 | GET | `/v1/catalog/life-experiences` |
 
 ---
 
 ## Final count
 
-**Total unique API endpoints: 79**
+**Total unique API endpoints: 80**
 
 **Live / wired in the mobile app today: 0** (auth + catalog clients exist; backend contracts still proposed where marked). Static legal/help HTML is separate from this REST count.
 
