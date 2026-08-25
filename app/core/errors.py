@@ -407,3 +407,42 @@ def legal_documents_unavailable() -> MainAPIException:
         },
         http_status=status.HTTP_503_SERVICE_UNAVAILABLE,
     )
+
+
+def invalid_help_locale() -> MainAPIException:
+    return MainAPIException(
+        type="validation",
+        code=770,
+        message="Invalid locale",
+        localized_message={
+            "en": "locale must be en or ar",
+            "ar": "يجب أن تكون locale هي en أو ar",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def invalid_help_topic() -> MainAPIException:
+    return MainAPIException(
+        type="validation",
+        code=771,
+        message="Invalid topic",
+        localized_message={
+            "en": "topic must be a lowercase slug (e.g. getting_started)",
+            "ar": "يجب أن يكون topic معرفاً بصيغة slug",
+        },
+        http_status=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def help_documents_unavailable() -> MainAPIException:
+    return MainAPIException(
+        type="server",
+        code=503,
+        message="Help documents unavailable",
+        localized_message={
+            "en": "Help documents are temporarily unavailable",
+            "ar": "مستندات المساعدة غير متاحة مؤقتاً",
+        },
+        http_status=status.HTTP_503_SERVICE_UNAVAILABLE,
+    )

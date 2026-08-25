@@ -76,6 +76,7 @@
 | 42 | `promo_codes` | Promo |
 | 43 | `promo_redemptions` | Promo |
 | 43b | `legal_documents` | Legal — terms / privacy per locale (portal-editable) |
+| 43c | `help_documents` | Help — article topics per locale (portal-editable) |
 
 | Band | Count |
 |------|------:|
@@ -92,7 +93,8 @@
 | Training | 2 |
 | Promo | 2 |
 | Legal | 1 |
-| **Total** | **44** |
+| Help | 1 |
+| **Total** | **45** |
 
 ---
 
@@ -929,6 +931,24 @@ Portal-editable Terms of Service / Privacy Policy links per locale. Mobile: `#76
 
 Seed both locales for `terms` and `privacy` before launch. Prefer this over storing legal URLs only in `app_config_kv`.
 
+### 43c. `help_documents`
+
+Portal-editable Help Center article URLs per topic × locale. Mobile: `#77 GET /v1/help/links`.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | **PK** |
+| `topic` | VARCHAR(64) | e.g. `getting_started`, `faqs`, `licenses` |
+| `locale` | VARCHAR(8) | `en` \| `ar` |
+| `title` | VARCHAR(128) | Localized display title |
+| `url` | TEXT | Absolute HTTPS URL for WebView |
+| `is_published` | BOOLEAN | default false |
+| `updated_at` | TIMESTAMPTZ | |
+| `created_at` | TIMESTAMPTZ | |
+| | | **UQ (topic, locale)** |
+
+Seed all mobile topic keys for both locales before launch. No app-side help base URL.
+
 ---
 
 ## Design choices (performance & efficiency)
@@ -949,7 +969,7 @@ Seed both locales for `terms` and `privacy` before launch. Prefer this over stor
 | Store privacy + notification prefs as JSONB on profiles | 4 | Harder to enforce bool columns / migrate |
 | Skip `promo_redemptions` (log only on `session_payments`) | 1 | Weaker promo abuse control |
 
-**Recommended production set: keep all 44** (includes `legal_documents`).
+**Recommended production set: keep all 45** (includes `legal_documents`, `help_documents`).
 
 ---
 
@@ -984,6 +1004,7 @@ Seed both locales for `terms` and `privacy` before launch. Prefer this over stor
 | Notifications | `notifications` |
 | Promo | `promo_codes`, `promo_redemptions` |
 | Legal `#76` | `legal_documents` (portal CMS `/cms/legal`) |
+| Help `#77` | `help_documents` (portal CMS `/cms/help`) |
 
 ---
 
@@ -991,12 +1012,12 @@ Seed both locales for `terms` and `privacy` before launch. Prefer this over stor
 
 | Metric | Value |
 |--------|------:|
-| **Total tables** | **43** |
+| **Total tables** | **45** |
 | Lookup / catalog tables | 6 (`languages`, `comfort_areas`, `life_experiences`, `boundaries`, `achievements`, `training_modules`, `reward_offers`, `promo_codes` → **8** catalogs if counted) |
 | Core transactional tables | `session_requests`, `sessions`, `session_payments`, `wallet_ledger_entries`, `payouts`, `reward_trades` |
 | 1:1 settings / wallet | 7 |
 
-**Total database tables to create: 43**
+**Total database tables to create: 45**
 
 ---
 

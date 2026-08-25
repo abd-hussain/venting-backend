@@ -79,6 +79,7 @@ from app.models.admin import (
     ModerationAction,
 )
 from app.models.legal import LegalDocument
+from app.models.help import HelpDocument
 
 DEMO_PASSWORD = "Password123!"
 DEMO_ADMIN_PASSWORD = "Admin123!"
@@ -813,6 +814,81 @@ def seed_admin_cms(db: Session, mobile_ids: dict[str, uuid.UUID] | None = None) 
             existing.title = legal["title"]
             existing.url = legal["url"]
             existing.is_published = legal["is_published"]
+
+    # Help document links (topics × locale)
+    help_rows = [
+        {
+            "topic": "getting_started",
+            "locale": "en",
+            "title": "Getting started",
+            "url": "https://cdn.venting.app/help/en/getting-started.html",
+            "is_published": True,
+        },
+        {
+            "topic": "getting_started",
+            "locale": "ar",
+            "title": "البدء",
+            "url": "https://cdn.venting.app/help/ar/getting-started.html",
+            "is_published": True,
+        },
+        {
+            "topic": "faqs",
+            "locale": "en",
+            "title": "FAQs",
+            "url": "https://cdn.venting.app/help/en/faqs.html",
+            "is_published": True,
+        },
+        {
+            "topic": "faqs",
+            "locale": "ar",
+            "title": "الأسئلة الشائعة",
+            "url": "https://cdn.venting.app/help/ar/faqs.html",
+            "is_published": True,
+        },
+        {
+            "topic": "guidelines",
+            "locale": "en",
+            "title": "Community guidelines",
+            "url": "https://cdn.venting.app/help/en/guidelines.html",
+            "is_published": True,
+        },
+        {
+            "topic": "guidelines",
+            "locale": "ar",
+            "title": "إرشادات المجتمع",
+            "url": "https://cdn.venting.app/help/ar/guidelines.html",
+            "is_published": True,
+        },
+        {
+            "topic": "licenses",
+            "locale": "en",
+            "title": "Licenses",
+            "url": "https://cdn.venting.app/help/en/licenses.html",
+            "is_published": True,
+        },
+        {
+            "topic": "licenses",
+            "locale": "ar",
+            "title": "التراخيص",
+            "url": "https://cdn.venting.app/help/ar/licenses.html",
+            "is_published": True,
+        },
+    ]
+    for help_row in help_rows:
+        existing = (
+            db.query(HelpDocument)
+            .filter(
+                HelpDocument.topic == help_row["topic"],
+                HelpDocument.locale == help_row["locale"],
+            )
+            .one_or_none()
+        )
+        if existing is None:
+            db.add(HelpDocument(**help_row))
+        else:
+            existing.title = help_row["title"]
+            existing.url = help_row["url"]
+            existing.is_published = help_row["is_published"]
 
     # Banners — skip duplicates by title+placement
     banners = [

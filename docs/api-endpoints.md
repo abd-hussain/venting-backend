@@ -76,7 +76,8 @@ List responses may include:
 | Promo | 1 | 73 |
 | Catalog / categories | 2 | 74–75 |
 | Legal (terms / privacy) | 1 | 76 |
-| **Total** | **78** | |
+| Help (help center topics) | 1 | 77 |
+| **Total** | **79** | |
 
 ---
 
@@ -1558,6 +1559,98 @@ Accept-Language: ar
 `document` ∈ `terms` \| `privacy`; `locale` ∈ `en` \| `ar`.
 
 ---
+
+## 14. Help documents
+
+### 77. `GET /v1/help/links`
+
+> **Status:** Implemented on backend.  
+> **Purpose:** Return **locale-specific** Help Center topic links for in-app WebViews.  
+> **Managed by:** Admin portal CMS (`/cms/help`) — content role can edit title + URL per topic × language.  
+> **Multi-language:** One row per `(topic, locale)`; mobile sends app locale.
+
+| | |
+|--|--|
+| **Auth** | Public (Bearer accepted if present) |
+| **Screens** | Help & Support, About (guidelines / licenses) |
+| **When** | On tap (or prefetch) |
+| **Query** | `locale` = `en` \| `ar` (default from `Accept-Language` / `skel-accept-language`); optional `topic` filter |
+| **Response** | `{ locale, items: HelpDocumentLink[] }` |
+
+#### `HelpDocumentLink` object
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `topic` | string | yes | e.g. `getting_started`, `faqs`, `guidelines`, `licenses` |
+| `locale` | string | yes | Resolved locale on the row (`en` / `ar`) |
+| `title` | string | yes | Localized display title |
+| `url` | string | yes | Absolute HTTPS URL opened in WebView |
+| `updated_at` | string | yes | ISO-8601 — for client cache invalidation |
+
+#### Success example
+
+```http
+GET /v1/help/links?locale=ar
+```
+
+```json
+{
+  "status": "success",
+  "data": {
+    "locale": "ar",
+    "items": [
+      {
+        "topic": "faqs",
+        "locale": "ar",
+        "title": "الأسئلة الشائعة",
+        "url": "https://cdn.venting.app/help/ar/faqs.html",
+        "updated_at": "2026-08-20T10:00:00Z"
+      },
+      {
+        "topic": "getting_started",
+        "locale": "ar",
+        "title": "البدء",
+        "url": "https://cdn.venting.app/help/ar/getting-started.html",
+        "updated_at": "2026-08-20T10:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+#### Rules
+
+- Only return **published** rows (`is_published = true`).
+- If `locale=ar` is missing a topic, **fall back to `en`** for that topic (still report the row’s locale).
+- Optional `topic` query returns only that topic (after locale resolution / fallback).
+- URLs must be absolute HTTPS. No app-side help base URL.
+- Cache-friendly: `Cache-Control: public, max-age=300` recommended.
+
+#### Errors
+
+| HTTP | type | code | When |
+|------|------|------|------|
+| 400 | validation | 770 | Invalid `locale` |
+| 503 | server | 503 | No published help docs (for locale / topic) |
+| 500 | server | 500 | Unexpected failure |
+
+#### Acceptance
+
+- [x] Public `GET /v1/help/links?locale=en` and `?locale=ar`
+- [x] Seeded topics include `getting_started`, `faqs`, `guidelines`, `licenses`
+- [x] Portal can edit title + URL per topic × locale without an app release
+- [ ] Mobile Help & Support opens the locale-matched URL by topic
+
+#### Portal admin APIs *(CMS — not mobile)*
+
+| Method | Path | Use |
+|--------|------|-----|
+| `GET` | `/v1/admin/help/documents` | List all topics × locales |
+| `PUT` | `/v1/admin/help/documents/{topic}/{locale}` | Upsert title, url, is_published |
+
+`locale` ∈ `en` \| `ar`; `topic` is a lowercase slug.
+
+---
 ## Efficiency guidelines (for implementers)
 
 1. **Prefer aggregates** — `#11` ventor home and `#30` listener dashboard load one screen in one round-trip.
@@ -1574,11 +1667,11 @@ Accept-Language: ar
 | URL | Use | 
 |-----|-----|
 | **Prefer `#76`** `GET /v1/legal/links` | Terms + Privacy (locale-aware, portal-editable) |
-| `{helpCenterBaseUrl}/…` | Help articles |
+| **Prefer `#77`** `GET /v1/help/links` | Help Center topics (locale-aware, portal-editable) |
 | `mailto:support@venting.app` | Support email |
 | WhatsApp `wa.me` | Support / share |
 
-> Hardcoded `termsUrl` / `privacyUrl` in app flavors are **fallback only** until `#76` is live.
+> Hardcoded `termsUrl` / `privacyUrl` / help base URLs in app flavors are **fallback only**.
 
 ---
 
@@ -1599,7 +1692,8 @@ Accept-Language: ar
 | Promo | 1 |
 | Catalog / categories | 2 |
 | Legal links | 1 |
-| **Total unique API endpoints** | **78** |
+| Help links | 1 |
+| **Total unique API endpoints** | **79** |
 
 ### Master checklist (method + path)
 
@@ -1683,14 +1777,15 @@ Accept-Language: ar
 | 74 | GET | `/v1/catalog/categories` *(proposed)* |
 | 75 | GET | `/v1/catalog/languages` *(proposed)* |
 | 76 | GET | `/v1/legal/links` |
+| 77 | GET | `/v1/help/links` |
 
 ---
 
 ## Final count
 
-**Total unique API endpoints: 78**
+**Total unique API endpoints: 79**
 
-**Live / wired in the mobile app today: 0** (auth + catalog + legal clients exist; backend contracts still proposed where marked)
+**Live / wired in the mobile app today: 0** (auth + catalog + legal/help clients exist; backend contracts still proposed where marked)
 
 ---
 
