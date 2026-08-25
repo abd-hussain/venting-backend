@@ -85,7 +85,9 @@ async def parse_language_upsert(
         try:
             payload = LanguageUpsertRequest(
                 name_en=str(form.get("name_en", "")),
+                name_native=str(form.get("name_native") or form.get("name_en") or ""),
                 name_ar=str(form.get("name_ar", "")),
+                flag_emoji=_optional_str(form.get("flag_emoji")),
                 sort_order=int(form.get("sort_order") or 0),
                 is_active=_parse_bool(form.get("is_active")),
             )
@@ -115,7 +117,6 @@ async def parse_comfort_area_upsert(
                 name_en=str(form.get("name_en", "")),
                 name_ar=str(form.get("name_ar", "")),
                 topic_group=_optional_str(form.get("topic_group")),
-                icon_key=str(form.get("icon_key") or "category"),
                 sort_order=int(form.get("sort_order") or 0),
                 allows_custom_text=_parse_bool(
                     form.get("allows_custom_text"), default=False

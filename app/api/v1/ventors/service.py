@@ -38,7 +38,8 @@ from app.core.errors import conflict, forbidden, not_found, validation_error
 from app.models.auth import User
 from app.models.enums import Gender as GenderEnum
 from app.models.enums import MoodKind, SessionStatus, UserRole
-from app.models.lookups import ComfortArea, VentorInterest
+from app.models.lookups import ComfortArea, VentorInterest, VentorLanguage
+from app.api.v1.catalogs.service import assert_active_languages
 from app.models.profiles import ListenerProfile, VentorProfile
 from app.models.rewards import RewardOffer
 from app.models.sessions import Session as VentingSession
@@ -115,6 +116,16 @@ def _interest_ids(db: Session, ventor_id: UUID) -> list[str]:
     return [row[0] for row in rows]
 
 
+def _language_ids(db: Session, ventor_id: UUID) -> list[str]:
+    rows = (
+        db.query(VentorLanguage.language_id)
+        .filter(VentorLanguage.ventor_id == ventor_id)
+        .order_by(VentorLanguage.language_id)
+        .all()
+    )
+    return [row[0] for row in rows]
+
+
 def _profile_response(
     db: Session,
     user: User,
@@ -133,29 +144,29 @@ def _profile_response(
             points=profile.points_balance,
             streak_days=profile.mood_streak_days,
         ),
+        language_ids=_language_ids(db, profile.user_id),
         interest_ids=_interest_ids(db, profile.user_id),
     )
 
 
-def _parse_interest_ids(raw: str | None) -> list[str]:
+def _parse_id_list(raw: str | None, *, field: str) -> list[str]:
     if raw is None or not raw.strip():
         raise validation_error(
-            "interest_ids is required",
-            ar="يجب تحديد مجالات الاهتمام",
+            f"{field} is required",
+            ar=f"يجب تحديد {field}",
         )
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise validation_error(
-            "interest_ids must be a JSON array of strings",
-            ar="يجب أن تكون مجالات الاهتمام مصفوفة JSON",
+            f"{field} must be a JSON array of strings",
+            ar=f"يجب أن تكون {field} مصفوفة JSON",
         ) from exc
     if not isinstance(parsed, list) or not parsed or not all(isinstance(i, str) for i in parsed):
         raise validation_error(
-            "interest_ids must be a non-empty JSON array of strings",
-            ar="يجب أن تكون مجالات الاهتمام قائمة غير فارغة من النصوص",
+            f"{field} must be a non-empty JSON array of strings",
+            ar=f"يجب أن تكون {field} قائمة غير فارغة من النصوص",
         )
-    # Deduplicate while preserving order
     seen: set[str] = set()
     result: list[str] = []
     for item in parsed:
@@ -163,6 +174,14 @@ def _parse_interest_ids(raw: str | None) -> list[str]:
             seen.add(item)
             result.append(item)
     return result
+
+
+def _parse_interest_ids(raw: str | None) -> list[str]:
+    return _parse_id_list(raw, field="interest_ids")
+
+
+def _parse_language_ids(raw: str | None) -> list[str]:
+    return _parse_id_list(raw, field="language_ids")
 
 
 def _validate_interest_ids(
@@ -248,6 +267,7 @@ async def register_ventor(
     *,
     nickname: str,
     gender: Gender,
+    language_ids_raw: str,
     interest_ids_raw: str,
     other_interest_text: str | None,
     avatar: UploadFile | None,
@@ -274,6 +294,9 @@ async def register_ventor(
             "nickname must be 1–20 characters",
             ar="يجب أن يكون اللقب بين 1 و 20 حرفًا",
         )
+
+    language_ids = _parse_language_ids(language_ids_raw)
+    assert_active_languages(db, language_ids)
 
     interest_ids = _parse_interest_ids(interest_ids_raw)
     interest_rows = _validate_interest_ids(
@@ -312,6 +335,8 @@ async def register_ventor(
     )
     db.add(profile)
     db.flush()
+    for language_id in language_ids:
+        db.add(VentorLanguage(ventor_id=user.id, language_id=language_id))
     for interest_id in interest_ids:
         row = interest_rows[interest_id]
         db.add(

@@ -26,7 +26,7 @@
 
 ---
 
-## Quick index (all 43 tables)
+## Quick index (all 44 tables)
 
 | # | Table | Domain |
 |--:|-------|--------|
@@ -36,11 +36,12 @@
 | 3 | `ventor_profiles` | Ventor |
 | 4 | `listener_profiles` | Listener |
 | 5 | `listener_identity_verifications` | Listener onboarding |
-| 6 | `languages` | Lookups |
-| 7 | `comfort_areas` | Lookups |
+| 6 | `languages` | Lookups — **one** speaking-language catalog (ventor + listener) |
+| 7 | `comfort_areas` | Lookups — interests / comfort (icons via `icon_url`) |
 | 8 | `life_experiences` | Lookups |
 | 9 | `boundaries` | Lookups |
-| 10 | `ventor_interests` | Ventor tags |
+| 10 | `ventor_languages` | Ventor tags → `languages` |
+| 10b | `ventor_interests` | Ventor tags → `comfort_areas` |
 | 11 | `listener_languages` | Listener tags |
 | 12 | `listener_comfort_areas` | Listener tags |
 | 13 | `listener_life_experiences` | Listener tags |
@@ -79,7 +80,7 @@
 |------|------:|
 | Auth | 2 |
 | Profiles + identity | 3 |
-| Lookups + tag links | 9 |
+| Lookups + tag links | 10 |
 | Availability | 2 |
 | Ventor social / wellness | 4 |
 | Settings | 4 |
@@ -104,8 +105,13 @@ erDiagram
 
   ventor_profiles ||--o{ mood_checkins : logs
   ventor_profiles ||--o{ ventor_favorites : saves
+  ventor_profiles ||--o{ ventor_languages : speaks
   ventor_profiles ||--o{ ventor_interests : picks
   ventor_profiles ||--o| ventor_privacy_settings : has
+  languages ||--o{ ventor_languages : tagged
+  languages ||--o{ listener_languages : tagged
+  comfort_areas ||--o{ ventor_interests : tagged
+  comfort_areas ||--o{ listener_comfort_areas : tagged
   ventor_profiles ||--o| ventor_notification_preferences : has
   ventor_profiles ||--o{ ventor_achievements : unlocks
   ventor_profiles ||--o| invite_codes : owns
@@ -313,23 +319,38 @@ Stable catalogs (seed once). App uses string ids like `anxiety_stress`, `en`, `p
 
 ### 6. `languages`
 
+> **Single catalog** for all speaking-language UIs (ventor registration language step, listener registration languages, discovery filters, availability).  
+> Do **not** create a separate “speaking_languages” table — use this one. Managed from the admin portal (`/catalogs` → Languages).
+
 | Column | Type | Notes |
 |--------|------|-------|
-| `id` | VARCHAR(16) | **PK** e.g. `en`, `ar` |
-| `name_en` | VARCHAR(64) | |
-| `name_ar` | VARCHAR(64) | |
-| `sort_order` | INT | default 0 — ascending display order |
+| `id` | VARCHAR(16) | **PK** e.g. `en`, `ar`, `hi` |
+| `name_en` | VARCHAR(64) | English name (`English`) |
+| `name_native` | VARCHAR(64) | Native script label (`العربية`, `हिन्दी`) |
+| `name_ar` | VARCHAR(64) | Arabic label of the language name |
+| `flag_url` | TEXT | **Required for active rows** — absolute HTTPS URL of flag image (CDN / object storage uploaded via portal) |
+| `flag_emoji` | VARCHAR(16) | ? optional fallback only (e.g. `🇺🇸`); mobile prefers `flag_url` |
+| `sort_order` | INT | default 0 |
 | `is_active` | BOOLEAN | default true |
-| `image_url` | TEXT | ? flag / icon image |
+
+**Consumers of the same rows:**
+
+| Consumer | Link |
+|----------|------|
+| Ventor registration `#75` | `GET /v1/catalog/languages` → `#8` `language_ids` → `ventor_languages` |
+| Listener registration / profile | same catalog ids → `listener_languages` |
+| Discovery `#40` filters | `languages` query csv of these ids |
 
 ### 7. `comfort_areas`
+
+> Interest / comfort categories for ventor registration and listener comfort tags. Managed from the admin portal (`/catalogs` → Comfort areas / Interests).
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | VARCHAR(64) | **PK** |
 | `name_en` | VARCHAR(120) | |
 | `name_ar` | VARCHAR(120) | |
-| `icon_key` | VARCHAR(64) | e.g. `favorite`, `work` — mobile maps to Material icon |
+| `icon_url` | TEXT | **Required for active rows** — absolute HTTPS URL of category icon/image (CDN / object storage via portal). Mobile loads this URL — do **not** ship Material `icon_key` mappings. |
 | `sort_order` | INT | default 0 — ascending display order |
 | `allows_custom_text` | BOOLEAN | default false — e.g. `other` shows free-text field |
 | `audience` | VARCHAR(32) | `ventor` \| `listener` \| `all` — who may select this category |
@@ -354,13 +375,23 @@ Stable catalogs (seed once). App uses string ids like `anxiety_stress`, `en`, `p
 | `name_ar` | VARCHAR(120) | |
 | `is_active` | BOOLEAN | |
 
-### 10. `ventor_interests`
+### 10. `ventor_languages`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `ventor_id` | UUID | **FK → ventor_profiles** |
+| `language_id` | VARCHAR(16) | **FK → languages** |
+| | | **PK (`ventor_id`, `language_id`)** |
+
+Written from `#8 POST /v1/ventors/register` (`language_ids`). Same `languages` catalog as listeners.
+
+### 10b. `ventor_interests`
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `ventor_id` | UUID | **FK → ventor_profiles** |
 | `comfort_area_id` | VARCHAR(64) | **FK → comfort_areas** |
-| `custom_text` | VARCHAR(280) | ? free text when category `allows_custom_text` |
+| `custom_text` | TEXT | ? free text when category `allows_custom_text` |
 | | | **PK (`ventor_id`, `comfort_area_id`)** |
 
 ### 11. `listener_languages`
@@ -897,7 +928,7 @@ Append-only money movement (earnings chart + audit).
 | Store privacy + notification prefs as JSONB on profiles | 4 | Harder to enforce bool columns / migrate |
 | Skip `promo_redemptions` (log only on `session_payments`) | 1 | Weaker promo abuse control |
 
-**Recommended production set: keep all 43.**
+**Recommended production set: keep all 44.**
 
 ---
 
@@ -920,7 +951,7 @@ Append-only money movement (earnings chart + audit).
 | API area | Primary tables |
 |----------|----------------|
 | Auth 0–7, 1b | `users`, `refresh_tokens`, `auth_identities` *(proposed)* |
-| Catalog 74 | `comfort_areas` *(categories)* |
+| Catalog 74–75 | `comfort_areas` (`icon_url`), `languages` (`flag_url`) — portal-managed; one languages table for all speaking-language UIs |
 | Ventor profile / home | `ventor_profiles`, `mood_checkins`, `ventor_favorites`, `sessions` |
 | Listener profile / setup | `listener_profiles`, identity, tag junctions, training |
 | Availability | settings + `listener_availability_slots` |

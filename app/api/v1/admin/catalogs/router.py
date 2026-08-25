@@ -12,6 +12,7 @@ from app.api.v1.admin.catalogs.parse import (
 from app.api.v1.admin.catalogs.schemas import (
     CatalogItemResponse,
     ComfortAreaResponse,
+    LanguageResponse,
 )
 from app.api.v1.admin.catalogs.service import (
     list_boundaries,
@@ -44,7 +45,7 @@ CatalogWriter = Annotated[
 
 @router.get(
     "/languages",
-    response_model=APISuccessResponse[list[CatalogItemResponse]],
+    response_model=APISuccessResponse[list[LanguageResponse]],
     responses={401: {"model": APIErrorResponse}, 403: {"model": APIErrorResponse}},
 )
 def languages_list(db: DbSession, _admin: CatalogReader):
@@ -55,7 +56,7 @@ def languages_list(db: DbSession, _admin: CatalogReader):
 
 @router.put(
     "/languages/{item_id}",
-    response_model=APISuccessResponse[CatalogItemResponse],
+    response_model=APISuccessResponse[LanguageResponse],
     responses={
         400: {"model": APIErrorResponse},
         401: {"model": APIErrorResponse},

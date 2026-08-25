@@ -63,6 +63,7 @@ async def register(
     settings: SettingsDep,
     nickname: str = Form(...),
     gender: Gender = Form(...),
+    language_ids: str = Form(..., description='JSON array of language ids, e.g. ["en","ar"]'),
     interest_ids: str = Form(..., description='JSON array of comfort area ids, e.g. ["stress_anxiety"]'),
     other_interest_text: str | None = Form(
         None,
@@ -76,6 +77,7 @@ async def register(
         current_user,
         nickname=nickname,
         gender=gender,
+        language_ids_raw=language_ids,
         interest_ids_raw=interest_ids,
         other_interest_text=other_interest_text,
         avatar=avatar,

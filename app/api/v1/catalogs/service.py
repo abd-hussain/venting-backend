@@ -4,10 +4,8 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.api.v1.catalogs.schemas import (
-    CatalogBundleResponse,
     CatalogItemResponse,
     CategoryResponse,
-    ComfortAreaResponse,
     LanguageResponse,
 )
 from app.core.errors import invalid_catalog_audience, validation_error
@@ -29,23 +27,11 @@ def _language_item(row: Language) -> LanguageResponse:
     return LanguageResponse(
         id=row.id,
         name_en=row.name_en,
+        name_native=row.name_native,
         name_ar=row.name_ar,
+        flag_url=row.flag_url or "",
+        flag_emoji=row.flag_emoji,
         sort_order=row.sort_order,
-        image_url=row.image_url,
-    )
-
-
-def _comfort_item(row: ComfortArea) -> ComfortAreaResponse:
-    return ComfortAreaResponse(
-        id=row.id,
-        name_en=row.name_en,
-        name_ar=row.name_ar,
-        topic_group=row.topic_group,
-        image_url=row.image_url,
-        icon_key=row.icon_key,
-        sort_order=row.sort_order,
-        allows_custom_text=row.allows_custom_text,
-        audience=row.audience,
     )
 
 
@@ -54,20 +40,27 @@ def _category_item(row: ComfortArea) -> CategoryResponse:
         id=row.id,
         name_en=row.name_en,
         name_ar=row.name_ar,
-        icon_key=row.icon_key,
+        icon_url=row.icon_url or "",
         sort_order=row.sort_order,
         allows_custom_text=row.allows_custom_text,
         topic_group=row.topic_group,
     )
 
 
-def list_languages(db: Session) -> list[LanguageResponse]:
-    rows = (
-        db.query(Language)
-        .filter(Language.is_active.is_(True))
-        .order_by(Language.sort_order, Language.id)
-        .all()
-    )
+def list_languages(db: Session, *, q: str | None = None) -> list[LanguageResponse]:
+    query = db.query(Language).filter(Language.is_active.is_(True))
+    if q:
+        term = f"%{q.strip()}%"
+        if term != "%%":
+            query = query.filter(
+                or_(
+                    Language.name_en.ilike(term),
+                    Language.name_native.ilike(term),
+                    Language.name_ar.ilike(term),
+                    Language.id.ilike(term),
+                )
+            )
+    rows = query.order_by(Language.sort_order, Language.id).all()
     return [_language_item(row) for row in rows]
 
 
@@ -86,14 +79,25 @@ def assert_active_language(db: Session, language_id: str) -> Language:
     return row
 
 
-def list_comfort_areas(db: Session) -> list[ComfortAreaResponse]:
+def assert_active_languages(db: Session, language_ids: list[str]) -> list[Language]:
+    if not language_ids:
+        raise validation_error(
+            "language_ids must include at least one language",
+            ar="يجب اختيار لغة واحدة واحدة على الأقل",
+        )
     rows = (
-        db.query(ComfortArea)
-        .filter(ComfortArea.is_active.is_(True))
-        .order_by(ComfortArea.sort_order, ComfortArea.id)
+        db.query(Language)
+        .filter(Language.id.in_(language_ids), Language.is_active.is_(True))
         .all()
     )
-    return [_comfort_item(row) for row in rows]
+    found = {row.id: row for row in rows}
+    missing = [i for i in language_ids if i not in found]
+    if missing:
+        raise validation_error(
+            f"Unknown language_ids: {', '.join(missing)}",
+            ar="لغات غير معروفة",
+        )
+    return [found[i] for i in language_ids]
 
 
 def list_categories(db: Session, *, audience: str = "all") -> list[CategoryResponse]:
@@ -128,12 +132,3 @@ def list_boundaries(db: Session) -> list[CatalogItemResponse]:
         .all()
     )
     return [_item(row) for row in rows]
-
-
-def list_all_catalogs(db: Session) -> CatalogBundleResponse:
-    return CatalogBundleResponse(
-        languages=list_languages(db),
-        comfort_areas=list_comfort_areas(db),
-        life_experiences=list_life_experiences(db),
-        boundaries=list_boundaries(db),
-    )

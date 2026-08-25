@@ -11,10 +11,12 @@ class Language(Base):
 
     id = Column(String(16), primary_key=True)
     name_en = Column(String(64), nullable=False)
+    name_native = Column(String(64), nullable=False)
     name_ar = Column(String(64), nullable=False)
+    flag_url = Column(Text, nullable=True)
+    flag_emoji = Column(String(16), nullable=True)
     sort_order = Column(Integer, nullable=False, server_default="0")
     is_active = Column(Boolean, nullable=False, server_default="true")
-    image_url = Column(Text, nullable=True)
 
 
 class ComfortArea(Base):
@@ -23,13 +25,12 @@ class ComfortArea(Base):
     id = Column(String(64), primary_key=True)
     name_en = Column(String(120), nullable=False)
     name_ar = Column(String(120), nullable=False)
-    icon_key = Column(String(64), nullable=False, server_default="category")
+    icon_url = Column(Text, nullable=True)
     sort_order = Column(Integer, nullable=False, server_default="0")
     allows_custom_text = Column(Boolean, nullable=False, server_default="false")
     audience = Column(String(32), nullable=False, server_default="all")
     topic_group = Column(String(64), nullable=True)
     is_active = Column(Boolean, nullable=False, server_default="true")
-    image_url = Column(Text, nullable=True)
 
 
 class LifeExperience(Base):
@@ -52,6 +53,21 @@ class Boundary(Base):
     image_url = Column(Text, nullable=True)
 
 
+class VentorLanguage(Base):
+    __tablename__ = "ventor_languages"
+
+    ventor_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("ventor_profiles.user_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    language_id = Column(
+        String(16),
+        ForeignKey("languages.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+
 class VentorInterest(Base):
     __tablename__ = "ventor_interests"
 
@@ -65,7 +81,7 @@ class VentorInterest(Base):
         ForeignKey("comfort_areas.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    custom_text = Column(String(280), nullable=True)
+    custom_text = Column(Text, nullable=True)
 
 
 class ListenerLanguage(Base):

@@ -34,6 +34,7 @@ class VentorProfileResponse(BaseModel):
     quote: str | None = None
     is_anonymous: bool
     stats: VentorStats
+    language_ids: list[str]
     interest_ids: list[str]
 
 

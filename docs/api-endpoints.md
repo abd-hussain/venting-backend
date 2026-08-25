@@ -63,7 +63,7 @@ List responses may include:
 
 | Domain | Count | Master list # |
 |--------|------:|---------------|
-| Auth & account | 8 | 0–7 |
+| Auth & account | 9 | 0–7, 1b |
 | Ventor profile / home / wellness | 14 | 8–21 |
 | Listener profile / onboarding / dashboard | 15 | 22–36 |
 | Listener availability | 3 | 37–39 |
@@ -74,15 +74,16 @@ List responses may include:
 | Notifications | 3 | 68–70 |
 | Training | 2 | 71–72 |
 | Promo | 1 | 73 |
-| **Total** | **74** | |
+| Catalog / categories | 2 | 74–75 |
+| **Total** | **77** | |
 
 ---
 
 ## 1. Auth & account
 
-### 0. `POST /v1/auth/check-email`
+### 0. `POST /v1/auth/check-email` *(proposed)*
 
-> **Status:** Implemented on backend.  
+> **Status:** Proposed — not implemented on backend or mobile yet.  
 > **Purpose:** Email-first discovery — branch **Create account** vs **Sign in** before password submit. Does **not** authenticate.
 
 | | |
@@ -170,31 +171,14 @@ List responses may include:
 - Soft-deleted accounts: treat as `exists: false` **or** 403 — pick one and document
 - Pure read; no session created
 
-**Out of scope:** login/register replacement, OTP, password validation.
+**Out of scope:** login/register replacement, OTP, password validation. Social auth is a separate endpoint — see [`social-auth-backend-requirements.md`](./social-auth-backend-requirements.md).
 
 **Acceptance criteria:**
 
-- [x] Public `POST /v1/auth/check-email` with `{ email, role? }`
-- [x] Standard `{ status, data }` success envelope
+- [ ] Public `POST /v1/auth/check-email` with `{ email, role? }`
+- [ ] Standard `{ status, data }` success envelope
 - [ ] Mobile can branch register vs login without calling `#1`/`#2` until password submit
-- [x] After auth, `#7` remains routing authority
-
----
-
-### 1b. `POST /v1/auth/social`
-
-| | |
-|--|--|
-| **Auth** | Public |
-| **Purpose** | Verify Google/Apple ID token → create user or log in → return session |
-| **Body** | `provider` (`google` \| `apple`), `id_token`, `role`, optional `nonce` (Apple), optional `full_name` |
-| **Response** | Same session shape as `#1` / `#2`: `access_token`, `refresh_token`, `user` `{ id, email, role, is_new, registration_complete }` |
-
-Mobile still calls `#0 check-email` when email is known (role-mismatch UX). Sessions work with `#3`–`#7`.
-
-**Env config:** `GOOGLE_CLIENT_IDS`, `APPLE_AUDIENCES` (comma-separated allowlists per deployment).
-
-**Errors:** `120` validation, `121` invalid token, `122` Apple nonce, `123` email unavailable, `124` role mismatch, `125` identity conflict, `126` disabled, `127` provider unavailable, `429` rate limit.
+- [ ] After auth, `#7` remains routing authority
 
 ---
 
@@ -219,6 +203,54 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 | **Screen** | Email registration (sign-in path) |
 | **Body** | `email`, `password`, `role` (`ventor` \| `listener`) |
 | **Response** | `access_token`, `refresh_token`, `user` `{ id, email, role, registration_complete }` |
+
+---
+
+### 1b. `POST /v1/auth/social` *(proposed)*
+
+> **Status:** Proposed — not implemented on backend or mobile yet.  
+> **Full spec:** [`social-auth-backend-requirements.md`](./social-auth-backend-requirements.md)
+
+| | |
+|--|--|
+| **Auth** | Public |
+| **Screen** | AuthScreen → “Continue with Google” / “Continue with Apple” |
+| **When** | After native Google/Apple Sign-In; mobile may call `#0 check-email` first when email is available |
+| **Body** | `provider` (`google` \| `apple`), `id_token` (string), `role` (`ventor` \| `listener`), optional `nonce` (Apple), optional `full_name` |
+| **Response** | Same session envelope as `#1` / `#2`: `access_token`, `refresh_token`, `user` `{ id, email, role, is_new, registration_complete }` |
+
+**Request example:**
+
+```json
+{
+  "provider": "google",
+  "id_token": "eyJhbGciOiJSUzI1NiIs...",
+  "role": "ventor"
+}
+```
+
+**Success example:**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "access_token": "...",
+    "refresh_token": "...",
+    "user": {
+      "id": "uuid",
+      "email": "user@example.com",
+      "role": "ventor",
+      "is_new": true,
+      "registration_complete": false
+    }
+  }
+}
+```
+
+**Errors (see full doc for codes 120–127):** invalid token, role mismatch (409), account disabled (403), rate limit (429).
+
+**After success:** mobile calls `#7 GET /v1/auth/me` for routing (same as email auth).
 
 ---
 
@@ -286,10 +318,8 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 |--|--|
 | **Auth** | Bearer |
 | **Screen** | Ventor registration (profile + interests) |
-| **Body** | `nickname` (≤20), `gender` (`male` \| `female` \| `prefer_not_to_say`), `avatar` (multipart file **or** `avatar_preset_index`), `interest_ids` (JSON string[] of catalog category ids), optional `other_interest_text` (required min 2 chars when an `allows_custom_text` category such as `other` is selected) |
+| **Body** | `nickname` (≤20), `gender` (`male` \| `female` \| `prefer_not_to_say`), `avatar` (multipart file **or** `avatar_preset_index`), `language_ids` (string[], ≥1), `interest_ids` (string[]) |
 | **Response** | Ventor profile object (see #9) |
-
-`interest_ids` must be active catalog categories with `audience` = `ventor` or `all` (see `#74`).
 
 ---
 
@@ -299,7 +329,7 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 |--|--|
 | **Auth** | Bearer (ventor) |
 | **Screen** | Ventor profile tab |
-| **Response** | `{ id, nickname, email, avatar_url, gender, quote?, is_anonymous, stats: { sessions_count, points, streak_days }, interest_ids }` |
+| **Response** | `{ id, nickname, email, avatar_url, gender, quote?, is_anonymous, stats: { sessions_count, points, streak_days }, language_ids, interest_ids }` |
 
 ---
 
@@ -1008,33 +1038,348 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 
 ---
 
-## 12. Catalog
+## 12. Catalog / categories *(proposed)*
 
-### 74. `GET /v1/catalog/categories`
+> Shared lookup lists for registration and filters. Seeded in DB (`comfort_areas`, `languages`, …).  
+> Mobile **must not** hardcode category labels long-term — fetch from here.
+
+> **Do not use** `GET /v1/catalog` (combined dump of languages + comfort areas + life experiences + boundaries).  
+> That route is **not part of this contract** — remove it from the backend if it still exists.  
+> Mobile and other clients must call the focused endpoints only:
+> - `#74` `GET /v1/catalog/categories`
+> - `#75` `GET /v1/catalog/languages`
+> (Listener registration may later add focused endpoints for life experiences / boundaries — never the mega dump.)
+
+### 74. `GET /v1/catalog/categories` *(proposed)*
+
+> **Status:** Proposed — ventor registration interests from portal-managed `comfort_areas`.  
+> **Purpose:** Return active interest / comfort categories for ventor (and optionally listener) registration.  
+> **DB source:** `comfort_areas` (ids also used as `interest_ids` on `#8 POST /v1/ventors/register`).  
+> **Icons:** `icon_url` (CDN) uploaded in admin portal — mobile does not map Material icon keys.
 
 | | |
 |--|--|
-| **Auth** | Public (Bearer optional) |
-| **Screen** | Ventor registration interests step |
-| **Query** | `audience` = `ventor` \| `listener` \| `all` (default `all`) |
-| **Response** | `{ items: [{ id, name_en, name_ar, icon_key, sort_order, allows_custom_text, topic_group? }] }` |
+| **Auth** | Public (Bearer accepted if present). Catalog is not secret. |
+| **Screen** | Ventor registration → interests step (`VentorRegistrationInterestsStep`) |
+| **When** | When interests step opens (and on pull-to-retry / error retry) |
+| **Query** | See below |
+| **Response** | `{ items: Category[] }` |
 
-Filter: active rows where `audience` matches the query **or** `audience = all`. Sorted by `sort_order`. Invalid `audience` → `400` code `740`.
+#### Query parameters
 
-`icon_key` maps to Material icons on mobile (e.g. `favorite`, `work_outline`, `add_circle_outline`).
+| Param | Type | Required | Default | Notes |
+|-------|------|----------|---------|-------|
+| `audience` | `ventor` \| `listener` \| `all` | no | `all` | Filter by who may select the category. Ventor interests step sends `audience=ventor`. |
+| `locale` | `en` \| `ar` | no | from `Accept-Language` / `skel-accept-language` | Optional hint; response still includes **both** `name_en` and `name_ar` so the client can switch language without re-fetch. |
 
-### 75. `GET /v1/catalog/languages`
+#### `Category` object
 
-| | |
-|--|--|
-| **Auth** | Public (Bearer optional) |
-| **Screen** | Listener languages picker · session booking `speech_language` |
-| **Response** | `{ items: [{ id, name_en, name_ar, sort_order, image_url? }] }` |
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `id` | string | yes | Stable slug PK — same value sent later in `#8` `interest_ids` |
+| `name_en` | string | yes | English label |
+| `name_ar` | string | yes | Arabic label |
+| `icon_url` | string | yes | Absolute HTTPS URL of the category icon/image (CDN). Mobile renders this image — **not** a Material `icon_key`. |
+| `sort_order` | number | yes | Ascending; lower first |
+| `allows_custom_text` | boolean | yes | `true` → show free-text field (e.g. `other`) |
+| `topic_group` | string \| null | no | Optional grouping for admin / filters |
 
-Active speaking languages sorted by `sort_order`. Use `id` as `language_ids[]` / `speech_language` values (e.g. `en`, `ar`).
+#### Success example
+
+```http
+GET /v1/catalog/categories?audience=ventor
+Accept-Language: en
+```
+
+```json
+{
+  "status": "success",
+  "data": {
+    "items": [
+      {
+        "id": "relationships",
+        "name_en": "Relationships",
+        "name_ar": "العلاقات",
+        "icon_url": "https://cdn.venting.app/catalog/comfort/relationships.png",
+        "sort_order": 10,
+        "allows_custom_text": false,
+        "topic_group": "relationships"
+      },
+      {
+        "id": "marriage",
+        "name_en": "Marriage",
+        "name_ar": "الزواج",
+        "icon_url": "https://cdn.venting.app/catalog/comfort/marriage.png",
+        "sort_order": 20,
+        "allows_custom_text": false,
+        "topic_group": "relationships"
+      },
+      {
+        "id": "parenting",
+        "name_en": "Parenting",
+        "name_ar": "الأبوة والأمومة",
+        "icon_url": "https://cdn.venting.app/catalog/comfort/parenting.png",
+        "sort_order": 30,
+        "allows_custom_text": false,
+        "topic_group": "family"
+      },
+      {
+        "id": "career_work",
+        "name_en": "Career & work",
+        "name_ar": "المهنة والعمل",
+        "icon_url": "https://cdn.venting.app/catalog/comfort/career_work.png",
+        "sort_order": 40,
+        "allows_custom_text": false,
+        "topic_group": "work"
+      },
+      {
+        "id": "stress_anxiety",
+        "name_en": "Stress & anxiety",
+        "name_ar": "التوتر والقلق",
+        "icon_url": "https://cdn.venting.app/catalog/comfort/stress_anxiety.png",
+        "sort_order": 50,
+        "allows_custom_text": false,
+        "topic_group": "mental"
+      },
+      {
+        "id": "loneliness",
+        "name_en": "Loneliness",
+        "name_ar": "الوحدة",
+        "icon_url": "https://cdn.venting.app/catalog/comfort/loneliness.png",
+        "sort_order": 60,
+        "allows_custom_text": false,
+        "topic_group": "mental"
+      },
+      {
+        "id": "student_life",
+        "name_en": "Student life",
+        "name_ar": "حياة الطالب",
+        "icon_url": "https://cdn.venting.app/catalog/comfort/student_life.png",
+        "sort_order": 70,
+        "allows_custom_text": false,
+        "topic_group": "life"
+      },
+      {
+        "id": "financial_stress",
+        "name_en": "Financial stress",
+        "name_ar": "الضغط المالي",
+        "icon_url": "https://cdn.venting.app/catalog/comfort/financial_stress.png",
+        "sort_order": 80,
+        "allows_custom_text": false,
+        "topic_group": "money"
+      },
+      {
+        "id": "health_wellness",
+        "name_en": "Health & wellness",
+        "name_ar": "الصحة والعافية",
+        "icon_url": "https://cdn.venting.app/catalog/comfort/health_wellness.png",
+        "sort_order": 90,
+        "allows_custom_text": false,
+        "topic_group": "health"
+      },
+      {
+        "id": "other",
+        "name_en": "Other",
+        "name_ar": "أخرى",
+        "icon_url": "https://cdn.venting.app/catalog/comfort/other.png",
+        "sort_order": 1000,
+        "allows_custom_text": true,
+        "topic_group": null
+      }
+    ]
+  }
+}
+```
+
+#### Seed notes
+
+| `id` | `allows_custom_text` | Notes |
+|------|----------------------|-------|
+| `relationships` … `health_wellness` | `false` | Icons uploaded in portal → stored as `icon_url` |
+| `other` | `true` | Free-text required on mobile when selected |
+
+Mobile must **not** hardcode category labels or icons. Missing/broken `icon_url` → show a generic placeholder image/icon.
+
+#### Mobile usage
+
+1. Open Ventor registration interests step.
+2. `GET /v1/catalog/categories?audience=ventor`.
+3. Render `items` sorted by `sort_order`.
+4. Localized label: `locale == ar ? name_ar : name_en`.
+5. Leading image: load `icon_url` (cached network image).
+6. If item has `allows_custom_text == true` and is selected → show free-text field; require non-empty trim before Finish.
+7. On Finish → collect selected `id`s (+ optional custom text for `other`) → send as `interest_ids` (and optional `other_interest_text`) on `#8 POST /v1/ventors/register`.
+
+#### Errors
+
+| HTTP | type | code | When |
+|------|------|------|------|
+| 400 | validation | 740 | Invalid `audience` |
+| 500 | server | 500 | Unexpected failure |
+| 503 | server | 503 | Catalog unavailable |
+
+Empty active catalog → still `200` with `"items": []` (mobile shows empty + retry). Do **not** 404.
+
+#### Rules
+
+- Only return rows with `is_active = true`.
+- IDs are immutable once shipped — changing an `id` breaks existing `ventor_interests` / `interest_ids`.
+- Add/remove/reorder/upload icons via admin CMS (`/v1/admin/catalog/comfort-areas`); this public GET is read-only.
+- `icon_url` must be a public absolute HTTPS URL (CDN). Portal uploads the asset, then stores the resulting URL on the row.
+- Cache-friendly: `Cache-Control: public, max-age=300` recommended (optional).
+
+#### Acceptance criteria
+
+- [ ] `GET /v1/catalog/categories?audience=ventor` returns active rows with `icon_url`
+- [ ] Standard `{ status, data: { items } }` envelope
+- [ ] Both `name_en` and `name_ar` present
+- [ ] `other` has `allows_custom_text: true`
+- [ ] Inactive rows omitted
+- [ ] Same `id` values accepted by `#8` `interest_ids`
+- [ ] Portal can create/update categories and upload/replace `icon_url`
+
+#### Link to register
+
+| Step | API |
+|------|-----|
+| Load chips | `#74 GET /v1/catalog/categories?audience=ventor` |
+| Submit profile + interests | `#8 POST /v1/ventors/register` with `interest_ids: ["relationships", "career_work", …]` |
+
+Optional body extension on `#8` when `other` selected:
+
+```json
+{
+  "nickname": "QuietFox",
+  "gender": "prefer_not_to_say",
+  "avatar_preset_index": 2,
+  "language_ids": ["en", "ar"],
+  "interest_ids": ["stress_anxiety", "other"],
+  "other_interest_text": "Grief after moving cities"
+}
+```
 
 ---
 
+### 75. `GET /v1/catalog/languages` *(proposed)*
+
+> **Status:** Proposed — ventor (and listener) speaking-language picker.  
+> **Purpose:** Return active spoken languages from the **single** `languages` table.  
+> **DB source:** `languages` only — there is **no** separate speaking-languages catalog.  
+> **Managed by:** Admin portal `/catalogs` → Languages (`A48`/`A49`).
+
+| | |
+|--|--|
+| **Auth** | Public (Bearer accepted if present) |
+| **Screen** | Ventor registration → **Choose your Language** step (also listener language pickers / filters) |
+| **When** | Step open / search retry |
+| **Query** | `q` (optional search string — filters `name_en`, `name_native`, `name_ar`) |
+| **Response** | `{ items: Language[] }` |
+
+#### `Language` object
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `id` | string | yes | Stable code PK — e.g. `en`, `ar`, `hi` — sent as `language_ids` on `#8` / listener profile |
+| `name_en` | string | yes | English display name (`English`) |
+| `name_native` | string | yes | Native script name (`العربية`, `हिन्दी`) |
+| `name_ar` | string | yes | Arabic translation of the language name |
+| `flag_url` | string | yes | Absolute HTTPS URL of flag image (CDN). Mobile shows this in the circular avatar. |
+| `flag_emoji` | string \| null | no | Optional emoji fallback only; mobile **prefers `flag_url`** |
+| `sort_order` | number | yes | Ascending |
+
+#### Success example
+
+```json
+{
+  "status": "success",
+  "data": {
+    "items": [
+      {
+        "id": "en",
+        "name_en": "English",
+        "name_native": "English",
+        "name_ar": "الإنجليزية",
+        "flag_url": "https://cdn.venting.app/catalog/flags/en.png",
+        "flag_emoji": "🇺🇸",
+        "sort_order": 10
+      },
+      {
+        "id": "hi",
+        "name_en": "Hindi",
+        "name_native": "हिन्दी",
+        "name_ar": "الهندية",
+        "flag_url": "https://cdn.venting.app/catalog/flags/hi.png",
+        "flag_emoji": "🇮🇳",
+        "sort_order": 20
+      },
+      {
+        "id": "es",
+        "name_en": "Spanish",
+        "name_native": "Español",
+        "name_ar": "الإسبانية",
+        "flag_url": "https://cdn.venting.app/catalog/flags/es.png",
+        "flag_emoji": "🇪🇸",
+        "sort_order": 30
+      },
+      {
+        "id": "ar",
+        "name_en": "Arabic",
+        "name_native": "العربية",
+        "name_ar": "العربية",
+        "flag_url": "https://cdn.venting.app/catalog/flags/ar.png",
+        "flag_emoji": "🇸🇦",
+        "sort_order": 40
+      },
+      {
+        "id": "bn",
+        "name_en": "Bengali",
+        "name_native": "বাংলা",
+        "name_ar": "البنغالية",
+        "flag_url": "https://cdn.venting.app/catalog/flags/bn.png",
+        "flag_emoji": "🇧🇩",
+        "sort_order": 50
+      },
+      {
+        "id": "tr",
+        "name_en": "Turkish",
+        "name_native": "Türkçe",
+        "name_ar": "التركية",
+        "flag_url": "https://cdn.venting.app/catalog/flags/tr.png",
+        "flag_emoji": "🇹🇷",
+        "sort_order": 60
+      }
+    ]
+  }
+}
+```
+
+#### Mobile list row
+
+Display: `[flag circle from flag_url]  {name_native} ({name_en})  [checkbox]`  
+Selected: purple border on tile + filled purple checkbox.  
+Multi-select allowed; **at least one** required before Continue.
+
+Same endpoint powers listener language selection — do not invent a second languages API/table.
+
+#### Errors
+
+| HTTP | type | code | When |
+|------|------|------|------|
+| 400 | validation | 750 | Invalid query |
+| 500 / 503 | server | … | Failure |
+
+Empty → `200` + `items: []`.
+
+#### Acceptance
+
+- [ ] Public `GET /v1/catalog/languages` reads **only** from `languages`
+- [ ] Each active item has a non-empty `flag_url` (HTTPS CDN)
+- [ ] Seed includes en, hi, es, ar, bn, tr (minimum)
+- [ ] `#8` accepts `language_ids` subset of active language ids → writes `ventor_languages`
+- [ ] Portal can upsert languages and upload/replace flag images
+- [ ] Search `q` filters server-side **or** mobile filters client-side (either OK for v1; prefer client filter for small lists)
+
+---
 ## Efficiency guidelines (for implementers)
 
 1. **Prefer aggregates** — `#11` ventor home and `#30` listener dashboard load one screen in one round-trip.
@@ -1073,17 +1418,17 @@ Active speaking languages sorted by `sort_order`. Use `id` as `language_ids[]` /
 | Notifications | 3 |
 | Training | 2 |
 | Promo | 1 |
-| Catalog | 2 |
+| Catalog / categories | 2 |
 | **Total unique API endpoints** | **77** |
 
 ### Master checklist (method + path)
 
 | # | Method | Path |
 |---|--------|------|
-| 0 | POST | `/v1/auth/check-email` |
+| 0 | POST | `/v1/auth/check-email` *(proposed)* |
 | 1 | POST | `/v1/auth/register` |
-| 1b | POST | `/v1/auth/social` |
 | 2 | POST | `/v1/auth/login` |
+| 1b | POST | `/v1/auth/social` *(proposed)* |
 | 3 | POST | `/v1/auth/refresh` |
 | 4 | POST | `/v1/auth/logout` |
 | 5 | DELETE | `/v1/auth/account` |
@@ -1155,14 +1500,14 @@ Active speaking languages sorted by `sort_order`. Use `id` as `language_ids[]` /
 | 71 | GET | `/v1/listeners/me/training` |
 | 72 | POST | `/v1/listeners/me/training/{moduleId}/complete` |
 | 73 | POST | `/v1/promo/validate` |
-| 74 | GET | `/v1/catalog/categories` |
-| 75 | GET | `/v1/catalog/languages` |
+| 74 | GET | `/v1/catalog/categories` *(proposed)* |
+| 75 | GET | `/v1/catalog/languages` *(proposed)* |
 
 ---
 
 ## Final count
 
-**Total unique API endpoints: 77**
+**Total unique API endpoints: 73**
 
 **Live / wired in the mobile app today: 0**
 
