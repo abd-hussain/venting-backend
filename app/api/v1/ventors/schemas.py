@@ -19,6 +19,15 @@ class Mood(str, Enum):
     angry = "angry"
 
 
+class VentorRegisterRequest(BaseModel):
+    nickname: str = Field(min_length=1, max_length=20)
+    gender: Gender
+    language_ids: list[str] = Field(min_length=1)
+    interest_ids: list[str] = Field(min_length=1)
+    other_interest_text: str | None = None
+    avatar_preset_index: int | None = None
+
+
 class VentorStats(BaseModel):
     sessions_count: int
     points: int

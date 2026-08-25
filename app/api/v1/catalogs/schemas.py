@@ -28,7 +28,8 @@ class CategoryResponse(BaseModel):
     id: str
     name_en: str
     name_ar: str
-    icon_url: str
+    icon_emoji: str
+    icon_url: str | None = None
     sort_order: int
     allows_custom_text: bool
     topic_group: str | None = None

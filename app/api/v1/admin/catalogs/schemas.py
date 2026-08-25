@@ -24,6 +24,7 @@ class ComfortAreaResponse(BaseModel):
     id: str
     name_en: str
     name_ar: str
+    icon_emoji: str = "📌"
     icon_url: str | None = None
     sort_order: int = 0
     allows_custom_text: bool = False
@@ -46,6 +47,7 @@ class LanguageUpsertRequest(CatalogUpsertRequest):
 
 class ComfortAreaUpsertRequest(CatalogUpsertRequest):
     topic_group: str | None = Field(default=None, max_length=64)
+    icon_emoji: str = Field(default="📌", min_length=1, max_length=16)
     sort_order: int = Field(default=0, ge=0)
     allows_custom_text: bool = False
     audience: str = Field(default="all", min_length=1, max_length=32)

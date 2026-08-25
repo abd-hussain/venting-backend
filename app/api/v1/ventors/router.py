@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from fastapi import APIRouter, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, File, Form, Query, Request, UploadFile, status
+from pydantic import ValidationError
 
 from app.api.deps import (
     CurrentUser,
@@ -23,6 +24,7 @@ from app.api.v1.ventors.schemas import (
     OkResponse,
     PrivacySettings,
     VentorProfileResponse,
+    VentorRegisterRequest,
 )
 from app.api.v1.ventors.service import (
     add_favorite,
@@ -40,6 +42,7 @@ from app.api.v1.ventors.service import (
     update_privacy,
     update_ventor_profile,
 )
+from app.core.errors import validation_error
 from app.core.responses import success_response
 from app.schemas.envelope import APIErrorResponse, APISuccessResponse
 
@@ -51,6 +54,7 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
     response_model=APISuccessResponse[VentorProfileResponse],
     responses={
+        400: {"model": APIErrorResponse},
         403: {"model": APIErrorResponse},
         409: {"model": APIErrorResponse},
         422: {"model": APIErrorResponse},
@@ -58,32 +62,72 @@ router = APIRouter()
     summary="Complete ventor profile registration",
 )
 async def register(
+    request: Request,
     current_user: CurrentVentor,
     db: DbSession,
     settings: SettingsDep,
-    nickname: str = Form(...),
-    gender: Gender = Form(...),
-    language_ids: str = Form(..., description='JSON array of language ids, e.g. ["en","ar"]'),
-    interest_ids: str = Form(..., description='JSON array of comfort area ids, e.g. ["stress_anxiety"]'),
-    other_interest_text: str | None = Form(
-        None,
-        description="Required (min 2 chars) when interest_ids includes a category with allows_custom_text",
-    ),
-    avatar_preset_index: int | None = Form(None),
-    avatar: UploadFile | None = File(None),
 ):
-    data = await register_ventor(
-        db,
-        current_user,
-        nickname=nickname,
-        gender=gender,
-        language_ids_raw=language_ids,
-        interest_ids_raw=interest_ids,
-        other_interest_text=other_interest_text,
-        avatar=avatar,
-        avatar_preset_index=avatar_preset_index,
-        settings=settings,
-    )
+    content_type = request.headers.get("content-type", "")
+    if content_type.startswith("application/json"):
+        try:
+            body = VentorRegisterRequest.model_validate(await request.json())
+        except ValidationError as exc:
+            raise validation_error(str(exc.errors()[0]["msg"])) from exc
+        data = await register_ventor(
+            db,
+            current_user,
+            nickname=body.nickname,
+            gender=body.gender,
+            language_ids_raw=body.language_ids,
+            interest_ids_raw=body.interest_ids,
+            other_interest_text=body.other_interest_text,
+            avatar=None,
+            avatar_preset_index=body.avatar_preset_index,
+            settings=settings,
+        )
+    else:
+        form = await request.form()
+        nickname = str(form.get("nickname") or "")
+        gender_raw = str(form.get("gender") or "")
+        try:
+            gender = Gender(gender_raw)
+        except ValueError as exc:
+            raise validation_error("Invalid gender") from exc
+
+        language_ids = form.get("language_ids")
+        interest_ids = form.get("interest_ids")
+        # Support repeated multipart parts: language_ids=en&language_ids=ar
+        if hasattr(form, "getlist"):
+            lang_list = [str(v) for v in form.getlist("language_ids") if str(v)]
+            interest_list = [str(v) for v in form.getlist("interest_ids") if str(v)]
+            if len(lang_list) > 1 or (len(lang_list) == 1 and not str(lang_list[0]).startswith("[")):
+                language_ids = lang_list
+            if len(interest_list) > 1 or (
+                len(interest_list) == 1 and not str(interest_list[0]).startswith("[")
+            ):
+                interest_ids = interest_list
+
+        other = form.get("other_interest_text")
+        other_interest_text = str(other) if other not in (None, "") else None
+        preset_raw = form.get("avatar_preset_index")
+        avatar_preset_index = int(preset_raw) if preset_raw not in (None, "") else None
+        avatar_field = form.get("avatar")
+        avatar: UploadFile | None = None
+        if isinstance(avatar_field, UploadFile) and avatar_field.filename:
+            avatar = avatar_field
+
+        data = await register_ventor(
+            db,
+            current_user,
+            nickname=nickname,
+            gender=gender,
+            language_ids_raw=language_ids if isinstance(language_ids, list) else str(language_ids or ""),
+            interest_ids_raw=interest_ids if isinstance(interest_ids, list) else str(interest_ids or ""),
+            other_interest_text=other_interest_text,
+            avatar=avatar,
+            avatar_preset_index=avatar_preset_index,
+            settings=settings,
+        )
     return success_response(data.model_dump(mode="json"), status_code=status.HTTP_201_CREATED)
 
 

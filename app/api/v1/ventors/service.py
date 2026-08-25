@@ -149,19 +149,22 @@ def _profile_response(
     )
 
 
-def _parse_id_list(raw: str | None, *, field: str) -> list[str]:
-    if raw is None or not raw.strip():
-        raise validation_error(
-            f"{field} is required",
-            ar=f"يجب تحديد {field}",
-        )
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise validation_error(
-            f"{field} must be a JSON array of strings",
-            ar=f"يجب أن تكون {field} مصفوفة JSON",
-        ) from exc
+def _parse_id_list(raw: str | list[str] | None, *, field: str) -> list[str]:
+    if isinstance(raw, list):
+        parsed = raw
+    else:
+        if raw is None or (isinstance(raw, str) and not raw.strip()):
+            raise validation_error(
+                f"{field} is required",
+                ar=f"يجب تحديد {field}",
+            )
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise validation_error(
+                f"{field} must be a JSON array of strings",
+                ar=f"يجب أن تكون {field} مصفوفة JSON",
+            ) from exc
     if not isinstance(parsed, list) or not parsed or not all(isinstance(i, str) for i in parsed):
         raise validation_error(
             f"{field} must be a non-empty JSON array of strings",
@@ -176,11 +179,11 @@ def _parse_id_list(raw: str | None, *, field: str) -> list[str]:
     return result
 
 
-def _parse_interest_ids(raw: str | None) -> list[str]:
+def _parse_interest_ids(raw: str | list[str] | None) -> list[str]:
     return _parse_id_list(raw, field="interest_ids")
 
 
-def _parse_language_ids(raw: str | None) -> list[str]:
+def _parse_language_ids(raw: str | list[str] | None) -> list[str]:
     return _parse_id_list(raw, field="language_ids")
 
 
@@ -267,8 +270,8 @@ async def register_ventor(
     *,
     nickname: str,
     gender: Gender,
-    language_ids_raw: str,
-    interest_ids_raw: str,
+    language_ids_raw: str | list[str],
+    interest_ids_raw: str | list[str],
     other_interest_text: str | None,
     avatar: UploadFile | None,
     avatar_preset_index: int | None,
@@ -306,22 +309,27 @@ async def register_ventor(
     )
     custom_text = (other_interest_text or "").strip() or None
 
-    if avatar is not None and avatar.filename and avatar_preset_index is not None:
+    has_upload = avatar is not None and bool(avatar.filename)
+    if has_upload and avatar_preset_index is not None:
         raise validation_error(
             "Provide either avatar file or avatar_preset_index, not both",
             ar="قدّم ملف صورة أو رقم صورة جاهزة فقط",
         )
 
+    # Spec: either file, preset, or neither (default preset 0).
+    preset = avatar_preset_index if has_upload else (
+        avatar_preset_index if avatar_preset_index is not None else 0
+    )
     avatar_url = await _save_avatar(
-        upload=avatar,
-        preset_index=avatar_preset_index,
+        upload=avatar if has_upload else None,
+        preset_index=None if has_upload else preset,
         user_id=user.id,
         settings=settings,
     )
     if avatar_url is None:
         raise validation_error(
-            "avatar file or avatar_preset_index is required",
-            ar="يلزم رفع صورة أو اختيار صورة جاهزة",
+            "Could not resolve avatar",
+            ar="تعذر تعيين صورة الملف الشخصي",
         )
 
     welcome = db.get(RewardOffer, WELCOME_OFFER_ID)

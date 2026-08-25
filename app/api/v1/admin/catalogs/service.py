@@ -57,6 +57,7 @@ def _comfort_item(row: ComfortArea) -> ComfortAreaResponse:
         id=row.id,
         name_en=row.name_en,
         name_ar=row.name_ar,
+        icon_emoji=row.icon_emoji,
         icon_url=row.icon_url,
         topic_group=row.topic_group,
         is_active=row.is_active,
@@ -111,6 +112,7 @@ def _audit_snapshot(row: CatalogModel) -> dict[str, object]:
     elif isinstance(row, ComfortArea):
         data.update(
             {
+                "icon_emoji": row.icon_emoji,
                 "icon_url": row.icon_url,
                 "topic_group": row.topic_group,
                 "sort_order": row.sort_order,
@@ -302,18 +304,19 @@ async def upsert_comfort_area(
     row.name_en = payload.name_en
     row.name_ar = payload.name_ar
     row.topic_group = payload.topic_group
+    row.icon_emoji = payload.icon_emoji
     row.sort_order = payload.sort_order
     row.allows_custom_text = payload.allows_custom_text
     row.audience = payload.audience
     row.is_active = payload.is_active
-    row.icon_url = await _apply_image_field(
-        current_url=row.icon_url,
-        is_new=is_new,
-        image=image,
-        catalog_type="comfort_areas",
-        item_id=item_id,
-        settings=settings,
-    )
+    # Image upload is optional for comfort areas (emoji is the primary icon).
+    if image is not None:
+        row.icon_url = await save_catalog_image(
+            image,
+            catalog_type="comfort_areas",
+            item_id=item_id,
+            settings=settings,
+        )
     write_audit(
         db,
         admin_user_id=admin.id,

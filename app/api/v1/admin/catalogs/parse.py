@@ -117,6 +117,7 @@ async def parse_comfort_area_upsert(
                 name_en=str(form.get("name_en", "")),
                 name_ar=str(form.get("name_ar", "")),
                 topic_group=_optional_str(form.get("topic_group")),
+                icon_emoji=str(form.get("icon_emoji") or "📌"),
                 sort_order=int(form.get("sort_order") or 0),
                 allows_custom_text=_parse_bool(
                     form.get("allows_custom_text"), default=False

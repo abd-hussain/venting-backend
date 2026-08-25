@@ -25,6 +25,7 @@ class ComfortArea(Base):
     id = Column(String(64), primary_key=True)
     name_en = Column(String(120), nullable=False)
     name_ar = Column(String(120), nullable=False)
+    icon_emoji = Column(String(16), nullable=False, server_default="📌")
     icon_url = Column(Text, nullable=True)
     sort_order = Column(Integer, nullable=False, server_default="0")
     allows_custom_text = Column(Boolean, nullable=False, server_default="false")

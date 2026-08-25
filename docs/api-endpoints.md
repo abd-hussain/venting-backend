@@ -316,12 +316,80 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 
 | | |
 |--|--|
-| **Auth** | Bearer |
-| **Screen** | Ventor registration (profile + interests) |
-| **Body** | `nickname` (≤20), `gender` (`male` \| `female` \| `prefer_not_to_say`), `avatar` (multipart file **or** `avatar_preset_index`), `language_ids` (string[], ≥1), `interest_ids` (string[]), optional `other_interest_text` when a custom-text category (e.g. `other`) is selected |
-| **Response** | Ventor profile object (see #9) |
+| **Auth** | Bearer (user already authenticated via `#1` / `#1b` / `#2`; `registration_complete` still `false`) |
+| **Screen** | Ventor registration — **final step** (after profile → languages → interests) |
+| **When** | User taps Finish / “Go to Dashboard” on the interests step |
+| **Content-Type** | `application/json` **or** `multipart/form-data` (required when uploading `avatar` file) |
+| **Response** | Ventor profile object (same shape as #9), wrapped in `{ status, data }` |
 
----
+#### Body fields
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `nickname` | string | yes | Trimmed, 1–20 chars |
+| `gender` | string | yes | `male` \| `female` \| `prefer_not_to_say` |
+| `language_ids` | string[] | yes | ≥1 ids from `#75` / `languages` table → writes `ventor_languages` |
+| `interest_ids` | string[] | yes | ≥1 ids from `#74` / `comfort_areas` → writes `ventor_interests` |
+| `other_interest_text` | string | conditional | **Required** when `interest_ids` contains a category with `allows_custom_text: true` (typically `other`). Trimmed free text; omit or `null` otherwise. Stored on `ventor_interests.custom_text`. |
+| `avatar_preset_index` | number | no* | 0-based preset index when user picks a built-in avatar |
+| `avatar` | file | no* | Multipart image file when user picks from gallery |
+
+\* Provide **either** `avatar` **or** `avatar_preset_index`, or neither (backend may assign a default). Do not send both.
+
+#### JSON example (preset avatar, with “Other” interest)
+
+```http
+POST /v1/ventors/register
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+```json
+{
+  "nickname": "QuietFox",
+  "gender": "prefer_not_to_say",
+  "avatar_preset_index": 2,
+  "language_ids": ["en", "ar"],
+  "interest_ids": ["stress_anxiety", "other"],
+  "other_interest_text": "Grief after moving cities"
+}
+```
+
+#### Multipart example (gallery photo)
+
+Form fields (repeat `language_ids` / `interest_ids` once per value):
+
+| Part | Value |
+|------|--------|
+| `nickname` | `QuietFox` |
+| `gender` | `male` |
+| `language_ids` | `en` (repeat for each) |
+| `interest_ids` | `relationships` (repeat for each) |
+| `other_interest_text` | *(omit unless Other selected)* |
+| `avatar` | image file |
+
+#### Rules
+
+- Call only after languages (≥1) and interests (≥1) are chosen.
+- If `other` (or any `allows_custom_text` id) is in `interest_ids` and `other_interest_text` is missing/blank → `400` validation.
+- Sets `users` / session `registration_complete = true` on success.
+- Idempotent-ish: second call while already complete → `409` or return existing profile (backend choice; document in error table).
+
+#### Errors
+
+| HTTP | type | code | When |
+|------|------|------|------|
+| 400 | validation | 800 | Missing/invalid nickname, gender, ids, or missing `other_interest_text` |
+| 401 | auth | 401 | Missing/invalid Bearer |
+| 409 | conflict | 809 | Profile already registered |
+| 500 / 503 | server | … | Failure |
+
+#### Mobile flow
+
+1. Profile step → nickname, gender, optional avatar/preset.  
+2. Language step → `#75` → keep `language_ids`.  
+3. Interests step → `#74` → keep `interest_ids` + optional `other_interest_text`.  
+4. Finish → `#8` with all fields → on success refresh `#7 me` (optional) → ventor home.
 
 ### 9. `GET /v1/ventors/me`
 
@@ -1055,7 +1123,7 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 > **Status:** Implemented on backend.  
 > **Purpose:** Return active interest / comfort categories for ventor (and optionally listener) registration.  
 > **DB source:** `comfort_areas` (ids also used as `interest_ids` on `#8 POST /v1/ventors/register`).  
-> **Icons:** `icon_url` (CDN) uploaded in admin portal — mobile does not map Material icon keys.
+> **Icons:** `icon_emoji` (like language `flag_emoji`) plus optional `icon_url` (CDN). Mobile does **not** map Material `icon_key`s.
 
 | | |
 |--|--|
@@ -1079,7 +1147,8 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 | `id` | string | yes | Stable slug PK — same value sent later in `#8` `interest_ids` |
 | `name_en` | string | yes | English label |
 | `name_ar` | string | yes | Arabic label |
-| `icon_url` | string | yes | Absolute HTTPS URL of the category icon/image (CDN). Mobile renders this image — **not** a Material `icon_key`. |
+| `icon_emoji` | string | yes | Unicode emoji for the leading icon (e.g. `❤️`) — mirrors `flag_emoji` on languages |
+| `icon_url` | string \| null | no | Optional CDN image URL; mobile **prefers `icon_url` when non-empty**, else shows `icon_emoji` |
 | `sort_order` | number | yes | Ascending; lower first |
 | `allows_custom_text` | boolean | yes | `true` → show free-text field (e.g. `other`) |
 | `topic_group` | string \| null | no | Optional grouping for admin / filters |
@@ -1100,7 +1169,8 @@ Accept-Language: en
         "id": "relationships",
         "name_en": "Relationships",
         "name_ar": "العلاقات",
-        "icon_url": "https://cdn.venting.app/catalog/comfort/relationships.png",
+        "icon_emoji": "❤️",
+        "icon_url": null,
         "sort_order": 10,
         "allows_custom_text": false,
         "topic_group": "relationships"
@@ -1109,7 +1179,8 @@ Accept-Language: en
         "id": "marriage",
         "name_en": "Marriage",
         "name_ar": "الزواج",
-        "icon_url": "https://cdn.venting.app/catalog/comfort/marriage.png",
+        "icon_emoji": "💍",
+        "icon_url": null,
         "sort_order": 20,
         "allows_custom_text": false,
         "topic_group": "relationships"
@@ -1118,7 +1189,8 @@ Accept-Language: en
         "id": "parenting",
         "name_en": "Parenting",
         "name_ar": "الأبوة والأمومة",
-        "icon_url": "https://cdn.venting.app/catalog/comfort/parenting.png",
+        "icon_emoji": "👨‍👩‍👧",
+        "icon_url": null,
         "sort_order": 30,
         "allows_custom_text": false,
         "topic_group": "family"
@@ -1127,7 +1199,8 @@ Accept-Language: en
         "id": "career_work",
         "name_en": "Career & work",
         "name_ar": "المهنة والعمل",
-        "icon_url": "https://cdn.venting.app/catalog/comfort/career_work.png",
+        "icon_emoji": "💼",
+        "icon_url": null,
         "sort_order": 40,
         "allows_custom_text": false,
         "topic_group": "work"
@@ -1136,7 +1209,8 @@ Accept-Language: en
         "id": "stress_anxiety",
         "name_en": "Stress & anxiety",
         "name_ar": "التوتر والقلق",
-        "icon_url": "https://cdn.venting.app/catalog/comfort/stress_anxiety.png",
+        "icon_emoji": "😰",
+        "icon_url": null,
         "sort_order": 50,
         "allows_custom_text": false,
         "topic_group": "mental"
@@ -1145,7 +1219,8 @@ Accept-Language: en
         "id": "loneliness",
         "name_en": "Loneliness",
         "name_ar": "الوحدة",
-        "icon_url": "https://cdn.venting.app/catalog/comfort/loneliness.png",
+        "icon_emoji": "😔",
+        "icon_url": null,
         "sort_order": 60,
         "allows_custom_text": false,
         "topic_group": "mental"
@@ -1154,7 +1229,8 @@ Accept-Language: en
         "id": "student_life",
         "name_en": "Student life",
         "name_ar": "حياة الطالب",
-        "icon_url": "https://cdn.venting.app/catalog/comfort/student_life.png",
+        "icon_emoji": "🎓",
+        "icon_url": null,
         "sort_order": 70,
         "allows_custom_text": false,
         "topic_group": "life"
@@ -1163,7 +1239,8 @@ Accept-Language: en
         "id": "financial_stress",
         "name_en": "Financial stress",
         "name_ar": "الضغط المالي",
-        "icon_url": "https://cdn.venting.app/catalog/comfort/financial_stress.png",
+        "icon_emoji": "💰",
+        "icon_url": null,
         "sort_order": 80,
         "allows_custom_text": false,
         "topic_group": "money"
@@ -1172,7 +1249,8 @@ Accept-Language: en
         "id": "health_wellness",
         "name_en": "Health & wellness",
         "name_ar": "الصحة والعافية",
-        "icon_url": "https://cdn.venting.app/catalog/comfort/health_wellness.png",
+        "icon_emoji": "🩺",
+        "icon_url": null,
         "sort_order": 90,
         "allows_custom_text": false,
         "topic_group": "health"
@@ -1181,7 +1259,8 @@ Accept-Language: en
         "id": "other",
         "name_en": "Other",
         "name_ar": "أخرى",
-        "icon_url": "https://cdn.venting.app/catalog/comfort/other.png",
+        "icon_emoji": "➕",
+        "icon_url": null,
         "sort_order": 1000,
         "allows_custom_text": true,
         "topic_group": null
@@ -1193,12 +1272,20 @@ Accept-Language: en
 
 #### Seed notes
 
-| `id` | `allows_custom_text` | Notes |
-|------|----------------------|-------|
-| `relationships` … `health_wellness` | `false` | Icons uploaded in portal → stored as `icon_url` |
-| `other` | `true` | Free-text required on mobile when selected |
+| `id` | `icon_emoji` (example) | `allows_custom_text` |
+|------|------------------------|----------------------|
+| `relationships` | ❤️ | `false` |
+| `marriage` | 💍 | `false` |
+| `parenting` | 👨‍👩‍👧 | `false` |
+| `career_work` | 💼 | `false` |
+| `stress_anxiety` | 😰 | `false` |
+| `loneliness` | 😔 | `false` |
+| `student_life` | 🎓 | `false` |
+| `financial_stress` | 💰 | `false` |
+| `health_wellness` | 🩺 | `false` |
+| `other` | ➕ | `true` |
 
-Mobile must **not** hardcode category labels or icons. Missing/broken `icon_url` → show a generic placeholder image/icon.
+Mobile must **not** hardcode category labels or icons. Prefer `icon_url` when set; otherwise show `icon_emoji`; if both missing → generic placeholder.
 
 #### Mobile usage
 
@@ -1206,7 +1293,7 @@ Mobile must **not** hardcode category labels or icons. Missing/broken `icon_url`
 2. `GET /v1/catalog/categories?audience=ventor`.
 3. Render `items` sorted by `sort_order`.
 4. Localized label: `locale == ar ? name_ar : name_en`.
-5. Leading image: load `icon_url` (cached network image).
+5. Leading icon: `icon_url` (network image) if non-empty, else `icon_emoji` (same pattern as language `flag_url` / `flag_emoji`).
 6. If item has `allows_custom_text == true` and is selected → show free-text field; require non-empty trim before Finish.
 7. On Finish → collect selected `id`s (+ optional custom text for `other`) → send as `interest_ids` (and optional `other_interest_text`) on `#8 POST /v1/ventors/register`.
 
@@ -1224,20 +1311,19 @@ Empty active catalog → still `200` with `"items": []` (mobile shows empty + re
 
 - Only return rows with `is_active = true`.
 - IDs are immutable once shipped — changing an `id` breaks existing `ventor_interests` / `interest_ids`.
-- Add/remove/reorder/upload icons via admin CMS (`/v1/admin/catalog/comfort-areas`); this public GET is read-only.
-- `icon_url` must be a public absolute HTTPS URL (CDN). Portal uploads the asset, then stores the resulting URL on the row.
+- Add/remove/reorder/edit emoji / upload icons via admin CMS (`/v1/admin/catalog/comfort-areas`); this public GET is read-only.
+- Active rows should have a non-empty `icon_emoji` (and optionally `icon_url`).
 - Cache-friendly: `Cache-Control: public, max-age=300` recommended (optional).
 
 #### Acceptance criteria
 
-- [x] `GET /v1/catalog/categories?audience=ventor` returns active rows with `icon_url`
+- [x] `GET /v1/catalog/categories?audience=ventor` returns active rows with `icon_emoji`
 - [x] Standard `{ status, data: { items } }` envelope
 - [x] Both `name_en` and `name_ar` present
 - [x] `other` has `allows_custom_text: true`
 - [x] Inactive rows omitted
 - [x] Same `id` values accepted by `#8` `interest_ids`
-- [x] Portal can create/update categories and upload/replace `icon_url`
-
+- [x] Portal can create/update categories, set `icon_emoji`, and optionally upload/replace `icon_url`
 #### Link to register
 
 | Step | API |

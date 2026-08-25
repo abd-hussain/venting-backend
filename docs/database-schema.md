@@ -37,7 +37,7 @@
 | 4 | `listener_profiles` | Listener |
 | 5 | `listener_identity_verifications` | Listener onboarding |
 | 6 | `languages` | Lookups — **one** speaking-language catalog (ventor + listener) |
-| 7 | `comfort_areas` | Lookups — interests / comfort (icons via `icon_url`) |
+| 7 | `comfort_areas` | Lookups — interests/comfort (`icon_emoji` + optional `icon_url`) |
 | 8 | `life_experiences` | Lookups |
 | 9 | `boundaries` | Lookups |
 | 10 | `ventor_languages` | Ventor tags → `languages` |
@@ -350,7 +350,8 @@ Stable catalogs (seed once). App uses string ids like `anxiety_stress`, `en`, `p
 | `id` | VARCHAR(64) | **PK** |
 | `name_en` | VARCHAR(120) | |
 | `name_ar` | VARCHAR(120) | |
-| `icon_url` | TEXT | **Required for active rows** — absolute HTTPS URL of category icon/image (CDN / object storage via portal). Mobile loads this URL — do **not** ship Material `icon_key` mappings. |
+| `icon_emoji` | VARCHAR(16) | Unicode emoji for the row icon (e.g. `❤️`, `💼`) — same idea as `languages.flag_emoji` |
+| `icon_url` | TEXT | ? optional CDN image URL; mobile prefers `icon_url` when set, else `icon_emoji` |
 | `sort_order` | INT | default 0 — ascending display order |
 | `allows_custom_text` | BOOLEAN | default false — e.g. `other` shows free-text field |
 | `audience` | VARCHAR(32) | `ventor` \| `listener` \| `all` — who may select this category |
@@ -951,7 +952,7 @@ Append-only money movement (earnings chart + audit).
 | API area | Primary tables |
 |----------|----------------|
 | Auth 0–7, 1b | `users`, `refresh_tokens`, `auth_identities` *(proposed)* |
-| Catalog 74–75 | `comfort_areas` (`icon_url`), `languages` (`flag_url`) — portal-managed; one languages table for all speaking-language UIs |
+| Catalog 74–75 | `comfort_areas` (`icon_emoji` / `icon_url`), `languages` (`flag_emoji` / `flag_url`) — portal-managed; one languages table for all speaking-language UIs |
 | Ventor profile / home | `ventor_profiles`, `mood_checkins`, `ventor_favorites`, `sessions` |
 | Listener profile / setup | `listener_profiles`, identity, tag junctions, training |
 | Availability | settings + `listener_availability_slots` |
