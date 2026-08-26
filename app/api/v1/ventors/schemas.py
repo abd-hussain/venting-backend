@@ -30,6 +30,55 @@ class VentorRegisterRequest(BaseModel):
     fcm_token: str | None = None
 
 
+class VentorSavedProfile(BaseModel):
+    nickname: str
+    gender: Gender
+    avatar_url: str | None = None
+    avatar_preset_index: int | None = None
+
+
+class VentorSavedLanguages(BaseModel):
+    language_ids: list[str]
+
+
+class VentorSavedInterests(BaseModel):
+    interest_ids: list[str]
+    other_interest_text: str | None = None
+
+
+class VentorRegisterSaved(BaseModel):
+    profile: VentorSavedProfile | None = None
+    languages: VentorSavedLanguages | None = None
+    interests: VentorSavedInterests | None = None
+
+
+class VentorRegisterProgressResponse(BaseModel):
+    registration_complete: bool
+    next_step: str | None = None
+    completed_steps: list[str] = Field(default_factory=list)
+    saved: VentorRegisterSaved = Field(default_factory=VentorRegisterSaved)
+
+
+class VentorRegisterProfileRequest(BaseModel):
+    nickname: str = Field(min_length=1, max_length=20)
+    gender: Gender
+    avatar_preset_index: int | None = None
+
+
+class VentorRegisterLanguagesRequest(BaseModel):
+    language_ids: list[str] = Field(min_length=1)
+
+
+class VentorRegisterInterestsRequest(BaseModel):
+    interest_ids: list[str] = Field(min_length=1)
+    other_interest_text: str | None = None
+
+
+class VentorRegisterCompleteRequest(BaseModel):
+    notifications_enabled: bool
+    fcm_token: str | None = None
+
+
 class VentorStats(BaseModel):
     sessions_count: int
     points: int

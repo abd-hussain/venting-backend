@@ -67,6 +67,112 @@ class RegisterListenerResponse(BaseModel):
     profile_status: ProfileStatusOut
 
 
+class ListenerSavedProfile(BaseModel):
+    full_name: str
+    phone: str
+    phone_country: str
+    avatar_url: str | None = None
+
+
+class ListenerSavedIdentity(BaseModel):
+    identity_document_url: str | None = None
+    selfie_url: str | None = None
+
+
+class ListenerSavedAbout(BaseModel):
+    date_of_birth: str
+    country_iso: str
+    city: str
+    language_ids: list[str]
+
+
+class ListenerSavedExperiences(BaseModel):
+    life_experience_ids: list[str]
+    custom_experiences: list[str] = Field(default_factory=list)
+
+
+class ListenerSavedComfortAreas(BaseModel):
+    comfort_area_ids: list[str]
+    custom_comfort_area_text: str | None = None
+
+
+class ListenerSavedBoundaries(BaseModel):
+    boundary_ids: list[str]
+    custom_boundary_text: str | None = None
+
+
+class ListenerSavedVoiceIntro(BaseModel):
+    voice_intro_url: str | None = None
+    voice_intro_seconds: int | None = None
+
+
+class ListenerSavedAvailability(BaseModel):
+    accept_instant_calls: bool
+    session_minutes: int
+    availability: AvailabilityPayload
+
+
+class ListenerRegisterSaved(BaseModel):
+    profile: ListenerSavedProfile | None = None
+    identity: ListenerSavedIdentity | None = None
+    about: ListenerSavedAbout | None = None
+    experiences: ListenerSavedExperiences | None = None
+    comfort_areas: ListenerSavedComfortAreas | None = None
+    boundaries: ListenerSavedBoundaries | None = None
+    voice_intro: ListenerSavedVoiceIntro | None = None
+    availability: ListenerSavedAvailability | None = None
+
+
+class ListenerRegisterProgressResponse(BaseModel):
+    registration_complete: bool
+    profile_status: ProfileStatusOut | None = None
+    next_step: str | None = None
+    completed_steps: list[str] = Field(default_factory=list)
+    saved: ListenerRegisterSaved = Field(default_factory=ListenerRegisterSaved)
+
+
+class ListenerRegisterProfileRequest(BaseModel):
+    full_name: str = Field(min_length=1, max_length=120)
+    phone: str
+    phone_country: str
+
+
+class ListenerRegisterAboutRequest(BaseModel):
+    date_of_birth: str
+    country_iso: str
+    city: str
+    language_ids: list[str] = Field(min_length=1)
+
+
+class ListenerRegisterExperiencesRequest(BaseModel):
+    life_experience_ids: list[str] = Field(min_length=1)
+    custom_experiences: list[str] = Field(default_factory=list)
+
+
+class ListenerRegisterComfortAreasRequest(BaseModel):
+    comfort_area_ids: list[str] = Field(min_length=1)
+    custom_comfort_area_text: str | None = None
+
+
+class ListenerRegisterBoundariesRequest(BaseModel):
+    boundary_ids: list[str] = Field(min_length=1)
+    custom_boundary_text: str | None = None
+
+
+class ListenerRegisterVoiceIntroRequest(BaseModel):
+    voice_intro_seconds: int
+
+
+class ListenerRegisterAvailabilityRequest(BaseModel):
+    accept_instant_calls: bool
+    session_minutes: int
+    availability: AvailabilityPayload
+
+
+class ListenerRegisterCompleteRequest(BaseModel):
+    fcm_token: str | None = None
+
+
 class IdentityVerificationResponse(BaseModel):
     status: IdentityStatusOut
 

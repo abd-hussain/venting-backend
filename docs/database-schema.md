@@ -183,6 +183,8 @@ Core login identity. One row per account.
 | `role` | `user_role` | ventor \| listener |
 | `is_active` | BOOLEAN | default true |
 | `registration_complete` | BOOLEAN | default false |
+| `registration_completed_steps` | JSONB | Array of saved step slugs, e.g. `["profile","identity"]` — ventor + listener onboarding |
+| `registration_next_step` | VARCHAR(64) | Next wizard step slug for resume (`profile`, `languages`, …) |
 | `last_login_at` | TIMESTAMPTZ | ? |
 | `created_at` | TIMESTAMPTZ | |
 | `updated_at` | TIMESTAMPTZ | |
@@ -329,7 +331,7 @@ Optional FCM device tokens from `#8` / `#22` registration (`fcm_token`). Registr
 
 ### 5. `listener_identity_verifications`
 
-Used for listener KYC documents. **First upload** is created from `#22 listeners/register`. **Resubmit** after admin rejection uses `#23 identity-verification` (new row or superseding pending attempt — do not require full re-registration).
+Used for listener KYC documents. **First upload** is created from listener registration step `identity` (`PATCH /v1/listeners/register/steps/identity`). **Resubmit** after admin rejection uses `#23 identity-verification`.
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -428,7 +430,7 @@ Exposed publicly via `#77 GET /v1/catalog/boundaries` (active rows only).
 | `language_id` | VARCHAR(16) | **FK → languages** |
 | | | **PK (`ventor_id`, `language_id`)** |
 
-Written from `#8 POST /v1/ventors/register` (`language_ids`). Same `languages` catalog as listeners.
+Written from ventor registration step `languages` (`PATCH /v1/ventors/register/steps/languages`). Same `languages` catalog as listeners.
 
 ### 10b. `ventor_interests`
 

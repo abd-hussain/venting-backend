@@ -33,6 +33,8 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     role = Column(Enum(UserRole, name="user_role", create_type=True), nullable=False)
     is_active = Column(Boolean, nullable=False, server_default="true")
     registration_complete = Column(Boolean, nullable=False, server_default="false")
+    registration_completed_steps = Column(JSONB, nullable=False, server_default="[]")
+    registration_next_step = Column(String(64), nullable=True)
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     suspended_until = Column(DateTime(timezone=True), nullable=True)
 

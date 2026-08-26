@@ -1,9 +1,10 @@
 from uuid import UUID
 
+import json
+
 from fastapi import APIRouter, File, Form, Query, Request, UploadFile, status
 
-from app.api.v1.listeners.parse import parse_register_form
-from app.api.v1.openapi_register import LISTENER_REGISTER_OPENAPI
+from app.api.v1.listeners.parse import form_json_list_raw, parse_session_minutes
 
 from app.api.deps import (
     CurrentListener,
@@ -25,6 +26,14 @@ from app.api.v1.listeners.schemas import (
     ListenerProfileResponse,
     ListenerProfileUpdate,
     ListenerPublicResponse,
+    ListenerRegisterAboutRequest,
+    ListenerRegisterAvailabilityRequest,
+    ListenerRegisterBoundariesRequest,
+    ListenerRegisterComfortAreasRequest,
+    ListenerRegisterCompleteRequest,
+    ListenerRegisterExperiencesRequest,
+    ListenerRegisterProgressResponse,
+    ListenerRegisterVoiceIntroRequest,
     OnlineStatusRequest,
     OnlineStatusResponse,
     RegisterListenerResponse,
@@ -32,6 +41,18 @@ from app.api.v1.listeners.schemas import (
     SetupProgressResponse,
     TutorialAckRequest,
     VoiceIntroResponse,
+)
+from app.api.v1.listeners.register_service import (
+    complete_register as complete_listener_register,
+    get_register_progress as get_listener_register_progress,
+    save_register_about_step,
+    save_register_availability_step,
+    save_register_boundaries_step,
+    save_register_comfort_areas_step,
+    save_register_experiences_step,
+    save_register_identity_step,
+    save_register_profile_step,
+    save_register_voice_intro_step,
 )
 from app.api.v1.listeners.earnings_service import (
     CreatePayoutRequest,
@@ -47,7 +68,6 @@ from app.api.v1.listeners.service import (
     get_public_listener,
     get_setup_progress,
     list_reviews,
-    register_listener,
     set_online_status,
     submit_identity_verification,
     update_listener_profile,
@@ -62,81 +82,267 @@ from app.schemas.envelope import APIErrorResponse, APISuccessResponse
 router = APIRouter()
 
 
-@router.post(
-    "/register",
-    status_code=status.HTTP_201_CREATED,
-    response_model=APISuccessResponse[RegisterListenerResponse],
+def _upload(form, name: str, fallback: UploadFile | None = None) -> UploadFile | None:
+    value = form.get(name)
+    if isinstance(value, UploadFile) and value.filename:
+        return value
+    if fallback is not None and fallback.filename:
+        return fallback
+    return None
+
+
+@router.get(
+    "/register/progress",
+    response_model=APISuccessResponse[ListenerRegisterProgressResponse],
+    responses={401: {"model": APIErrorResponse}, 403: {"model": APIErrorResponse}},
+    summary="Get listener registration progress (#22a)",
+)
+def register_progress(
+    current_user: CurrentListener,
+    db: DbSession,
+):
+    data = get_listener_register_progress(db, current_user)
+    return success_response(data.model_dump(mode="json"))
+
+
+@router.patch(
+    "/register/steps/profile",
+    response_model=APISuccessResponse[ListenerRegisterProgressResponse],
     responses={
+        400: {"model": APIErrorResponse},
+        401: {"model": APIErrorResponse},
         403: {"model": APIErrorResponse},
         409: {"model": APIErrorResponse},
-        422: {"model": APIErrorResponse},
     },
-    summary="Complete listener registration (steps 1–9)",
-    openapi_extra=LISTENER_REGISTER_OPENAPI,
+    summary="Save listener registration profile step (#22b)",
 )
-async def register(
+async def register_step_profile(
     request: Request,
     current_user: CurrentListener,
     db: DbSession,
     settings: SettingsDep,
-    # Form/File params restore Swagger fields. Runtime reads request.form().
-    avatar: UploadFile = File(..., description="Profile photo"),
-    full_name: str = Form(..., description="Listener full name"),
-    phone: str = Form(..., description="E.164 phone number"),
-    phone_country: str = Form(..., description="ISO country code for phone"),
-    identity_document: UploadFile = File(
-        ..., description="Single government-ID photo"
-    ),
-    selfie: UploadFile = File(..., description="Selfie with ID"),
-    date_of_birth: str = Form(..., description="YYYY-MM-DD"),
-    country_iso: str = Form(..., description="Residence country ISO"),
-    city: str = Form(..., description="City"),
-    language_ids: str = Form(..., description='JSON array, e.g. ["en","ar"]'),
-    life_experience_ids: str = Form(..., description="JSON array"),
-    comfort_area_ids: str = Form(..., description="JSON array of comfort area ids"),
-    boundary_ids: str = Form(..., description="JSON array — at least one boundary"),
-    voice_intro: UploadFile = File(..., description="Voice intro audio"),
-    voice_intro_seconds: str = Form(..., description="Duration in seconds"),
-    accept_instant_calls: str = Form(..., description='"true" or "false"'),
-    session_minutes: str = Form(..., description="Integer minutes, e.g. 30"),
-    availability: str = Form(..., description="JSON availability object (#37)"),
-    custom_experiences: str | None = Form(None, description="JSON array"),
-    custom_comfort_area_text: str | None = Form(None),
-    custom_boundary_text: str | None = Form(None),
-    fcm_token: str | None = Form(None, description="Omit when permission denied"),
+    avatar: UploadFile | None = File(None),
+    full_name: str | None = Form(None),
+    phone: str | None = Form(None),
+    phone_country: str | None = Form(None),
 ):
-    _ = (
-        avatar,
-        full_name,
-        phone,
-        phone_country,
-        identity_document,
-        selfie,
-        date_of_birth,
-        country_iso,
-        city,
-        language_ids,
-        life_experience_ids,
-        comfort_area_ids,
-        boundary_ids,
-        voice_intro,
-        voice_intro_seconds,
-        accept_instant_calls,
-        session_minutes,
-        availability,
-        custom_experiences,
-        custom_comfort_area_text,
-        custom_boundary_text,
-        fcm_token,
-    )
     form = await request.form()
-    fields = parse_register_form(form)
-    data = await register_listener(
+    data = await save_register_profile_step(
         db,
         current_user,
+        full_name=str(form.get("full_name") or full_name or ""),
+        phone=str(form.get("phone") or phone or "") or None,
+        phone_country=str(form.get("phone_country") or phone_country or "") or None,
+        avatar=_upload(form, "avatar", avatar),
         settings=settings,
-        **fields,
     )
+    return success_response(data.model_dump(mode="json"))
+
+
+@router.patch(
+    "/register/steps/identity",
+    response_model=APISuccessResponse[ListenerRegisterProgressResponse],
+    responses={
+        400: {"model": APIErrorResponse},
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        409: {"model": APIErrorResponse},
+    },
+    summary="Save listener registration identity step (#22c)",
+)
+async def register_step_identity(
+    request: Request,
+    current_user: CurrentListener,
+    db: DbSession,
+    settings: SettingsDep,
+    identity_document: UploadFile | None = File(None),
+    selfie: UploadFile | None = File(None),
+):
+    form = await request.form()
+    data = await save_register_identity_step(
+        db,
+        current_user,
+        identity_document=_upload(form, "identity_document", identity_document),
+        selfie=_upload(form, "selfie", selfie),
+        settings=settings,
+    )
+    return success_response(data.model_dump(mode="json"))
+
+
+@router.patch(
+    "/register/steps/about",
+    response_model=APISuccessResponse[ListenerRegisterProgressResponse],
+    responses={
+        400: {"model": APIErrorResponse},
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        409: {"model": APIErrorResponse},
+    },
+    summary="Save listener registration about step (#22d)",
+)
+async def register_step_about(
+    request: Request,
+    current_user: CurrentListener,
+    db: DbSession,
+):
+    content_type = request.headers.get("content-type", "")
+    if content_type.startswith("application/json"):
+        body = ListenerRegisterAboutRequest.model_validate(await request.json())
+    else:
+        form = await request.form()
+        body = ListenerRegisterAboutRequest(
+            date_of_birth=str(form.get("date_of_birth") or ""),
+            country_iso=str(form.get("country_iso") or ""),
+            city=str(form.get("city") or ""),
+            language_ids=json.loads(form_json_list_raw(form, "language_ids") or "[]"),
+        )
+    data = save_register_about_step(db, current_user, body)
+    return success_response(data.model_dump(mode="json"))
+
+
+@router.patch(
+    "/register/steps/experiences",
+    response_model=APISuccessResponse[ListenerRegisterProgressResponse],
+    responses={
+        400: {"model": APIErrorResponse},
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        409: {"model": APIErrorResponse},
+    },
+    summary="Save listener registration experiences step (#22e)",
+)
+async def register_step_experiences(
+    request: Request,
+    current_user: CurrentListener,
+    db: DbSession,
+):
+    body = ListenerRegisterExperiencesRequest.model_validate(await request.json())
+    data = save_register_experiences_step(db, current_user, body)
+    return success_response(data.model_dump(mode="json"))
+
+
+@router.patch(
+    "/register/steps/comfort-areas",
+    response_model=APISuccessResponse[ListenerRegisterProgressResponse],
+    responses={
+        400: {"model": APIErrorResponse},
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        409: {"model": APIErrorResponse},
+    },
+    summary="Save listener registration comfort areas step (#22f)",
+)
+async def register_step_comfort_areas(
+    request: Request,
+    current_user: CurrentListener,
+    db: DbSession,
+):
+    body = ListenerRegisterComfortAreasRequest.model_validate(await request.json())
+    data = save_register_comfort_areas_step(db, current_user, body)
+    return success_response(data.model_dump(mode="json"))
+
+
+@router.patch(
+    "/register/steps/boundaries",
+    response_model=APISuccessResponse[ListenerRegisterProgressResponse],
+    responses={
+        400: {"model": APIErrorResponse},
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        409: {"model": APIErrorResponse},
+    },
+    summary="Save listener registration boundaries step (#22g)",
+)
+async def register_step_boundaries(
+    request: Request,
+    current_user: CurrentListener,
+    db: DbSession,
+):
+    body = ListenerRegisterBoundariesRequest.model_validate(await request.json())
+    data = save_register_boundaries_step(db, current_user, body)
+    return success_response(data.model_dump(mode="json"))
+
+
+@router.patch(
+    "/register/steps/voice-intro",
+    response_model=APISuccessResponse[ListenerRegisterProgressResponse],
+    responses={
+        400: {"model": APIErrorResponse},
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        409: {"model": APIErrorResponse},
+    },
+    summary="Save listener registration voice intro step (#22h)",
+)
+async def register_step_voice_intro(
+    request: Request,
+    current_user: CurrentListener,
+    db: DbSession,
+    settings: SettingsDep,
+    voice_intro: UploadFile | None = File(None),
+    voice_intro_seconds: str | None = Form(None),
+):
+    form = await request.form()
+    seconds = parse_session_minutes(
+        str(form.get("voice_intro_seconds") or voice_intro_seconds or "")
+        or None
+    )
+    if seconds is None:
+        raise validation_error(
+            "voice_intro_seconds is required",
+            ar="voice_intro_seconds مطلوب",
+        )
+    body = ListenerRegisterVoiceIntroRequest(voice_intro_seconds=seconds)
+    data = await save_register_voice_intro_step(
+        db,
+        current_user,
+        payload=body,
+        voice_intro=_upload(form, "voice_intro", voice_intro),
+        settings=settings,
+    )
+    return success_response(data.model_dump(mode="json"))
+
+
+@router.patch(
+    "/register/steps/availability",
+    response_model=APISuccessResponse[ListenerRegisterProgressResponse],
+    responses={
+        400: {"model": APIErrorResponse},
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        409: {"model": APIErrorResponse},
+    },
+    summary="Save listener registration availability step (#22i)",
+)
+async def register_step_availability(
+    request: Request,
+    current_user: CurrentListener,
+    db: DbSession,
+):
+    body = ListenerRegisterAvailabilityRequest.model_validate(await request.json())
+    data = save_register_availability_step(db, current_user, body)
+    return success_response(data.model_dump(mode="json"))
+
+
+@router.post(
+    "/register/complete",
+    status_code=status.HTTP_201_CREATED,
+    response_model=APISuccessResponse[RegisterListenerResponse],
+    responses={
+        400: {"model": APIErrorResponse},
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        409: {"model": APIErrorResponse},
+    },
+    summary="Complete listener registration (#22j)",
+)
+async def register_complete(
+    request: Request,
+    current_user: CurrentListener,
+    db: DbSession,
+):
+    body = ListenerRegisterCompleteRequest.model_validate(await request.json())
+    data = complete_listener_register(db, current_user, body)
     return success_response(data.model_dump(mode="json"), status_code=status.HTTP_201_CREATED)
 
 
