@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, File, Form, Query, Request, UploadFile, status
 
 from app.api.v1.listeners.parse import parse_register_form
+from app.api.v1.openapi_register import LISTENER_REGISTER_OPENAPI
 
 from app.api.deps import (
     CurrentListener,
@@ -70,13 +71,78 @@ router = APIRouter()
         422: {"model": APIErrorResponse},
     },
     summary="Complete listener registration (steps 1–9)",
+    openapi_extra=LISTENER_REGISTER_OPENAPI,
 )
 async def register(
     request: Request,
     current_user: CurrentListener,
     db: DbSession,
     settings: SettingsDep,
+    # Form/File params restore Swagger fields. Runtime still reads request.form()
+    # so JSON-encoded lists and legacy aliases work the same.
+    full_name: str = Form(..., description="Listener full name"),
+    agreed_to_terms: str = Form(..., description='"true" or "false"'),
+    language_ids: str = Form(..., description='JSON array, e.g. ["en","ar"]'),
+    comfort_area_ids: str = Form(..., description='JSON array of comfort area ids'),
+    phone: str | None = Form(None),
+    phone_country: str | None = Form(None),
+    date_of_birth: str | None = Form(None, description="YYYY-MM-DD"),
+    country_iso: str | None = Form(None),
+    city: str | None = Form(None),
+    life_experience_ids: str | None = Form(None, description="JSON array"),
+    custom_experiences: str | None = Form(None, description="JSON array"),
+    custom_comfort_area_text: str | None = Form(None),
+    boundary_ids: str | None = Form(None, description="JSON array"),
+    custom_boundary_text: str | None = Form(None),
+    availability: str | None = Form(None, description="JSON availability object (#37)"),
+    accept_instant_calls: str | None = Form("true"),
+    session_minutes: str | None = Form(None, description="Integer minutes, e.g. 30"),
+    notifications_enabled: str | None = Form("true"),
+    fcm_token: str | None = Form(None),
+    voice_intro_seconds: str | None = Form(None),
+    avatar: UploadFile | None = File(None),
+    document_front: UploadFile | None = File(
+        None, description="ID document front (required)"
+    ),
+    document_back: UploadFile | None = File(None),
+    selfie: UploadFile | None = File(None, description="Selfie (required)"),
+    voice_intro: UploadFile | None = File(None),
+    identity_document: UploadFile | None = File(
+        None, description="Legacy alias for document_front"
+    ),
+    identity_document_front: UploadFile | None = File(None),
+    identity_document_back: UploadFile | None = File(None),
 ):
+    _ = (
+        full_name,
+        agreed_to_terms,
+        language_ids,
+        comfort_area_ids,
+        phone,
+        phone_country,
+        date_of_birth,
+        country_iso,
+        city,
+        life_experience_ids,
+        custom_experiences,
+        custom_comfort_area_text,
+        boundary_ids,
+        custom_boundary_text,
+        availability,
+        accept_instant_calls,
+        session_minutes,
+        notifications_enabled,
+        fcm_token,
+        voice_intro_seconds,
+        avatar,
+        document_front,
+        document_back,
+        selfie,
+        voice_intro,
+        identity_document,
+        identity_document_front,
+        identity_document_back,
+    )
     form = await request.form()
     fields = parse_register_form(form)
     data = await register_listener(
