@@ -163,8 +163,7 @@ class ListenerIdentityVerification(Base, UUIDPrimaryKeyMixin):
         ForeignKey("listener_profiles.user_id", ondelete="CASCADE"),
         nullable=False,
     )
-    document_front_url = Column(Text, nullable=False)
-    document_back_url = Column(Text, nullable=True)
+    identity_document_url = Column(Text, nullable=False)
     selfie_url = Column(Text, nullable=False)
     status = Column(
         Enum(ProfileStatus, name="profile_status", create_type=False),

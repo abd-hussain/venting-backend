@@ -236,8 +236,7 @@ def _identity_detail(row: ListenerIdentityVerification) -> IdentityVerificationD
     return IdentityVerificationDetail(
         id=str(row.id),
         listener_id=str(row.listener_id),
-        document_front_url=row.document_front_url,
-        document_back_url=row.document_back_url,
+        identity_document_url=row.identity_document_url,
         selfie_url=row.selfie_url,
         status=_value(row.status),
         reviewer_note=row.reviewer_note,
@@ -246,6 +245,8 @@ def _identity_detail(row: ListenerIdentityVerification) -> IdentityVerificationD
         ),
         reviewed_at=row.reviewed_at,
         created_at=row.created_at,
+        document_front_url=row.identity_document_url,
+        document_back_url=None,
     )
 
 

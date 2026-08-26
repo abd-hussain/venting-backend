@@ -55,6 +55,7 @@ from app.api.v1.listeners.service import (
     update_privacy,
     upload_voice_intro,
 )
+from app.core.errors import validation_error
 from app.core.responses import success_response
 from app.schemas.envelope import APIErrorResponse, APISuccessResponse
 
@@ -101,17 +102,23 @@ async def register(
     fcm_token: str | None = Form(None),
     voice_intro_seconds: str | None = Form(None),
     avatar: UploadFile | None = File(None),
-    document_front: UploadFile | None = File(
-        None, description="ID document front (required)"
+    identity_document: UploadFile | None = File(
+        None, description="Single government-ID photo (required)"
     ),
-    document_back: UploadFile | None = File(None),
+    document_front: UploadFile | None = File(
+        None, description="Legacy alias for identity_document"
+    ),
+    identity_document_front: UploadFile | None = File(
+        None, description="Legacy alias for identity_document"
+    ),
     selfie: UploadFile | None = File(None, description="Selfie (required)"),
     voice_intro: UploadFile | None = File(None),
-    identity_document: UploadFile | None = File(
-        None, description="Legacy alias for document_front"
+    document_back: UploadFile | None = File(
+        None, description="Deprecated — ignored (single ID photo only)"
     ),
-    identity_document_front: UploadFile | None = File(None),
-    identity_document_back: UploadFile | None = File(None),
+    identity_document_back: UploadFile | None = File(
+        None, description="Deprecated — ignored"
+    ),
 ):
     _ = (
         full_name,
@@ -135,12 +142,12 @@ async def register(
         fcm_token,
         voice_intro_seconds,
         avatar,
+        identity_document,
         document_front,
-        document_back,
+        identity_document_front,
         selfie,
         voice_intro,
-        identity_document,
-        identity_document_front,
+        document_back,
         identity_document_back,
     )
     form = await request.form()
@@ -169,16 +176,25 @@ async def identity_verification(
     profile: CurrentListenerProfile,
     db: DbSession,
     settings: SettingsDep,
-    document_front: UploadFile = File(...),
     selfie: UploadFile = File(...),
-    document_back: UploadFile | None = File(None),
+    identity_document: UploadFile | None = File(
+        None, description="Single government-ID photo"
+    ),
+    document_front: UploadFile | None = File(
+        None, description="Legacy alias for identity_document"
+    ),
 ):
+    doc = identity_document or document_front
+    if doc is None or not doc.filename:
+        raise validation_error(
+            "identity_document is required",
+            ar="صورة وثيقة الهوية مطلوبة",
+        )
     data = await submit_identity_verification(
         db,
         profile,
         settings=settings,
-        document_front=document_front,
-        document_back=document_back,
+        identity_document=doc,
         selfie=selfie,
     )
     return success_response(data.model_dump(mode="json"))

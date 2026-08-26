@@ -648,26 +648,54 @@ Form fields (repeat `language_ids` / `interest_ids` once per value):
 
 | | |
 |--|--|
-| **Auth** | Bearer (or Public if register creates account in one shot) |
-| **Screen** | Listener registration steps 1–9 (multipart / JSON) |
+| **Auth** | Bearer (user already authenticated; `registration_complete` still `false`) |
+| **Screen** | Listener registration steps 1–9 → **one** submit loading screen |
+| **Content-Type** | `multipart/form-data` (required — carries all media in a **single** request) |
 | **Body** | See table below |
 | **Response** | `{ listener_id, profile_status: "under_review" }` |
 
-| Field | From step | Type |
-|-------|-----------|------|
-| `full_name`, `phone`, `phone_country`, `avatar`, `agreed_to_terms` | 1 | string / file / bool |
-| `document_front`, `selfie` | 2 | multipart (`document_back` optional if UI captures one ID image) |
-| `date_of_birth`, `country_iso`, `city`, `language_ids` | 3 | date / string / string[] |
-| `life_experience_ids`, `custom_experiences?` | 4 | string[] (includes client-local relationship/family slugs + catalog ids) |
-| `comfort_area_ids`, `custom_comfort_area_text?` | 5 | string[] / string |
-| `boundary_ids`, `custom_boundary_text?` | 6 | string[] / string |
-| `voice_intro`, `voice_intro_seconds?` | 7 | audio multipart / int |
-| `availability` (JSON — `#37` days/slots shape), `accept_instant_calls`, `session_minutes` | 8 | object / bool / **int** (preferred session length in minutes; if UI allows 30+60, send shortest selected, e.g. `30`) |
-| `notifications_enabled`, `fcm_token?` | 9 | bool / string \| null — **`fcm_token` omitted or `null` when permission denied**; registration must still succeed |
+#### One-shot payload (all steps together)
+
+This endpoint is the **only** first-time registration submit. The app collects steps 1–9 locally, then sends **all text fields + all files in one multipart body**. Do **not** split media across multiple endpoints for first registration.
+
+| Field | From step | Type | Notes |
+|-------|-----------|------|-------|
+| `full_name`, `phone`, `phone_country`, `avatar`, `agreed_to_terms` | 1 | string / file / bool | |
+| `identity_document`, `selfie` | 2 | file / file | **One** government-ID photo (`identity_document`) + selfie. **Not** front/back of a card. |
+| `date_of_birth`, `country_iso`, `city`, `language_ids` | 3 | date / string / string[] | |
+| `life_experience_ids`, `custom_experiences?` | 4 | string[] | |
+| `comfort_area_ids`, `custom_comfort_area_text?` | 5 | string[] / string | |
+| `boundary_ids`, `custom_boundary_text?` | 6 | string[] / string | |
+| `voice_intro`, `voice_intro_seconds?` | 7 | audio file / int | |
+| `availability`, `accept_instant_calls`, `session_minutes` | 8 | JSON object / bool / **int** | `session_minutes` = preferred length; if UI allows 30+60, send shortest selected |
+| `notifications_enabled`, `fcm_token?` | 9 | bool / string \| null | omit / `null` token when permission denied |
+
+#### Identity field rename (required backend change)
+
+| Canonical (use this) | Deprecated | Meaning |
+|----------------------|------------|---------|
+| `identity_document` | `document_front`, `document_back`, `identity_document_front`, `identity_document_back` | Single ID / passport / residence photo from step 2 — **not** “front and back” of a two-sided scan |
+
+**Backend contract to ship:**
+
+1. Require **`identity_document`** + **`selfie`** (not `document_front`).
+2. Accept legacy `document_front` as an alias during migration only.
+3. Drop / ignore `document_back` for mobile onboarding (optional later if product adds a second capture).
+4. Persist URL as `listener_identity_verifications.identity_document_url` (see DB schema).
+
+Mobile currently sends **`identity_document` and `document_front`** (same file) until production validates `identity_document` alone.
+
+#### Size / timeouts (large combined upload)
+
+| Layer | Guidance |
+|-------|----------|
+| **App** | No artificial per-file cap in the client. Send timeout / receive timeout = **5 minutes** for this call. |
+| **API** | Accept the full multipart body (avatar + identity_document + selfie + voice_intro + JSON fields) in **one** request. Do not reject solely for “too many parts”. |
+| **Infra** | Raise reverse-proxy / PaaS body limits if needed (Heroku router default is ~**30 MB**). Prefer compressing images server-side or accepting up to that ceiling. |
 
 #### Multipart encoding (`#22`)
 
-When using `multipart/form-data` (required for file uploads), **array and object fields must be JSON-encoded strings** — do **not** repeat the same field name per item (Heroku returns `422` for repeated `language_ids`).
+When using `multipart/form-data`, **array and object fields must be JSON-encoded strings** — do **not** repeat the same field name per item.
 
 | Field | Multipart value example |
 |-------|-------------------------|
@@ -681,9 +709,7 @@ When using `multipart/form-data` (required for file uploads), **array and object
 
 Scalars (`agreed_to_terms`, `accept_instant_calls`, `notifications_enabled`) are sent as `"true"` / `"false"` strings. `fcm_token` is omitted when null.
 
-**Efficiency note:** Prefer one submit at end (`POST`) + optional `PATCH /v1/listeners/me/registration/{step}` for resume. If you split by step, keep the same field names.
-
-**Identity documents:** Include front/back + selfie on **this** `#22` call for first-time registration. Do **not** also call `#23` during initial onboarding.
+**Identity documents:** Include `identity_document` + `selfie` on **this** `#22` call for first-time registration. Do **not** also call `#23` during initial onboarding.
 
 ---
 
@@ -697,7 +723,7 @@ Scalars (`agreed_to_terms`, `accept_instant_calls`, `notifications_enabled`) are
 | **Auth** | Bearer (listener) |
 | **When** | Listener `profile_status` (or identity verification status) is **`rejected`** and the user taps resubmit / re-verify |
 | **Screen** | KYC rejected / resubmit identity screen (not the initial registration step 2 submit) |
-| **Body** | multipart: `document_front`, `document_back?`, `selfie` |
+| **Body** | multipart: `identity_document`, `selfie` (same naming as `#22`; no front/back) |
 | **Response** | `{ status: "pending" }` — returns to admin review queue |
 
 #### Rules
@@ -712,6 +738,7 @@ Scalars (`agreed_to_terms`, `accept_instant_calls`, `notifications_enabled`) are
 - [ ] Rejected listeners can resubmit docs without re-entering profile / experiences / voice / availability
 - [ ] First-time onboarding never requires `#23`
 - [ ] Successful resubmit puts the case back in the admin review queue
+- [ ] Field names match `#22` (`identity_document` + `selfie`)
 
 ---
 

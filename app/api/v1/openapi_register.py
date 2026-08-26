@@ -101,7 +101,7 @@ LISTENER_REGISTER_OPENAPI = {
                         "agreed_to_terms",
                         "language_ids",
                         "comfort_area_ids",
-                        "document_front",
+                        "identity_document",
                         "selfie",
                     ],
                     "properties": {
@@ -159,24 +159,17 @@ LISTENER_REGISTER_OPENAPI = {
                         "fcm_token": {"type": "string"},
                         "voice_intro_seconds": {"type": "integer"},
                         "avatar": {"type": "string", "format": "binary"},
-                        "document_front": {"type": "string", "format": "binary"},
-                        "document_back": {"type": "string", "format": "binary"},
-                        "selfie": {"type": "string", "format": "binary"},
-                        "voice_intro": {"type": "string", "format": "binary"},
                         "identity_document": {
                             "type": "string",
                             "format": "binary",
-                            "description": "Legacy alias for document_front",
+                            "description": "Single government-ID photo (required)",
                         },
-                        "identity_document_front": {
+                        "selfie": {"type": "string", "format": "binary"},
+                        "voice_intro": {"type": "string", "format": "binary"},
+                        "document_front": {
                             "type": "string",
                             "format": "binary",
-                            "description": "Legacy alias for document_front",
-                        },
-                        "identity_document_back": {
-                            "type": "string",
-                            "format": "binary",
-                            "description": "Legacy alias for document_back",
+                            "description": "Legacy alias for identity_document",
                         },
                     },
                 }

@@ -84,14 +84,13 @@ def parse_session_minutes(raw: str | int | None) -> int | None:
 
 
 def parse_register_form(form: Any) -> dict[str, Any]:
-    document_front = (
-        _upload(form.get("document_front"))
+    # Canonical: identity_document. Legacy aliases kept for migration.
+    identity_document = (
+        _upload(form.get("identity_document"))
+        or _upload(form.get("document_front"))
         or _upload(form.get("identity_document_front"))
-        or _upload(form.get("identity_document"))
     )
-    document_back = (
-        _upload(form.get("document_back")) or _upload(form.get("identity_document_back"))
-    )
+    # document_back ignored for mobile onboarding (single ID photo).
 
     session_raw = _scalar(form, "session_minutes")
 
@@ -117,10 +116,7 @@ def parse_register_form(form: Any) -> dict[str, Any]:
         "fcm_token": _scalar(form, "fcm_token"),
         "voice_intro_seconds": parse_session_minutes(_scalar(form, "voice_intro_seconds")),
         "avatar": _upload(form.get("avatar")),
-        "document_front": document_front,
-        "document_back": document_back,
-        "identity_document_front": document_front,
-        "identity_document_back": document_back,
+        "identity_document": identity_document,
         "selfie": _upload(form.get("selfie")),
         "voice_intro": _upload(form.get("voice_intro")),
     }

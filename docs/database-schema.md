@@ -335,13 +335,14 @@ Used for listener KYC documents. **First upload** is created from `#22 listeners
 |--------|------|-------|
 | `id` | UUID | **PK** |
 | `listener_id` | UUID | **FK → listener_profiles** |
-| `document_front_url` | TEXT | |
-| `document_back_url` | TEXT | ? |
+| `identity_document_url` | TEXT | Single government-ID photo (not front/back). Replaces deprecated `document_front_url` |
 | `selfie_url` | TEXT | |
 | `status` | `profile_status` | pending/approved/rejected via under_review |
 | `reviewed_at` | TIMESTAMPTZ | ? |
 | `reviewer_note` | TEXT | ? |
 | `created_at` | TIMESTAMPTZ | |
+
+> **Deprecated (do not use in new code):** `document_front_url`, `document_back_url` — mobile captures **one** ID image + selfie only.
 
 **Indexes:** `IDX(listener_id, created_at DESC)`
 

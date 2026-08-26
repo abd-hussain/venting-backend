@@ -604,10 +604,7 @@ async def register_listener(
     notifications_enabled: str | bool | None,
     fcm_token: str | None,
     avatar: UploadFile | None,
-    document_front: UploadFile | None,
-    document_back: UploadFile | None,
-    identity_document_front: UploadFile | None,
-    identity_document_back: UploadFile | None,
+    identity_document: UploadFile | None,
     selfie: UploadFile | None,
     voice_intro: UploadFile | None,
     voice_intro_seconds: int | None,
@@ -650,9 +647,6 @@ async def register_listener(
     )
     dob = _parse_date(date_of_birth)
 
-    front_upload = document_front or identity_document_front
-    back_upload = document_back or identity_document_back
-
     avatar_url = None
     if avatar is not None and avatar.filename:
         avatar_url = await _save_upload(
@@ -663,30 +657,21 @@ async def register_listener(
             max_bytes=5 * 1024 * 1024,
         )
 
-    if front_upload is None or not front_upload.filename:
+    if identity_document is None or not identity_document.filename:
         raise validation_error(
-            "document_front is required",
-            ar="صورة الوجه الأمامي للمستند مطلوبة",
+            "identity_document is required",
+            ar="صورة وثيقة الهوية مطلوبة",
         )
     if selfie is None or not selfie.filename:
         raise validation_error("selfie is required", ar="صورة السيلفي مطلوبة")
 
-    front_url = await _save_upload(
-        front_upload,
+    identity_url = await _save_upload(
+        identity_document,
         dest_dir=_static_url(settings, "uploads", "identity", str(user.id)),
-        filename="document_front",
+        filename="identity_document",
         allowed=IMAGE_SUFFIXES,
         max_bytes=10 * 1024 * 1024,
     )
-    back_url = None
-    if back_upload is not None and back_upload.filename:
-        back_url = await _save_upload(
-            back_upload,
-            dest_dir=_static_url(settings, "uploads", "identity", str(user.id)),
-            filename="document_back",
-            allowed=IMAGE_SUFFIXES,
-            max_bytes=10 * 1024 * 1024,
-        )
     selfie_url = await _save_upload(
         selfie,
         dest_dir=_static_url(settings, "uploads", "identity", str(user.id)),
@@ -737,8 +722,7 @@ async def register_listener(
     db.add(
         ListenerIdentityVerification(
             listener_id=user.id,
-            document_front_url=front_url,
-            document_back_url=back_url,
+            identity_document_url=identity_url,
             selfie_url=selfie_url,
             status=ProfileStatus.under_review,
         )
@@ -805,8 +789,7 @@ async def submit_identity_verification(
     profile: ListenerProfile,
     *,
     settings: Settings,
-    document_front: UploadFile,
-    document_back: UploadFile | None,
+    identity_document: UploadFile,
     selfie: UploadFile,
 ) -> IdentityVerificationResponse:
     """Resubmit KYC after admin rejection — not for first-time registration (#22)."""
@@ -826,27 +809,21 @@ async def submit_identity_verification(
             ar="إعادة إرسال الهوية متاحة فقط بعد رفض التحقق السابق",
         )
 
-    if document_front.filename is None:
-        raise validation_error("document_front is required", ar="صورة المستند مطلوبة")
+    if identity_document.filename is None:
+        raise validation_error(
+            "identity_document is required",
+            ar="صورة وثيقة الهوية مطلوبة",
+        )
     if selfie.filename is None:
         raise validation_error("selfie is required", ar="صورة السيلفي مطلوبة")
 
-    front_url = await _save_upload(
-        document_front,
+    identity_url = await _save_upload(
+        identity_document,
         dest_dir=_static_url(settings, "uploads", "identity", str(profile.user_id)),
-        filename="document_front",
+        filename="identity_document",
         allowed=IMAGE_SUFFIXES,
         max_bytes=10 * 1024 * 1024,
     )
-    back_url = None
-    if document_back is not None and document_back.filename:
-        back_url = await _save_upload(
-            document_back,
-            dest_dir=_static_url(settings, "uploads", "identity", str(profile.user_id)),
-            filename="document_back",
-            allowed=IMAGE_SUFFIXES,
-            max_bytes=10 * 1024 * 1024,
-        )
     selfie_url = await _save_upload(
         selfie,
         dest_dir=_static_url(settings, "uploads", "identity", str(profile.user_id)),
@@ -856,8 +833,7 @@ async def submit_identity_verification(
     )
     row = ListenerIdentityVerification(
         listener_id=profile.user_id,
-        document_front_url=front_url,
-        document_back_url=back_url,
+        identity_document_url=identity_url,
         selfie_url=selfie_url,
         status=ProfileStatus.under_review,
     )

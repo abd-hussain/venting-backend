@@ -43,14 +43,16 @@ class ListenerReviewDetail(ListenerQueueItem):
 class IdentityVerificationDetail(BaseModel):
     id: str
     listener_id: str
-    document_front_url: str
-    document_back_url: str | None = None
+    identity_document_url: str
     selfie_url: str
     status: str
     reviewer_note: str | None = None
     reviewed_by_admin_id: str | None = None
     reviewed_at: datetime | None = None
     created_at: datetime
+    # Deprecated aliases for older admin UI during migration
+    document_front_url: str | None = None
+    document_back_url: str | None = None
 
 
 class RejectListenerRequest(BaseModel):
