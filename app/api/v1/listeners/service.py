@@ -579,6 +579,13 @@ def _when_label(moment: datetime | None) -> str:
     return f"{moment.strftime('%b')} {moment.day} · {clock}"
 
 
+def _require_text(value: str | None, *, field: str, min_len: int = 1) -> str:
+    text = (value or "").strip()
+    if len(text) < min_len:
+        raise validation_error(f"{field} is required", ar=f"{field} مطلوب")
+    return text
+
+
 async def register_listener(
     db: Session,
     user: User,
@@ -587,7 +594,6 @@ async def register_listener(
     full_name: str,
     phone: str | None,
     phone_country: str | None,
-    agreed_to_terms: str | bool,
     date_of_birth: str | None,
     country_iso: str | None,
     city: str | None,
@@ -601,7 +607,6 @@ async def register_listener(
     availability_raw: str | None,
     accept_instant_calls: str | bool | None,
     session_minutes: int | None,
-    notifications_enabled: str | bool | None,
     fcm_token: str | None,
     avatar: UploadFile | None,
     identity_document: UploadFile | None,
@@ -616,11 +621,6 @@ async def register_listener(
             "Listener profile already exists",
             ar="ملف المستمع موجود بالفعل",
         )
-    if not _parse_bool(agreed_to_terms, field="agreed_to_terms"):
-        raise validation_error(
-            "agreed_to_terms must be true",
-            ar="يجب الموافقة على الشروط",
-        )
 
     full_name = full_name.strip()
     if not full_name or len(full_name) > 120:
@@ -629,33 +629,52 @@ async def register_listener(
             ar="الاسم يجب أن يكون بين 1 و 120 حرفًا",
         )
 
+    phone_value = _require_text(phone, field="phone")
+    phone_country_value = _require_text(phone_country, field="phone_country")
+    city_value = _require_text(city, field="city")
+    country_iso_value = _require_text(country_iso, field="country_iso").upper()
+
     language_ids = _parse_json_list(language_ids_raw, field="language_ids")
     life_experience_ids = _parse_json_list(
-        life_experience_ids_raw, field="life_experience_ids", allow_empty=True
+        life_experience_ids_raw, field="life_experience_ids"
     )
     custom_experiences = _parse_json_list(
         custom_experiences_raw, field="custom_experiences", allow_empty=True
     )
     comfort_area_ids = _parse_json_list(comfort_area_ids_raw, field="comfort_area_ids")
-    boundary_ids = _parse_json_list(boundary_ids_raw, field="boundary_ids", allow_empty=True)
+    boundary_ids = _parse_json_list(boundary_ids_raw, field="boundary_ids")
+    if availability_raw is None or not str(availability_raw).strip():
+        raise validation_error("availability is required", ar="التوفر مطلوب")
     availability = _parse_availability(availability_raw)
-    accept_instant = _parse_bool(
-        accept_instant_calls, field="accept_instant_calls", default=True
-    )
-    notif_enabled = _parse_bool(
-        notifications_enabled, field="notifications_enabled", default=True
-    )
-    dob = _parse_date(date_of_birth)
-
-    avatar_url = None
-    if avatar is not None and avatar.filename:
-        avatar_url = await _save_upload(
-            avatar,
-            dest_dir=_static_url(settings, "uploads", "avatars"),
-            filename=str(user.id),
-            allowed=IMAGE_SUFFIXES,
-            max_bytes=5 * 1024 * 1024,
+    if not availability.days:
+        raise validation_error(
+            "availability.days must include at least one day",
+            ar="يجب تضمين يوم واحد على الأقل في التوفر",
         )
+    accept_instant = _parse_bool(accept_instant_calls, field="accept_instant_calls")
+    if session_minutes is None:
+        raise validation_error("session_minutes is required", ar="session_minutes مطلوب")
+    if voice_intro_seconds is None:
+        raise validation_error(
+            "voice_intro_seconds is required",
+            ar="voice_intro_seconds مطلوب",
+        )
+    dob = _parse_date(date_of_birth)
+    if dob is None:
+        raise validation_error(
+            "date_of_birth is required (YYYY-MM-DD)",
+            ar="تاريخ الميلاد مطلوب",
+        )
+
+    if avatar is None or not avatar.filename:
+        raise validation_error("avatar is required", ar="صورة الملف الشخصي مطلوبة")
+    avatar_url = await _save_upload(
+        avatar,
+        dest_dir=_static_url(settings, "uploads", "avatars"),
+        filename=str(user.id),
+        allowed=IMAGE_SUFFIXES,
+        max_bytes=5 * 1024 * 1024,
+    )
 
     if identity_document is None or not identity_document.filename:
         raise validation_error(
@@ -680,28 +699,29 @@ async def register_listener(
         max_bytes=10 * 1024 * 1024,
     )
 
-    voice_url = None
-    if voice_intro is not None and voice_intro.filename:
-        voice_url = await _save_upload(
-            voice_intro,
-            dest_dir=_static_url(settings, "uploads", "voice"),
-            filename=str(user.id),
-            allowed=AUDIO_SUFFIXES,
-            max_bytes=20 * 1024 * 1024,
-        )
+    if voice_intro is None or not voice_intro.filename:
+        raise validation_error("voice_intro is required", ar="التسجيل الصوتي مطلوب")
+    voice_url = await _save_upload(
+        voice_intro,
+        dest_dir=_static_url(settings, "uploads", "voice"),
+        filename=str(user.id),
+        allowed=AUDIO_SUFFIXES,
+        max_bytes=20 * 1024 * 1024,
+    )
 
     tz = availability.time_zone_id or "UTC"
-    session_length = session_minutes or availability.session_length_minutes or 30
+    session_length = session_minutes
+    push_enabled = bool((fcm_token or "").strip())
 
     profile = ListenerProfile(
         user_id=user.id,
         full_name=full_name,
-        phone_e164=phone.strip() if phone else None,
-        phone_country_iso=phone_country.strip().upper() if phone_country else None,
+        phone_e164=phone_value,
+        phone_country_iso=phone_country_value,
         avatar_url=avatar_url,
         date_of_birth=dob,
-        country_iso=country_iso.strip().upper() if country_iso else None,
-        city=city.strip() if city else None,
+        country_iso=country_iso_value,
+        city=city_value,
         voice_intro_url=voice_url,
         voice_intro_seconds=voice_intro_seconds,
         profile_status=ProfileStatus.under_review,
@@ -769,8 +789,8 @@ async def register_listener(
     db.add(
         ListenerNotificationPreferencesRow(
             listener_id=user.id,
-            push_enabled=notif_enabled,
-            email_enabled=notif_enabled,
+            push_enabled=push_enabled,
+            email_enabled=push_enabled,
         )
     )
     db.add(ListenerWallet(listener_id=user.id))

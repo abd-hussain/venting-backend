@@ -654,48 +654,56 @@ Form fields (repeat `language_ids` / `interest_ids` once per value):
 | **Body** | See table below |
 | **Response** | `{ listener_id, profile_status: "under_review" }` |
 
-#### One-shot payload (all steps together)
+#### One-shot payload (registration submit)
 
-This endpoint is the **only** first-time registration submit. The app collects steps 1–9 locally, then sends **all text fields + all files in one multipart body**. Do **not** split media across multiple endpoints for first registration.
+Collect steps 1–9 locally, then send **one** multipart body including step 8 availability.
 
-| Field | From step | Type | Notes |
-|-------|-----------|------|-------|
-| `full_name`, `phone`, `phone_country`, `avatar`, `agreed_to_terms` | 1 | string / file / bool | |
-| `identity_document`, `selfie` | 2 | file / file | **One** government-ID photo (`identity_document`) + selfie. **Not** front/back of a card. |
-| `date_of_birth`, `country_iso`, `city`, `language_ids` | 3 | date / string / string[] | |
-| `life_experience_ids`, `custom_experiences?` | 4 | string[] | |
-| `comfort_area_ids`, `custom_comfort_area_text?` | 5 | string[] / string | |
-| `boundary_ids`, `custom_boundary_text?` | 6 | string[] / string | |
-| `voice_intro`, `voice_intro_seconds?` | 7 | audio file / int | |
-| `availability`, `accept_instant_calls`, `session_minutes` | 8 | JSON object / bool / **int** | `session_minutes` = preferred length; if UI allows 30+60, send shortest selected |
-| `notifications_enabled`, `fcm_token?` | 9 | bool / string \| null | omit / `null` token when permission denied |
+| Field | Step | Required | Type | Notes |
+|-------|------|----------|------|-------|
+| `avatar` | 1 | yes | file | Profile photo |
+| `full_name` | 1 | yes | string | |
+| `phone` | 1 | yes | string | E.164 |
+| `phone_country` | 1 | yes | string | ISO country code for phone |
+| `identity_document` | 2 | yes | file | Single government-ID photo (**not** `document_front`) |
+| `selfie` | 2 | yes | file | |
+| `date_of_birth` | 3 | yes | string | `YYYY-MM-DD` |
+| `country_iso` | 3 | yes | string | Residence country |
+| `city` | 3 | yes | string | |
+| `language_ids` | 3 | yes | JSON string array | e.g. `["en","ar"]` |
+| `life_experience_ids` | 4 | yes | JSON string array | Catalog + relationship/family slugs |
+| `custom_experiences` | 4 | no | JSON string array | When user adds custom text |
+| `comfort_area_ids` | 5 | yes | JSON string array | |
+| `custom_comfort_area_text` | 5 | no | string | When “Other” comfort area selected |
+| `boundary_ids` | 6 | yes | JSON string array | At least one boundary |
+| `custom_boundary_text` | 6 | no | string | When “Other” boundary selected |
+| `voice_intro` | 7 | yes | file | Audio |
+| `voice_intro_seconds` | 7 | yes | string/int | Duration in seconds |
+| `accept_instant_calls` | 8 | yes | string | `"true"` / `"false"` |
+| `session_minutes` | 8 | yes | string/int | Preferred length; if UI allows 30+60, send shortest (e.g. `30`) |
+| `availability` | 8 | yes | JSON string object | `#37` shape: `{ time_zone_id, days: [{ day, slots: [{ start, end }] }] }` |
+| `fcm_token` | 9 | no | string | Omit when notifications permission denied |
 
-#### Identity field rename (required backend change)
+**Do not send on `#22`:** `agreed_to_terms`, `notifications_enabled`, `document_front`, `document_back`.
 
-| Canonical (use this) | Deprecated | Meaning |
-|----------------------|------------|---------|
-| `identity_document` | `document_front`, `document_back`, `identity_document_front`, `identity_document_back` | Single ID / passport / residence photo from step 2 — **not** “front and back” of a two-sided scan |
+#### Identity field naming
 
-**Backend contract to ship:**
+| Use | Do not use |
+|-----|------------|
+| `identity_document` | `document_front`, `document_back`, front/back scan semantics |
 
-1. Require **`identity_document`** + **`selfie`** (not `document_front`).
-2. Accept legacy `document_front` as an alias during migration only.
-3. Drop / ignore `document_back` for mobile onboarding (optional later if product adds a second capture).
-4. Persist URL as `listener_identity_verifications.identity_document_url` (see DB schema).
-
-Mobile currently sends **`identity_document` and `document_front`** (same file) until production validates `identity_document` alone.
+Mobile captures **one** government-ID image + selfie in step 2.
 
 #### Size / timeouts (large combined upload)
 
 | Layer | Guidance |
 |-------|----------|
-| **App** | No artificial per-file cap in the client. Send timeout / receive timeout = **5 minutes** for this call. |
-| **API** | Accept the full multipart body (avatar + identity_document + selfie + voice_intro + JSON fields) in **one** request. Do not reject solely for “too many parts”. |
-| **Infra** | Raise reverse-proxy / PaaS body limits if needed (Heroku router default is ~**30 MB**). Prefer compressing images server-side or accepting up to that ceiling. |
+| **App** | No artificial per-file cap. Send/receive timeout = **5 minutes** for this call. |
+| **API** | Accept avatar + identity_document + selfie + voice_intro + JSON fields in **one** request. |
+| **Infra** | Heroku router default body limit ~**30 MB**. |
 
 #### Multipart encoding (`#22`)
 
-When using `multipart/form-data`, **array and object fields must be JSON-encoded strings** — do **not** repeat the same field name per item.
+Array fields must be **JSON-encoded strings** — do **not** repeat the same field name per item.
 
 | Field | Multipart value example |
 |-------|-------------------------|
@@ -705,11 +713,11 @@ When using `multipart/form-data`, **array and object fields must be JSON-encoded
 | `comfort_area_ids` | `["relationships","other"]` |
 | `boundary_ids` | `["suicide_self_harm"]` |
 | `session_minutes` | `30` (integer string, not JSON array) |
-| `availability` | `{"time_zone_id":"America/Chicago","days":[...]}` |
+| `availability` | `{"time_zone_id":"America/Chicago","days":[{"day":"mon","slots":[{"start":"09:00","end":"23:00"}]}]}` |
 
-Scalars (`agreed_to_terms`, `accept_instant_calls`, `notifications_enabled`) are sent as `"true"` / `"false"` strings. `fcm_token` is omitted when null.
+Scalars (`accept_instant_calls`) are sent as `"true"` / `"false"` strings. `fcm_token` is omitted when null.
 
-**Identity documents:** Include `identity_document` + `selfie` on **this** `#22` call for first-time registration. Do **not** also call `#23` during initial onboarding.
+**Identity documents:** Include `identity_document` + `selfie` on **this** `#22` call. Do **not** also call `#23` during initial onboarding.
 
 ---
 

@@ -79,76 +79,55 @@ async def register(
     current_user: CurrentListener,
     db: DbSession,
     settings: SettingsDep,
-    # Form/File params restore Swagger fields. Runtime still reads request.form()
-    # so JSON-encoded lists and legacy aliases work the same.
+    # Form/File params restore Swagger fields. Runtime reads request.form().
+    avatar: UploadFile = File(..., description="Profile photo"),
     full_name: str = Form(..., description="Listener full name"),
-    agreed_to_terms: str = Form(..., description='"true" or "false"'),
+    phone: str = Form(..., description="E.164 phone number"),
+    phone_country: str = Form(..., description="ISO country code for phone"),
+    identity_document: UploadFile = File(
+        ..., description="Single government-ID photo"
+    ),
+    selfie: UploadFile = File(..., description="Selfie with ID"),
+    date_of_birth: str = Form(..., description="YYYY-MM-DD"),
+    country_iso: str = Form(..., description="Residence country ISO"),
+    city: str = Form(..., description="City"),
     language_ids: str = Form(..., description='JSON array, e.g. ["en","ar"]'),
-    comfort_area_ids: str = Form(..., description='JSON array of comfort area ids'),
-    phone: str | None = Form(None),
-    phone_country: str | None = Form(None),
-    date_of_birth: str | None = Form(None, description="YYYY-MM-DD"),
-    country_iso: str | None = Form(None),
-    city: str | None = Form(None),
-    life_experience_ids: str | None = Form(None, description="JSON array"),
+    life_experience_ids: str = Form(..., description="JSON array"),
+    comfort_area_ids: str = Form(..., description="JSON array of comfort area ids"),
+    boundary_ids: str = Form(..., description="JSON array — at least one boundary"),
+    voice_intro: UploadFile = File(..., description="Voice intro audio"),
+    voice_intro_seconds: str = Form(..., description="Duration in seconds"),
+    accept_instant_calls: str = Form(..., description='"true" or "false"'),
+    session_minutes: str = Form(..., description="Integer minutes, e.g. 30"),
+    availability: str = Form(..., description="JSON availability object (#37)"),
     custom_experiences: str | None = Form(None, description="JSON array"),
     custom_comfort_area_text: str | None = Form(None),
-    boundary_ids: str | None = Form(None, description="JSON array"),
     custom_boundary_text: str | None = Form(None),
-    availability: str | None = Form(None, description="JSON availability object (#37)"),
-    accept_instant_calls: str | None = Form("true"),
-    session_minutes: str | None = Form(None, description="Integer minutes, e.g. 30"),
-    notifications_enabled: str | None = Form("true"),
-    fcm_token: str | None = Form(None),
-    voice_intro_seconds: str | None = Form(None),
-    avatar: UploadFile | None = File(None),
-    identity_document: UploadFile | None = File(
-        None, description="Single government-ID photo (required)"
-    ),
-    document_front: UploadFile | None = File(
-        None, description="Legacy alias for identity_document"
-    ),
-    identity_document_front: UploadFile | None = File(
-        None, description="Legacy alias for identity_document"
-    ),
-    selfie: UploadFile | None = File(None, description="Selfie (required)"),
-    voice_intro: UploadFile | None = File(None),
-    document_back: UploadFile | None = File(
-        None, description="Deprecated — ignored (single ID photo only)"
-    ),
-    identity_document_back: UploadFile | None = File(
-        None, description="Deprecated — ignored"
-    ),
+    fcm_token: str | None = Form(None, description="Omit when permission denied"),
 ):
     _ = (
+        avatar,
         full_name,
-        agreed_to_terms,
-        language_ids,
-        comfort_area_ids,
         phone,
         phone_country,
+        identity_document,
+        selfie,
         date_of_birth,
         country_iso,
         city,
+        language_ids,
         life_experience_ids,
-        custom_experiences,
-        custom_comfort_area_text,
+        comfort_area_ids,
         boundary_ids,
-        custom_boundary_text,
-        availability,
+        voice_intro,
+        voice_intro_seconds,
         accept_instant_calls,
         session_minutes,
-        notifications_enabled,
+        availability,
+        custom_experiences,
+        custom_comfort_area_text,
+        custom_boundary_text,
         fcm_token,
-        voice_intro_seconds,
-        avatar,
-        identity_document,
-        document_front,
-        identity_document_front,
-        selfie,
-        voice_intro,
-        document_back,
-        identity_document_back,
     )
     form = await request.form()
     fields = parse_register_form(form)

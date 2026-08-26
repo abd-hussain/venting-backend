@@ -97,21 +97,39 @@ LISTENER_REGISTER_OPENAPI = {
                 "schema": {
                     "type": "object",
                     "required": [
+                        "avatar",
                         "full_name",
-                        "agreed_to_terms",
-                        "language_ids",
-                        "comfort_area_ids",
+                        "phone",
+                        "phone_country",
                         "identity_document",
                         "selfie",
+                        "date_of_birth",
+                        "country_iso",
+                        "city",
+                        "language_ids",
+                        "life_experience_ids",
+                        "comfort_area_ids",
+                        "boundary_ids",
+                        "voice_intro",
+                        "voice_intro_seconds",
+                        "accept_instant_calls",
+                        "session_minutes",
+                        "availability",
                     ],
                     "properties": {
+                        "avatar": {"type": "string", "format": "binary"},
                         "full_name": {"type": "string"},
-                        "phone": {"type": "string"},
-                        "phone_country": {"type": "string"},
-                        "agreed_to_terms": {
+                        "phone": {"type": "string", "description": "E.164"},
+                        "phone_country": {
                             "type": "string",
-                            "description": '"true" or "false"',
+                            "description": "ISO country code for phone",
                         },
+                        "identity_document": {
+                            "type": "string",
+                            "format": "binary",
+                            "description": "Single government-ID photo",
+                        },
+                        "selfie": {"type": "string", "format": "binary"},
                         "date_of_birth": {
                             "type": "string",
                             "description": "YYYY-MM-DD",
@@ -124,26 +142,24 @@ LISTENER_REGISTER_OPENAPI = {
                         },
                         "life_experience_ids": {
                             "type": "string",
-                            "description": 'JSON array string',
+                            "description": "JSON array string",
                         },
                         "custom_experiences": {
                             "type": "string",
-                            "description": 'JSON array string',
+                            "description": "JSON array string",
                         },
                         "comfort_area_ids": {
                             "type": "string",
-                            "description": 'JSON array string',
+                            "description": "JSON array string",
                         },
                         "custom_comfort_area_text": {"type": "string"},
                         "boundary_ids": {
                             "type": "string",
-                            "description": 'JSON array string',
+                            "description": "JSON array string",
                         },
                         "custom_boundary_text": {"type": "string"},
-                        "availability": {
-                            "type": "string",
-                            "description": "JSON object (#37 shape)",
-                        },
+                        "voice_intro": {"type": "string", "format": "binary"},
+                        "voice_intro_seconds": {"type": "integer"},
                         "accept_instant_calls": {
                             "type": "string",
                             "description": '"true" or "false"',
@@ -152,24 +168,13 @@ LISTENER_REGISTER_OPENAPI = {
                             "type": "integer",
                             "description": "Preferred session length (e.g. 30)",
                         },
-                        "notifications_enabled": {
+                        "availability": {
                             "type": "string",
-                            "description": '"true" or "false"',
+                            "description": "JSON object (#37 shape)",
                         },
-                        "fcm_token": {"type": "string"},
-                        "voice_intro_seconds": {"type": "integer"},
-                        "avatar": {"type": "string", "format": "binary"},
-                        "identity_document": {
+                        "fcm_token": {
                             "type": "string",
-                            "format": "binary",
-                            "description": "Single government-ID photo (required)",
-                        },
-                        "selfie": {"type": "string", "format": "binary"},
-                        "voice_intro": {"type": "string", "format": "binary"},
-                        "document_front": {
-                            "type": "string",
-                            "format": "binary",
-                            "description": "Legacy alias for identity_document",
+                            "description": "Omit when notifications permission denied",
                         },
                     },
                 }
