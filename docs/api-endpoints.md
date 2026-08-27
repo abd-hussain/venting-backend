@@ -745,6 +745,21 @@ Finalizes listener registration after all step saves. JSON body.
 | **Screen** | Listener profile tab + settings |
 | **Response** | `{ id, full_name, email, phone, phone_country, avatar_url, about_me, country, country_iso, city, language_ids, life_experiences, comfort_areas, boundaries, voice_intro_url, voice_intro_seconds, rating, review_count, session_count, is_online, profile_status, rate_per_minute }` |
 
+**`life_experiences` shape (GET):** object (preferred) or array:
+
+```json
+{
+  "life_experience_ids": ["job_loss", "grief_loss"],
+  "relationship_status": "widowed",
+  "family_role_ids": ["single_parent"],
+  "custom_experiences": ["Raised twins abroad"]
+}
+```
+
+Legacy array form is still accepted (`["job_loss", "widowed", …]` or `[{ "id": "job_loss" }, …]`).
+
+**`comfort_areas` / `boundaries` (GET):** object with `*_ids` + optional `custom_*_text`, or legacy id array.
+
 **Media URL note:** `avatar_url` and `voice_intro_url` are often **relative** paths (e.g. `/static/uploads/avatars/{user_id}.jpg`). Mobile must prefix with API `baseUrl` before `Image.network` / audio playback. See [Media URLs](#media-urls-static-uploads) below.
 
 ---
@@ -774,8 +789,10 @@ Finalizes listener registration after all step saves. JSON body.
 | `relationship_status` | string \| null | Client enum: `single` \| `in_relationship` \| `married` \| `divorced` \| `widowed` |
 | `family_role_ids` | string[] | Client enums: `parent`, `single_parent`, `caregiver` |
 | `custom_experiences` | string[] | Optional free-text experiences (plain labels, **not** `custom_*` slugs) |
-| `comfort_areas` | string[] | Comfort area ids |
-| `boundaries` | string[] | Boundary ids |
+| `comfort_area_ids` | string[] | Comfort area ids from `#74` |
+| `custom_comfort_area_text` | string \| null | Required when `other` comfort area is selected |
+| `boundary_ids` | string[] | Boundary ids from `#77` |
+| `custom_boundary_text` | string \| null | Required when `other` boundary is selected |
 
 > **Experiences PATCH:** Same split as registration step **experiences** (`#22`):
 > - `life_experience_ids` — ids from `#76 GET /v1/catalog/life-experiences` only
@@ -824,7 +841,7 @@ Mirror **#26** voice intro, but for images:
 | **Auth** | Bearer |
 | **Screen** | Edit voice intro sheet |
 | **Content-Type** | `multipart/form-data` |
-| **Body** | `audio` (file, m4a/aac/mp3/wav/caf); optional `duration_seconds` (int) |
+| **Body** | `audio` (file, m4a/aac/mp3/wav/caf); optional `voice_intro_seconds` (int) |
 | **Response** | `{ voice_intro_url, voice_intro_seconds }` |
 
 **Media URL note:** `voice_intro_url` is relative like avatar; mobile prefixes with `baseUrl` before playback.

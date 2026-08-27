@@ -23,10 +23,13 @@ from app.api.v1.listeners.schemas import (
     IdentityStatusOut,
     IdentityVerificationResponse,
     ImpactChartPoint,
+    ListenerLifeExperiencesOut,
     ListenerNotificationPreferences,
     ListenerPrivacySettings,
     ListenerProfileResponse,
     ListenerProfileUpdate,
+    ListenerComfortAreasOut,
+    ListenerBoundariesOut,
     ListenerPublicResponse,
     OnlineStatusResponse,
     ProfileStatusOut,
@@ -310,6 +313,30 @@ def _custom_experience_labels(db: Session, listener_id: UUID) -> list[str]:
         .all()
     )
     return [row[0] for row in rows if row[0]]
+
+
+def _comfort_custom_text(db: Session, listener_id: UUID) -> str | None:
+    row = (
+        db.query(ListenerComfortArea.custom_text)
+        .filter(
+            ListenerComfortArea.listener_id == listener_id,
+            ListenerComfortArea.custom_text.isnot(None),
+        )
+        .first()
+    )
+    return row[0] if row else None
+
+
+def _boundary_custom_text(db: Session, listener_id: UUID) -> str | None:
+    row = (
+        db.query(ListenerBoundary.custom_text)
+        .filter(
+            ListenerBoundary.listener_id == listener_id,
+            ListenerBoundary.custom_text.isnot(None),
+        )
+        .first()
+    )
+    return row[0] if row else None
 
 
 def _validate_relationship_status(value: str | None) -> str | None:
@@ -628,12 +655,20 @@ def _profile_response(db: Session, user: User, profile: ListenerProfile) -> List
         country_iso=profile.country_iso,
         city=profile.city,
         language_ids=tags["languages"],
-        life_experiences=_catalog_experience_ids(db, profile.user_id),
-        relationship_status=profile.relationship_status,
-        family_role_ids=list(profile.family_role_ids or []),
-        custom_experiences=_custom_experience_labels(db, profile.user_id),
-        comfort_areas=tags["comfort"],
-        boundaries=tags["boundaries"],
+        life_experiences=ListenerLifeExperiencesOut(
+            life_experience_ids=_catalog_experience_ids(db, profile.user_id),
+            relationship_status=profile.relationship_status,
+            family_role_ids=list(profile.family_role_ids or []),
+            custom_experiences=_custom_experience_labels(db, profile.user_id),
+        ),
+        comfort_areas=ListenerComfortAreasOut(
+            comfort_area_ids=tags["comfort"],
+            custom_comfort_area_text=_comfort_custom_text(db, profile.user_id),
+        ),
+        boundaries=ListenerBoundariesOut(
+            boundary_ids=tags["boundaries"],
+            custom_boundary_text=_boundary_custom_text(db, profile.user_id),
+        ),
         voice_intro_url=profile.voice_intro_url,
         voice_intro_seconds=profile.voice_intro_seconds,
         rating=float(profile.rating_avg or 0),
@@ -1046,13 +1081,32 @@ def update_listener_profile(
             custom_experiences=custom_labels,
         )
 
-    _replace_tags(
-        db,
-        listener_id=profile.user_id,
-        language_ids=data.get("language_ids"),
-        comfort_area_ids=data.get("comfort_areas"),
-        boundary_ids=data.get("boundaries"),
-    )
+    tags = _load_tag_ids(db, profile.user_id)
+    tag_kwargs: dict[str, object] = {}
+    if "language_ids" in data:
+        tag_kwargs["language_ids"] = data["language_ids"]
+    if "comfort_area_ids" in data or "custom_comfort_area_text" in data:
+        tag_kwargs["comfort_area_ids"] = (
+            data["comfort_area_ids"]
+            if "comfort_area_ids" in data
+            else tags["comfort"]
+        )
+        tag_kwargs["custom_comfort_area_text"] = (
+            data["custom_comfort_area_text"]
+            if "custom_comfort_area_text" in data
+            else _comfort_custom_text(db, profile.user_id)
+        )
+    if "boundary_ids" in data or "custom_boundary_text" in data:
+        tag_kwargs["boundary_ids"] = (
+            data["boundary_ids"] if "boundary_ids" in data else tags["boundaries"]
+        )
+        tag_kwargs["custom_boundary_text"] = (
+            data["custom_boundary_text"]
+            if "custom_boundary_text" in data
+            else _boundary_custom_text(db, profile.user_id)
+        )
+    if tag_kwargs:
+        _replace_tags(db, listener_id=profile.user_id, **tag_kwargs)
     db.commit()
     db.refresh(profile)
     return _profile_response(db, user, profile)
@@ -1064,7 +1118,7 @@ async def upload_voice_intro(
     *,
     settings: Settings,
     audio: UploadFile,
-    duration_seconds: int | None,
+    voice_intro_seconds: int | None,
 ) -> VoiceIntroResponse:
     if audio.filename is None:
         raise validation_error("audio is required", ar="ملف الصوت مطلوب")
@@ -1076,8 +1130,8 @@ async def upload_voice_intro(
         max_bytes=20 * 1024 * 1024,
     )
     profile.voice_intro_url = url
-    if duration_seconds is not None:
-        profile.voice_intro_seconds = duration_seconds
+    if voice_intro_seconds is not None:
+        profile.voice_intro_seconds = voice_intro_seconds
     db.commit()
     db.refresh(profile)
     return VoiceIntroResponse(

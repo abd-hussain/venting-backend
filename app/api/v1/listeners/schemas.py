@@ -181,6 +181,23 @@ class IdentityVerificationResponse(BaseModel):
     status: IdentityStatusOut
 
 
+class ListenerLifeExperiencesOut(BaseModel):
+    life_experience_ids: list[str] = Field(default_factory=list)
+    relationship_status: str | None = None
+    family_role_ids: list[str] = Field(default_factory=list)
+    custom_experiences: list[str] = Field(default_factory=list)
+
+
+class ListenerComfortAreasOut(BaseModel):
+    comfort_area_ids: list[str] = Field(default_factory=list)
+    custom_comfort_area_text: str | None = None
+
+
+class ListenerBoundariesOut(BaseModel):
+    boundary_ids: list[str] = Field(default_factory=list)
+    custom_boundary_text: str | None = None
+
+
 class ListenerProfileResponse(BaseModel):
     id: str
     full_name: str
@@ -193,12 +210,11 @@ class ListenerProfileResponse(BaseModel):
     country_iso: str | None = None
     city: str | None = None
     language_ids: list[str] = Field(default_factory=list)
-    life_experiences: list[str] = Field(default_factory=list)
-    relationship_status: str | None = None
-    family_role_ids: list[str] = Field(default_factory=list)
-    custom_experiences: list[str] = Field(default_factory=list)
-    comfort_areas: list[str] = Field(default_factory=list)
-    boundaries: list[str] = Field(default_factory=list)
+    life_experiences: ListenerLifeExperiencesOut = Field(
+        default_factory=ListenerLifeExperiencesOut
+    )
+    comfort_areas: ListenerComfortAreasOut = Field(default_factory=ListenerComfortAreasOut)
+    boundaries: ListenerBoundariesOut = Field(default_factory=ListenerBoundariesOut)
     voice_intro_url: str | None = None
     voice_intro_seconds: int | None = None
     rating: float
@@ -221,8 +237,10 @@ class ListenerProfileUpdate(BaseModel):
     relationship_status: str | None = None
     family_role_ids: list[str] | None = None
     custom_experiences: list[str] | None = None
-    comfort_areas: list[str] | None = None
-    boundaries: list[str] | None = None
+    comfort_area_ids: list[str] | None = None
+    custom_comfort_area_text: str | None = None
+    boundary_ids: list[str] | None = None
+    custom_boundary_text: str | None = None
 
 
 class VoiceIntroResponse(BaseModel):

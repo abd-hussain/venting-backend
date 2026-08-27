@@ -31,7 +31,9 @@ from app.api.v1.listeners.service import (
     AUDIO_SUFFIXES,
     IMAGE_SUFFIXES,
     _apply_availability,
+    _boundary_custom_text,
     _catalog_experience_ids,
+    _comfort_custom_text,
     _custom_experience_labels,
     _load_tag_ids,
     _parse_date,
@@ -50,7 +52,6 @@ from app.core.errors import conflict, forbidden, validation_error
 from app.models.auth import User
 from app.models.earnings import ListenerWallet
 from app.models.enums import ProfileStatus, SetupStepStatus, UserRole
-from app.models.lookups import ListenerComfortArea
 from app.models.profiles import ListenerIdentityVerification, ListenerProfile
 from app.models.settings import (
     ListenerNotificationPreferences as ListenerNotificationPreferencesRow,
@@ -78,32 +79,6 @@ def _latest_identity(db: Session, listener_id) -> ListenerIdentityVerification |
         .order_by(ListenerIdentityVerification.created_at.desc())
         .first()
     )
-
-
-def _comfort_custom_text(db: Session, listener_id) -> str | None:
-    row = (
-        db.query(ListenerComfortArea.custom_text)
-        .filter(
-            ListenerComfortArea.listener_id == listener_id,
-            ListenerComfortArea.custom_text.isnot(None),
-        )
-        .first()
-    )
-    return row[0] if row else None
-
-
-def _boundary_custom_text(db: Session, listener_id) -> str | None:
-    from app.models.lookups import ListenerBoundary
-
-    row = (
-        db.query(ListenerBoundary.custom_text)
-        .filter(
-            ListenerBoundary.listener_id == listener_id,
-            ListenerBoundary.custom_text.isnot(None),
-        )
-        .first()
-    )
-    return row[0] if row else None
 
 
 def get_register_progress(db: Session, user: User) -> ListenerRegisterProgressResponse:

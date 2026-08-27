@@ -459,14 +459,18 @@ async def voice_intro(
     db: DbSession,
     settings: SettingsDep,
     audio: UploadFile = File(...),
+    voice_intro_seconds: int | None = Form(None),
     duration_seconds: int | None = Form(None),
 ):
+    seconds = (
+        voice_intro_seconds if voice_intro_seconds is not None else duration_seconds
+    )
     data = await upload_voice_intro(
         db,
         profile,
         settings=settings,
         audio=audio,
-        duration_seconds=duration_seconds,
+        voice_intro_seconds=seconds,
     )
     return success_response(data.model_dump(mode="json"))
 
