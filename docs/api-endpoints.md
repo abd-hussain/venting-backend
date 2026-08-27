@@ -65,7 +65,7 @@ List responses may include:
 |--------|------:|---------------|
 | Auth & account | 11 | 0–7, 1b, 2b–2c |
 | Ventor profile / home / wellness | 14 | 8–21 |
-| Listener profile / onboarding / dashboard | 15 | 22–36 |
+| Listener profile / onboarding / dashboard | 16 | 22–36 |
 | Listener availability | 3 | 37–39 |
 | Discovery & sessions | 13 | 40–52 |
 | Call feedback & reports | 3 | 53–55 |
@@ -745,6 +745,8 @@ Finalizes listener registration after all step saves. JSON body.
 | **Screen** | Listener profile tab + settings |
 | **Response** | `{ id, full_name, email, phone, phone_country, avatar_url, about_me, country, country_iso, city, language_ids, life_experiences, comfort_areas, boundaries, voice_intro_url, voice_intro_seconds, rating, review_count, session_count, is_online, profile_status, rate_per_minute }` |
 
+**Media URL note:** `avatar_url` and `voice_intro_url` are often **relative** paths (e.g. `/static/uploads/avatars/{user_id}.jpg`). Mobile must prefix with API `baseUrl` before `Image.network` / audio playback. See [Media URLs](#media-urls-static-uploads) below.
+
 ---
 
 ### 25. `PATCH /v1/listeners/me`
@@ -753,8 +755,55 @@ Finalizes listener registration after all step saves. JSON body.
 |--|--|
 | **Auth** | Bearer |
 | **Screens** | Edit about / city / phone / experiences / comfort areas / boundaries / country / languages |
-| **Body** | Partial fields from #24 (except computed rating/counts) |
+| **Content-Type** | `application/json` only |
+| **Body** | Partial JSON fields from #24 (except computed `rating` / `review_count` / `session_count`). **Do not** send multipart here. |
 | **Response** | Updated profile (#24) |
+
+#### Allowed JSON fields
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `about_me` | string \| null | Bio text |
+| `phone` | string | E.164 |
+| `phone_country` | string | ISO-3166 alpha-2 (e.g. `JO`) |
+| `country` | string \| null | Display country name |
+| `country_iso` | string | ISO-3166 alpha-2 |
+| `city` | string | Max 30 chars |
+| `language_ids` | string[] | Replaces spoken languages |
+| `life_experiences` | string[] | Experience / relationship tag ids |
+| `comfort_areas` | string[] | Comfort area ids |
+| `boundaries` | string[] | Boundary ids |
+
+> **Avatar is not on this endpoint.** Use **#25b** `POST /v1/listeners/me/avatar` for photo upload (same pattern as **#26** voice intro).
+
+---
+
+### 25b. `POST /v1/listeners/me/avatar`
+
+| | |
+|--|--|
+| **Auth** | Bearer (listener) |
+| **Screen** | Listener profile tab — edit photo on header |
+| **Content-Type** | `multipart/form-data` |
+| **Body** | `avatar` (file) — `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`; max 5 MB |
+| **Response** | Updated profile (#24) — includes new `avatar_url` |
+
+#### Backend implementation reference
+
+Mirror **#26** voice intro, but for images:
+
+1. Accept `avatar: UploadFile = File(...)` on `POST /v1/listeners/me/avatar`.
+2. Save under `uploads/avatars/` with filename `{listener_user_id}{suffix}`.
+3. Store relative URL on profile, e.g. `/static/uploads/avatars/{user_id}.jpg`.
+4. Return full `ListenerProfileResponse` wrapped in `{ status, data }`.
+
+> **Do not** accept avatar multipart on `PATCH /v1/listeners/me` — that route is JSON-only (FastAPI `ListenerProfileUpdate` body).
+
+#### Mobile implementation reference
+
+- Repository: `POST v1/listeners/me/avatar` with `FormData` field `avatar`.
+- Usecase: `UpdateListenerAvatarUsecase` → refresh profile via `GET /v1/listeners/me`.
+- Resolve `avatar_url` with `resolveApiAssetUrl(url, baseUrl: appConfig.baseUrl)` in `listenerProfileFromApi()`.
 
 ---
 
@@ -764,8 +813,11 @@ Finalizes listener registration after all step saves. JSON body.
 |--|--|
 | **Auth** | Bearer |
 | **Screen** | Edit voice intro sheet |
-| **Body** | multipart `audio` (m4a/aac) |
+| **Content-Type** | `multipart/form-data` |
+| **Body** | `audio` (file, m4a/aac/mp3/wav/caf); optional `duration_seconds` (int) |
 | **Response** | `{ voice_intro_url, voice_intro_seconds }` |
+
+**Media URL note:** `voice_intro_url` is relative like avatar; mobile prefixes with `baseUrl` before playback.
 
 ---
 
@@ -1937,14 +1989,34 @@ Empty → `200` + `items: []`. Do **not** 404.
 
 ---
 
+## Media URLs (static uploads)
+
+Uploaded listener media (`avatar_url`, `voice_intro_url`, registration identity docs, etc.) is stored on disk and exposed as **relative** paths:
+
+```
+/static/uploads/avatars/{user_id}.jpg
+/static/uploads/voice/{user_id}.m4a
+```
+
+| Client | Rule |
+|--------|------|
+| **Mobile** | Prefix with `AppConfig.baseUrl` when the value does not start with `http://` or `https://`. Helper: `lib/utils/api_asset_url.dart` → `resolveApiAssetUrl()`. Applied in `listenerProfileFromApi()` for `avatar_url` and `voice_intro_url`. |
+| **Backend** | Continue returning relative paths in API JSON; static files are served from the app host under `/static/...`. |
+| **Portal / admin** | Same prefix rule if rendering uploads in the browser. |
+
+Catalog CDN assets (`flag_url`, category `icon_url`) are **absolute HTTPS** URLs — no prefix needed.
+
+---
+
 ## Efficiency guidelines (for implementers)
 
-1. **Prefer aggregates** — `#11` ventor home and `#30` listener dashboard load one screen in one round-trip.
-2. **Prefer `PATCH` partial updates** — listener/ventor profile edits should not require full object.
-3. **One discovery list** — `#40` carries filters; avoid separate endpoints per filter chip.
-4. **Multipart only when needed** — avatar, ID docs, voice intro, registration photo.
-5. **Pagination** — lists (`sessions`, `listeners`, `reviews`, `notifications`, `payouts`) should support `page` + `page_size`.
-6. **Idempotent writes** — accept/decline/redeem/cancel should be safe to retry (`409` / clear status when already handled).
+1. **Prefer aggregates** — `#11` ventor home and `#32` listener dashboard load one screen in one round-trip.
+2. **Prefer `PATCH` partial updates** — listener/ventor profile text fields via JSON `#25` / `#10`; do not re-send the whole profile for one field.
+3. **Dedicated multipart routes for binaries** — listener avatar → `#25b`; listener voice → `#26`; ventor avatar → `#10` (multipart). Never JSON-encode file bytes.
+4. **One discovery list** — `#40` carries filters; avoid separate endpoints per filter chip.
+5. **Multipart only when needed** — avatar, ID docs, voice intro, registration photo.
+6. **Pagination** — lists (`sessions`, `listeners`, `reviews`, `notifications`, `payouts`) should support `page` + `page_size`.
+7. **Idempotent writes** — accept/decline/redeem/cancel should be safe to retry (`409` / clear status when already handled).
 
 ---
 
@@ -1985,7 +2057,7 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 |----------|------:|
 | Auth & account | 8 |
 | Ventor profile / home / wellness | 14 |
-| Listener profile / onboarding / dashboard | 15 |
+| Listener profile / onboarding / dashboard | 16 |
 | Listener availability | 3 |
 | Discovery & sessions | 13 |
 | Call feedback & reports | 3 |
@@ -1995,7 +2067,7 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | Training | 2 |
 | Promo | 1 |
 | Catalog / categories | 4 |
-| **Total unique API endpoints** | **81** |
+| **Total unique API endpoints** | **82** |
 
 ### Master checklist (method + path)
 
@@ -2043,6 +2115,7 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | 23 | POST | `/v1/listeners/me/identity-verification` |
 | 24 | GET | `/v1/listeners/me` |
 | 25 | PATCH | `/v1/listeners/me` |
+| 25b | POST | `/v1/listeners/me/avatar` |
 | 26 | POST | `/v1/listeners/me/voice-intro` |
 | 27 | GET | `/v1/listeners/me/reviews` |
 | 28 | GET | `/v1/listeners/{listenerId}` |

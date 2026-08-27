@@ -878,11 +878,6 @@ def update_listener_profile(
     payload: ListenerProfileUpdate,
 ) -> ListenerProfileResponse:
     data = payload.model_dump(exclude_unset=True)
-    if "full_name" in data and data["full_name"] is not None:
-        name = data["full_name"].strip()
-        if not name:
-            raise validation_error("full_name cannot be empty", ar="الاسم لا يمكن أن يكون فارغًا")
-        profile.full_name = name
     if "phone" in data:
         profile.phone_e164 = data["phone"]
     if "phone_country" in data:
@@ -891,8 +886,6 @@ def update_listener_profile(
         )
     if "about_me" in data:
         profile.about_me = data["about_me"]
-    if "bio" in data:
-        profile.bio = data["bio"]
     if "country" in data:
         profile.country = data["country"]
     if "country_iso" in data:
@@ -941,6 +934,29 @@ async def upload_voice_intro(
         voice_intro_url=profile.voice_intro_url or url,
         voice_intro_seconds=profile.voice_intro_seconds,
     )
+
+
+async def upload_avatar(
+    db: Session,
+    user: User,
+    profile: ListenerProfile,
+    *,
+    settings: Settings,
+    avatar: UploadFile,
+) -> ListenerProfileResponse:
+    if avatar.filename is None:
+        raise validation_error("avatar is required", ar="صورة الملف الشخصي مطلوبة")
+    url = await _save_upload(
+        avatar,
+        dest_dir=_static_url(settings, "uploads", "avatars"),
+        filename=str(profile.user_id),
+        allowed=IMAGE_SUFFIXES,
+        max_bytes=5 * 1024 * 1024,
+    )
+    profile.avatar_url = url
+    db.commit()
+    db.refresh(profile)
+    return _profile_response(db, user, profile)
 
 
 def list_reviews(

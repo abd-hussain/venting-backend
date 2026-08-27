@@ -203,11 +203,9 @@ class ListenerProfileResponse(BaseModel):
 
 
 class ListenerProfileUpdate(BaseModel):
-    full_name: str | None = Field(default=None, max_length=120)
     phone: str | None = None
     phone_country: str | None = Field(default=None, max_length=2)
     about_me: str | None = None
-    bio: str | None = None
     country: str | None = None
     country_iso: str | None = Field(default=None, max_length=2)
     city: str | None = Field(default=None, max_length=30)

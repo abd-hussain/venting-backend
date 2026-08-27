@@ -73,6 +73,7 @@ from app.api.v1.listeners.service import (
     update_listener_profile,
     update_notification_preferences,
     update_privacy,
+    upload_avatar,
     upload_voice_intro,
 )
 from app.core.errors import validation_error
@@ -413,6 +414,33 @@ def patch_me(
     db: DbSession,
 ):
     data = update_listener_profile(db, current_user, profile, body)
+    return success_response(data.model_dump(mode="json"))
+
+
+@router.post(
+    "/me/avatar",
+    response_model=APISuccessResponse[ListenerProfileResponse],
+    responses={
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        422: {"model": APIErrorResponse},
+    },
+    summary="Upload listener avatar (#25b)",
+)
+async def avatar_upload(
+    current_user: CurrentUser,
+    profile: CurrentListenerProfile,
+    db: DbSession,
+    settings: SettingsDep,
+    avatar: UploadFile = File(...),
+):
+    data = await upload_avatar(
+        db,
+        current_user,
+        profile,
+        settings=settings,
+        avatar=avatar,
+    )
     return success_response(data.model_dump(mode="json"))
 
 
