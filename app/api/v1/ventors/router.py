@@ -23,6 +23,7 @@ from app.api.v1.ventors.schemas import (
     OkResponse,
     PrivacySettings,
     VentorProfileResponse,
+    VentorProfileUpdate,
     VentorRegisterCompleteRequest,
     VentorRegisterInterestsRequest,
     VentorRegisterLanguagesRequest,
@@ -219,14 +220,31 @@ def me(
     summary="Update ventor profile",
 )
 async def patch_me(
+    request: Request,
     current_user: CurrentUser,
     profile: CurrentVentorProfile,
     db: DbSession,
     settings: SettingsDep,
-    nickname: str | None = Form(None),
-    quote: str | None = Form(None),
-    avatar: UploadFile | None = File(None),
 ):
+    content_type = request.headers.get("content-type", "")
+    nickname: str | None = None
+    quote: str | None = None
+    avatar: UploadFile | None = None
+
+    if "application/json" in content_type:
+        payload = VentorProfileUpdate.model_validate(await request.json())
+        nickname = payload.nickname
+        quote = payload.quote
+    else:
+        form = await request.form()
+        raw_nickname = form.get("nickname")
+        raw_quote = form.get("quote")
+        nickname = str(raw_nickname) if raw_nickname is not None else None
+        quote = str(raw_quote) if raw_quote is not None else None
+        avatar_field = form.get("avatar")
+        if isinstance(avatar_field, UploadFile):
+            avatar = avatar_field
+
     data = await update_ventor_profile(
         db,
         current_user,

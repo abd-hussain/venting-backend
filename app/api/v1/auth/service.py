@@ -470,12 +470,12 @@ def login_user(
     )
     if (
         user is None
-        or not user.is_active
         or user.role.value != payload.role.value
         or user.password_hash is None
         or not verify_password(payload.password, user.password_hash)
     ):
         raise invalid_credentials()
+    _assert_user_can_authenticate(user)
 
     user.last_login_at = datetime.now(timezone.utc)
     access_token, refresh_token = _issue_tokens(db, user, settings)

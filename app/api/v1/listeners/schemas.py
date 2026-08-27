@@ -1,9 +1,9 @@
 """Listener request/response schemas (Pydantic)."""
 
 from enum import Enum
-from typing import Any
+from typing import Any, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ProfileStatusOut(str, Enum):
@@ -147,10 +147,23 @@ class ListenerRegisterAboutRequest(BaseModel):
 
 
 class ListenerRegisterExperiencesRequest(BaseModel):
-    life_experience_ids: list[str] = Field(min_length=1)
+    life_experience_ids: list[str] = Field(default_factory=list)
     relationship_status: str | None = None
     family_role_ids: list[str] = Field(default_factory=list)
     custom_experiences: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def require_some_experience(self) -> Self:
+        has_catalog = bool(self.life_experience_ids)
+        has_relationship = bool((self.relationship_status or "").strip())
+        has_family = bool(self.family_role_ids)
+        has_custom = any(label.strip() for label in self.custom_experiences)
+        if not (has_catalog or has_relationship or has_family or has_custom):
+            raise ValueError(
+                "At least one of life_experience_ids, relationship_status, "
+                "family_role_ids, or custom_experiences is required"
+            )
+        return self
 
 
 class ListenerRegisterComfortAreasRequest(BaseModel):

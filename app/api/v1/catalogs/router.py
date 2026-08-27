@@ -27,9 +27,11 @@ router = APIRouter(prefix="/catalog", tags=["catalogs"])
 )
 def categories_list(db: DbSession):
     items = list_categories(db)
-    return success_response(
+    response = success_response(
         CategoriesListResponse(items=items).model_dump(mode="json")
     )
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return response
 
 
 @router.get(
@@ -43,9 +45,11 @@ def languages_list(
     q: str | None = Query(default=None, description="Search name_en / name_native / name_ar"),
 ):
     items = list_languages(db, q=q)
-    return success_response(
+    response = success_response(
         LanguagesListResponse(items=items).model_dump(mode="json")
     )
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return response
 
 
 @router.get(

@@ -10,6 +10,7 @@ from app.api.deps import (
     CurrentListener,
     CurrentListenerProfile,
     CurrentUser,
+    CurrentVentor,
     DbSession,
     SettingsDep,
 )
@@ -662,7 +663,7 @@ def availability_day_put(
     summary="Discover / find listeners",
 )
 def listeners_list(
-    current_user: CurrentUser,
+    current_user: CurrentVentor,
     db: DbSession,
     q: str | None = Query(None),
     topic: str | None = Query(None),
@@ -989,7 +990,7 @@ def training_complete(
 )
 def public_listener(
     listener_id: UUID,
-    current_user: CurrentUser,
+    current_user: CurrentVentor,
     db: DbSession,
 ):
     data = get_public_listener(db, listener_id, viewer=current_user)

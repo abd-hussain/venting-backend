@@ -98,6 +98,11 @@ class VentorProfileResponse(BaseModel):
     interest_ids: list[str]
 
 
+class VentorProfileUpdate(BaseModel):
+    nickname: str | None = Field(default=None, max_length=20)
+    quote: str | None = Field(default=None, max_length=280)
+
+
 class OkResponse(BaseModel):
     ok: bool = True
 

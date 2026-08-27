@@ -1970,15 +1970,6 @@ Accept-Language: en
         "icon_url": null,
         "sort_order": 70,
         "allows_custom_text": false
-      },
-      {
-        "id": "other",
-        "name_en": "Other",
-        "name_ar": "أخرى",
-        "icon_emoji": "➕",
-        "icon_url": null,
-        "sort_order": 1000,
-        "allows_custom_text": true
       }
     ]
   }
@@ -1987,16 +1978,15 @@ Accept-Language: en
 
 #### Seed notes
 
-| `id` | `icon_emoji` | `allows_custom_text` |
-|------|--------------|----------------------|
-| `suicide_self_harm` | 🛡️ | `false` |
-| `domestic_violence` | 🏠 | `false` |
-| `sexual_topics` | 👁️ | `false` |
-| `addiction` | 💊 | `false` |
-| `politics` | 🏛️ | `false` |
-| `religion` | 📖 | `false` |
-| `illegal_activities` | 🚫 | `false` |
-| `other` | ➕ | `true` |
+| `id` | `icon_emoji` |
+|------|--------------|
+| `suicide_self_harm` | 🛡️ |
+| `domestic_violence` | 🏠 |
+| `sexual_topics` | 👁️ |
+| `addiction` | 💊 |
+| `politics` | 🏛️ |
+| `religion` | 📖 |
+| `illegal_activities` | 🚫 |
 
 Mobile must **not** hardcode boundary labels or icons. Prefer `icon_url` when set; otherwise show `icon_emoji`.
 

@@ -44,8 +44,11 @@ from app.api.v1.listeners.schemas import (
     TutorialAckRequest,
     VoiceIntroResponse,
 )
+from fastapi import status
+
 from app.core.config import Settings
 from app.core.errors import conflict, forbidden, not_found, validation_error
+from app.core.exceptions import MainAPIException
 from app.models.auth import User
 from app.models.availability import ListenerAvailabilitySettings, ListenerAvailabilitySlot
 from app.models.earnings import ListenerWallet
@@ -337,6 +340,48 @@ def _boundary_custom_text(db: Session, listener_id: UUID) -> str | None:
         .first()
     )
     return row[0] if row else None
+
+
+def _display_label(value: str) -> str:
+    return value.replace("_", " ").strip().title()
+
+
+def _public_life_experience_labels(
+    db: Session, listener_id: UUID, profile: ListenerProfile
+) -> list[str]:
+    labels: list[str] = []
+    catalog_ids = _catalog_experience_ids(db, listener_id)
+    if catalog_ids:
+        rows = (
+            db.query(LifeExperience)
+            .filter(LifeExperience.id.in_(catalog_ids))
+            .all()
+        )
+        name_by_id = {row.id: row.name_en for row in rows}
+        labels.extend(
+            name_by_id.get(exp_id, _display_label(exp_id)) for exp_id in catalog_ids
+        )
+    labels.extend(_custom_experience_labels(db, listener_id))
+    if profile.relationship_status:
+        labels.append(_display_label(profile.relationship_status))
+    for role_id in profile.family_role_ids or []:
+        labels.append(_display_label(role_id))
+    return labels
+
+
+def _public_boundary_labels(db: Session, listener_id: UUID) -> list[str]:
+    rows = (
+        db.query(ListenerBoundary.boundary_id, Boundary.name_en)
+        .join(Boundary, Boundary.id == ListenerBoundary.boundary_id)
+        .filter(ListenerBoundary.listener_id == listener_id)
+        .order_by(ListenerBoundary.boundary_id)
+        .all()
+    )
+    labels = [name_en for _, name_en in rows]
+    custom_text = _boundary_custom_text(db, listener_id)
+    if custom_text:
+        labels.append(custom_text)
+    return labels
 
 
 def _validate_relationship_status(value: str | None) -> str | None:
@@ -1238,6 +1283,9 @@ def get_public_listener(
     profile = db.get(ListenerProfile, listener_id)
     if profile is None or profile.profile_status == ProfileStatus.incomplete:
         raise not_found("Listener")
+    if profile.profile_status != ProfileStatus.approved:
+        if viewer.role != UserRole.listener or viewer.id != listener_id:
+            raise not_found("Listener")
     if not _listener_is_discoverable(db, listener_id, viewer=viewer):
         raise not_found("Listener")
 
@@ -1280,8 +1328,8 @@ def get_public_listener(
         country=profile.country,
         city=profile.city,
         country_iso=profile.country_iso,
-        life_experiences=tags["experiences"],
-        boundaries=tags["boundaries"],
+        life_experiences=_public_life_experience_labels(db, listener_id, profile),
+        boundaries=_public_boundary_labels(db, listener_id),
         availability=get_availability_payload(db, listener_id),
         is_favorite=is_favorite,
     )
@@ -1416,18 +1464,29 @@ def update_privacy(
     profile: ListenerProfile,
     payload: ListenerPrivacySettings,
 ) -> ListenerPrivacySettings:
-    if not payload.visible_in_all_countries and not payload.visible_countries:
-        raise validation_error(
-            "visible_countries is required when visible_in_all_countries is false",
-            ar="يجب تحديد الدول عند تعطيل الظهور في جميع الدول",
+    if (
+        payload.profile_visible
+        and not payload.visible_in_all_countries
+        and not payload.visible_countries
+    ):
+        raise MainAPIException(
+            type="validation",
+            code=110,
+            message="visible_countries is required when visible_in_all_countries is false",
+            localized_message={
+                "en": "visible_countries is required when visible_in_all_countries is false",
+                "ar": "يجب تحديد الدول عند تعطيل الظهور في جميع الدول",
+            },
+            http_status=status.HTTP_400_BAD_REQUEST,
         )
 
     row = _privacy_row(db, profile.user_id)
     row.profile_visible = payload.profile_visible
-    row.show_online_status = payload.show_online_status
-    row.visible_in_all_countries = payload.visible_in_all_countries
-    row.visible_countries = payload.visible_countries or None
     row.allow_search_indexing = payload.allow_search_indexing
+    if payload.profile_visible:
+        row.show_online_status = payload.show_online_status
+        row.visible_in_all_countries = payload.visible_in_all_countries
+        row.visible_countries = payload.visible_countries or None
     db.commit()
     db.refresh(row)
     return get_privacy(db, profile)
