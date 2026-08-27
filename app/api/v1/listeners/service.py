@@ -722,6 +722,7 @@ def _profile_response(db: Session, user: User, profile: ListenerProfile) -> List
         is_online=profile.is_online,
         profile_status=ProfileStatusOut(profile.profile_status.value),
         rate_per_minute=float(profile.rate_per_minute or 0),
+        rating_breakdown=profile.rating_breakdown,
     )
 
 

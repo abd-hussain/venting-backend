@@ -743,7 +743,7 @@ Finalizes listener registration after all step saves. JSON body.
 |--|--|
 | **Auth** | Bearer (listener) |
 | **Screen** | Listener profile tab + settings |
-| **Response** | `{ id, full_name, email, phone, phone_country, avatar_url, about_me, country, country_iso, city, language_ids, life_experiences, comfort_areas, boundaries, voice_intro_url, voice_intro_seconds, rating, review_count, session_count, is_online, profile_status, rate_per_minute }` |
+| **Response** | `{ id, full_name, email, phone, phone_country, avatar_url, about_me, country, country_iso, city, language_ids, life_experiences, comfort_areas, boundaries, voice_intro_url, voice_intro_seconds, rating, review_count, session_count, is_online, profile_status, rate_per_minute, rating_breakdown? }` |
 
 **`life_experiences` shape (GET):** object (preferred) or array:
 
@@ -797,7 +797,7 @@ Legacy array form is still accepted (`["job_loss", "widowed", …]` or `[{ "id":
 > **Experiences PATCH:** Same split as registration step **experiences** (`#22`):
 > - `life_experience_ids` — ids from `#76 GET /v1/catalog/life-experiences` only
 > - `relationship_status` + `family_role_ids` — client-local enums (see `#76` rules); **do not** put these in `life_experience_ids`
-> - `custom_experiences` — user-typed labels; API assigns `custom_*` slugs server-side. Send `[]` to remove all custom rows without changing catalog ids.
+> - `custom_experiences` — user-typed labels; API assigns `custom_*` slugs server-side
 >
 > Backend must **replace** all experience rows for the listener (delete then insert). Do **not** accept `custom_*` slugs from the client.
 

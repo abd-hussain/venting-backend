@@ -236,6 +236,7 @@ class ListenerProfileResponse(BaseModel):
     is_online: bool
     profile_status: ProfileStatusOut
     rate_per_minute: float
+    rating_breakdown: dict[str, Any] | None = None
 
 
 class ListenerProfileUpdate(BaseModel):
