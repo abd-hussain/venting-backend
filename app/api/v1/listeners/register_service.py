@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import re
-
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
@@ -35,6 +33,7 @@ from app.api.v1.listeners.service import (
     _apply_availability,
     _load_tag_ids,
     _parse_date,
+    _replace_listener_experiences,
     _replace_tags,
     _require_text,
     _save_upload,
@@ -47,7 +46,7 @@ from app.core.errors import conflict, forbidden, validation_error
 from app.models.auth import User
 from app.models.earnings import ListenerWallet
 from app.models.enums import ProfileStatus, SetupStepStatus, UserRole
-from app.models.lookups import LifeExperience, ListenerComfortArea, ListenerLifeExperience
+from app.models.lookups import ListenerComfortArea, ListenerLifeExperience
 from app.models.profiles import ListenerIdentityVerification, ListenerProfile
 from app.models.settings import (
     ListenerNotificationPreferences as ListenerNotificationPreferencesRow,
@@ -372,32 +371,12 @@ def save_register_experiences_step(
 
     life_experience_ids = payload.life_experience_ids
     custom_experiences = [label.strip() for label in payload.custom_experiences if label.strip()]
-    _replace_tags(db, listener_id=user.id, life_experience_ids=life_experience_ids)
-
-    db.query(ListenerLifeExperience).filter(
-        ListenerLifeExperience.listener_id == user.id,
-        ListenerLifeExperience.custom_label.isnot(None),
-    ).delete(synchronize_session=False)
-    for index, label in enumerate(custom_experiences):
-        slug = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")[:40] or "custom"
-        exp_id = f"custom_{user.id.hex[:8]}_{index}_{slug}"[:64]
-        if db.get(LifeExperience, exp_id) is None:
-            db.add(
-                LifeExperience(
-                    id=exp_id,
-                    name_en=label[:120],
-                    name_ar=label[:120],
-                    is_active=True,
-                )
-            )
-            db.flush()
-        db.add(
-            ListenerLifeExperience(
-                listener_id=user.id,
-                life_experience_id=exp_id,
-                custom_label=label[:120],
-            )
-        )
+    _replace_listener_experiences(
+        db,
+        user.id,
+        life_experience_ids=life_experience_ids,
+        custom_experiences=custom_experiences,
+    )
 
     mark_step_done(user, "experiences", LISTENER_REGISTER_STEPS)
     db.commit()

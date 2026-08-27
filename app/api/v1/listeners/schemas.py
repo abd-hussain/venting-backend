@@ -210,7 +210,8 @@ class ListenerProfileUpdate(BaseModel):
     country_iso: str | None = Field(default=None, max_length=2)
     city: str | None = Field(default=None, max_length=30)
     language_ids: list[str] | None = None
-    life_experiences: list[str] | None = None
+    life_experience_ids: list[str] | None = None
+    custom_experiences: list[str] | None = None
     comfort_areas: list[str] | None = None
     boundaries: list[str] | None = None
 

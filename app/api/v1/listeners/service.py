@@ -280,6 +280,82 @@ def _ensure_life_experience_ids(db: Session, ids: list[str]) -> None:
         db.flush()
 
 
+def _catalog_experience_ids(db: Session, listener_id: UUID) -> list[str]:
+    rows = (
+        db.query(ListenerLifeExperience.life_experience_id)
+        .filter(
+            ListenerLifeExperience.listener_id == listener_id,
+            ListenerLifeExperience.custom_label.is_(None),
+        )
+        .order_by(ListenerLifeExperience.life_experience_id)
+        .all()
+    )
+    return [row[0] for row in rows]
+
+
+def _custom_experience_labels(db: Session, listener_id: UUID) -> list[str]:
+    rows = (
+        db.query(ListenerLifeExperience.custom_label)
+        .filter(
+            ListenerLifeExperience.listener_id == listener_id,
+            ListenerLifeExperience.custom_label.isnot(None),
+        )
+        .order_by(ListenerLifeExperience.life_experience_id)
+        .all()
+    )
+    return [row[0] for row in rows if row[0]]
+
+
+def _replace_listener_experiences(
+    db: Session,
+    listener_id: UUID,
+    *,
+    life_experience_ids: list[str],
+    custom_experiences: list[str],
+) -> None:
+    if any(exp_id.startswith("custom_") for exp_id in life_experience_ids):
+        raise validation_error(
+            "Send custom experience labels in custom_experiences, not as life_experience_ids",
+            ar="أرسل التجارب المخصصة في custom_experiences وليس كمعرفات",
+        )
+    if life_experience_ids:
+        _validate_ids(db, LifeExperience, life_experience_ids, field="life_experience_ids")
+    _ensure_life_experience_ids(db, life_experience_ids)
+
+    db.query(ListenerLifeExperience).filter(
+        ListenerLifeExperience.listener_id == listener_id
+    ).delete(synchronize_session=False)
+
+    for exp_id in life_experience_ids:
+        db.add(
+            ListenerLifeExperience(listener_id=listener_id, life_experience_id=exp_id)
+        )
+
+    for index, label in enumerate(custom_experiences):
+        text = label.strip()
+        if not text:
+            continue
+        slug = re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")[:40] or "custom"
+        exp_id = f"custom_{listener_id.hex[:8]}_{index}_{slug}"[:64]
+        if db.get(LifeExperience, exp_id) is None:
+            db.add(
+                LifeExperience(
+                    id=exp_id,
+                    name_en=text[:120],
+                    name_ar=text[:120],
+                    is_active=True,
+                )
+            )
+            db.flush()
+        db.add(
+            ListenerLifeExperience(
+                listener_id=listener_id,
+                life_experience_id=exp_id,
+                custom_label=text[:120],
+            )
+        )
+
+
 def _replace_tags(
     db: Session,
     *,
@@ -318,15 +394,12 @@ def _replace_tags(
                 )
             )
     if life_experience_ids is not None:
-        _ensure_life_experience_ids(db, life_experience_ids)
-        db.query(ListenerLifeExperience).filter(
-            ListenerLifeExperience.listener_id == listener_id,
-            ListenerLifeExperience.custom_label.is_(None),
-        ).delete(synchronize_session=False)
-        for exp_id in life_experience_ids:
-            db.add(
-                ListenerLifeExperience(listener_id=listener_id, life_experience_id=exp_id)
-            )
+        _replace_listener_experiences(
+            db,
+            listener_id,
+            life_experience_ids=life_experience_ids,
+            custom_experiences=[],
+        )
     if boundary_ids is not None:
         boundary_rows = _validate_custom_text_ids(
             db,
@@ -895,11 +968,28 @@ def update_listener_profile(
     if "city" in data:
         profile.city = data["city"]
 
+    if "life_experience_ids" in data or "custom_experiences" in data:
+        catalog_ids = (
+            data["life_experience_ids"]
+            if "life_experience_ids" in data
+            else _catalog_experience_ids(db, profile.user_id)
+        )
+        custom_labels = (
+            data["custom_experiences"]
+            if "custom_experiences" in data
+            else _custom_experience_labels(db, profile.user_id)
+        )
+        _replace_listener_experiences(
+            db,
+            profile.user_id,
+            life_experience_ids=catalog_ids,
+            custom_experiences=custom_labels,
+        )
+
     _replace_tags(
         db,
         listener_id=profile.user_id,
         language_ids=data.get("language_ids"),
-        life_experience_ids=data.get("life_experiences"),
         comfort_area_ids=data.get("comfort_areas"),
         boundary_ids=data.get("boundaries"),
     )
