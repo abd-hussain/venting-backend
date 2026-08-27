@@ -167,6 +167,7 @@ def seed_catalogs(db: Session) -> None:
             {"id": "politics", "name_en": "Politics", "name_ar": "السياسة", "icon_emoji": "🏛️", "icon_url": None, "sort_order": 50, "allows_custom_text": False, "is_active": True},
             {"id": "religion", "name_en": "Religion", "name_ar": "الدين", "icon_emoji": "📖", "icon_url": None, "sort_order": 60, "allows_custom_text": False, "is_active": True},
             {"id": "illegal_activities", "name_en": "Illegal activities", "name_ar": "أنشطة غير قانونية", "icon_emoji": "🚫", "icon_url": None, "sort_order": 70, "allows_custom_text": False, "is_active": True},
+            {"id": "other", "name_en": "Other", "name_ar": "أخرى", "icon_emoji": "➕", "icon_url": None, "sort_order": 1000, "allows_custom_text": True, "is_active": True},
         ],
     )
 
