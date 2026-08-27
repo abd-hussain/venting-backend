@@ -80,6 +80,12 @@ from app.services.push_tokens import upsert_push_token
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 AUDIO_SUFFIXES = {".m4a", ".aac", ".mp3", ".wav", ".caf"}
 
+RELATIONSHIP_STATUSES = frozenset(
+    {"single", "in_relationship", "married", "divorced", "widowed"}
+)
+FAMILY_ROLE_IDS = frozenset({"parent", "single_parent", "caregiver"})
+CLIENT_LOCAL_EXPERIENCE_IDS = RELATIONSHIP_STATUSES | FAMILY_ROLE_IDS
+
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -306,6 +312,38 @@ def _custom_experience_labels(db: Session, listener_id: UUID) -> list[str]:
     return [row[0] for row in rows if row[0]]
 
 
+def _validate_relationship_status(value: str | None) -> str | None:
+    if value is None:
+        return None
+    status = value.strip()
+    if not status:
+        return None
+    if status not in RELATIONSHIP_STATUSES:
+        raise validation_error(
+            "relationship_status must be one of: "
+            + ", ".join(sorted(RELATIONSHIP_STATUSES)),
+            ar="حالة العلاقة غير صالحة",
+        )
+    return status
+
+
+def _validate_family_role_ids(ids: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for role_id in ids:
+        if role_id in seen:
+            continue
+        if role_id not in FAMILY_ROLE_IDS:
+            raise validation_error(
+                "family_role_ids must be one of: "
+                + ", ".join(sorted(FAMILY_ROLE_IDS)),
+                ar="دور العائلة غير صالح",
+            )
+        seen.add(role_id)
+        result.append(role_id)
+    return result
+
+
 def _replace_listener_experiences(
     db: Session,
     listener_id: UUID,
@@ -317,6 +355,13 @@ def _replace_listener_experiences(
         raise validation_error(
             "Send custom experience labels in custom_experiences, not as life_experience_ids",
             ar="أرسل التجارب المخصصة في custom_experiences وليس كمعرفات",
+        )
+    client_local = [exp_id for exp_id in life_experience_ids if exp_id in CLIENT_LOCAL_EXPERIENCE_IDS]
+    if client_local:
+        raise validation_error(
+            "relationship_status and family_role_ids are separate fields; "
+            "do not include them in life_experience_ids",
+            ar="أرسل حالة العلاقة وأدوار العائلة في حقولها المنفصلة",
         )
     if life_experience_ids:
         _validate_ids(db, LifeExperience, life_experience_ids, field="life_experience_ids")
@@ -583,7 +628,10 @@ def _profile_response(db: Session, user: User, profile: ListenerProfile) -> List
         country_iso=profile.country_iso,
         city=profile.city,
         language_ids=tags["languages"],
-        life_experiences=tags["experiences"],
+        life_experiences=_catalog_experience_ids(db, profile.user_id),
+        relationship_status=profile.relationship_status,
+        family_role_ids=list(profile.family_role_ids or []),
+        custom_experiences=_custom_experience_labels(db, profile.user_id),
         comfort_areas=tags["comfort"],
         boundaries=tags["boundaries"],
         voice_intro_url=profile.voice_intro_url,
@@ -968,7 +1016,19 @@ def update_listener_profile(
     if "city" in data:
         profile.city = data["city"]
 
-    if "life_experience_ids" in data or "custom_experiences" in data:
+    if "relationship_status" in data:
+        profile.relationship_status = _validate_relationship_status(
+            data["relationship_status"]
+        )
+    if "family_role_ids" in data:
+        profile.family_role_ids = _validate_family_role_ids(data["family_role_ids"])
+
+    if (
+        "life_experience_ids" in data
+        or "custom_experiences" in data
+        or "relationship_status" in data
+        or "family_role_ids" in data
+    ):
         catalog_ids = (
             data["life_experience_ids"]
             if "life_experience_ids" in data

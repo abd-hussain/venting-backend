@@ -82,6 +82,8 @@ class ListenerProfile(Base, TimestampMixin):
     city = Column(String(30), nullable=True)
     gender = Column(Enum(Gender, name="gender", create_type=False), nullable=True)
     bio = Column(Text, nullable=True)
+    relationship_status = Column(String(32), nullable=True)
+    family_role_ids = Column(JSONB, nullable=False, server_default="[]")
     voice_intro_url = Column(Text, nullable=True)
     voice_intro_seconds = Column(Integer, nullable=True)
     is_online = Column(Boolean, nullable=False, server_default="false")

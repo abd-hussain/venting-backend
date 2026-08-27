@@ -31,6 +31,8 @@ from app.api.v1.listeners.service import (
     AUDIO_SUFFIXES,
     IMAGE_SUFFIXES,
     _apply_availability,
+    _catalog_experience_ids,
+    _custom_experience_labels,
     _load_tag_ids,
     _parse_date,
     _replace_listener_experiences,
@@ -39,6 +41,8 @@ from app.api.v1.listeners.service import (
     _save_upload,
     _static_url,
     _utc_now,
+    _validate_family_role_ids,
+    _validate_relationship_status,
     get_availability_payload,
 )
 from app.core.config import Settings
@@ -46,7 +50,7 @@ from app.core.errors import conflict, forbidden, validation_error
 from app.models.auth import User
 from app.models.earnings import ListenerWallet
 from app.models.enums import ProfileStatus, SetupStepStatus, UserRole
-from app.models.lookups import ListenerComfortArea, ListenerLifeExperience
+from app.models.lookups import ListenerComfortArea
 from app.models.profiles import ListenerIdentityVerification, ListenerProfile
 from app.models.settings import (
     ListenerNotificationPreferences as ListenerNotificationPreferencesRow,
@@ -74,19 +78,6 @@ def _latest_identity(db: Session, listener_id) -> ListenerIdentityVerification |
         .order_by(ListenerIdentityVerification.created_at.desc())
         .first()
     )
-
-
-def _custom_experience_labels(db: Session, listener_id) -> list[str]:
-    rows = (
-        db.query(ListenerLifeExperience.custom_label)
-        .filter(
-            ListenerLifeExperience.listener_id == listener_id,
-            ListenerLifeExperience.custom_label.isnot(None),
-        )
-        .order_by(ListenerLifeExperience.life_experience_id)
-        .all()
-    )
-    return [row[0] for row in rows if row[0]]
 
 
 def _comfort_custom_text(db: Session, listener_id) -> str | None:
@@ -150,9 +141,10 @@ def get_register_progress(db: Session, user: User) -> ListenerRegisterProgressRe
                 language_ids=tags["languages"],
             )
         if "experiences" in done:
-            tags = _load_tag_ids(db, user.id)
             saved.experiences = ListenerSavedExperiences(
-                life_experience_ids=tags["experiences"],
+                life_experience_ids=_catalog_experience_ids(db, user.id),
+                relationship_status=profile.relationship_status,
+                family_role_ids=list(profile.family_role_ids or []),
                 custom_experiences=_custom_experience_labels(db, user.id),
             )
         if "comfort-areas" in done:
@@ -371,6 +363,8 @@ def save_register_experiences_step(
 
     life_experience_ids = payload.life_experience_ids
     custom_experiences = [label.strip() for label in payload.custom_experiences if label.strip()]
+    profile.relationship_status = _validate_relationship_status(payload.relationship_status)
+    profile.family_role_ids = _validate_family_role_ids(payload.family_role_ids)
     _replace_listener_experiences(
         db,
         user.id,

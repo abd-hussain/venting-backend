@@ -677,7 +677,7 @@ Each step `PATCH` returns the **same progress envelope** as `#22a`.
 | **profile** | `avatar` (file), `full_name`, `phone` (E.164), `phone_country` |
 | **identity** | `identity_document` (file), `selfie` (file) — **not** `document_front` / `document_back` |
 | **about** | `date_of_birth`, `country_iso`, `city`, `language_ids[]` |
-| **experiences** | `life_experience_ids[]`, optional `custom_experiences[]` |
+| **experiences** | `life_experience_ids[]` (catalog only, `#76`), `relationship_status` (client enum), `family_role_ids[]` (client enums), optional `custom_experiences[]` |
 | **comfort-areas** | `comfort_area_ids[]`, optional `custom_comfort_area_text` |
 | **boundaries** | `boundary_ids[]` (≥1), optional `custom_boundary_text` |
 | **voice-intro** | `voice_intro` (file), `voice_intro_seconds` |
@@ -770,12 +770,19 @@ Finalizes listener registration after all step saves. JSON body.
 | `country_iso` | string | ISO-3166 alpha-2 |
 | `city` | string | Max 30 chars |
 | `language_ids` | string[] | Replaces spoken languages |
-| `life_experience_ids` | string[] | Catalog experience / relationship tag ids only (same as `#22` experiences step) |
-| `custom_experiences` | string[] | Optional free-text experiences typed by the user (plain labels, **not** `custom_*` slugs) |
+| `life_experience_ids` | string[] | Catalog experience tag ids from `#76` only (`job_loss`, `grief_loss`, …) |
+| `relationship_status` | string \| null | Client enum: `single` \| `in_relationship` \| `married` \| `divorced` \| `widowed` |
+| `family_role_ids` | string[] | Client enums: `parent`, `single_parent`, `caregiver` |
+| `custom_experiences` | string[] | Optional free-text experiences (plain labels, **not** `custom_*` slugs) |
 | `comfort_areas` | string[] | Comfort area ids |
 | `boundaries` | string[] | Boundary ids |
 
-> **Experiences PATCH:** Use the same split as registration step **experiences** (`#22`): catalog ids in `life_experience_ids`, user-typed labels in `custom_experiences`. Do **not** send server-generated `custom_*` slugs in the request — the API creates those from labels. Backend must **replace** all `listener_life_experiences` rows for the listener (delete then insert), not append.
+> **Experiences PATCH:** Same split as registration step **experiences** (`#22`):
+> - `life_experience_ids` — ids from `#76 GET /v1/catalog/life-experiences` only
+> - `relationship_status` + `family_role_ids` — client-local enums (see `#76` rules); **do not** put these in `life_experience_ids`
+> - `custom_experiences` — user-typed labels; API assigns `custom_*` slugs server-side
+>
+> Backend must **replace** all experience rows for the listener (delete then insert). Do **not** accept `custom_*` slugs from the client.
 
 > **Avatar is not on this endpoint.** Use **#25b** `POST /v1/listeners/me/avatar` for photo upload (same pattern as **#26** voice intro).
 

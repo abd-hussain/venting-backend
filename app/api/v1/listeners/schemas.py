@@ -88,6 +88,8 @@ class ListenerSavedAbout(BaseModel):
 
 class ListenerSavedExperiences(BaseModel):
     life_experience_ids: list[str]
+    relationship_status: str | None = None
+    family_role_ids: list[str] = Field(default_factory=list)
     custom_experiences: list[str] = Field(default_factory=list)
 
 
@@ -146,6 +148,8 @@ class ListenerRegisterAboutRequest(BaseModel):
 
 class ListenerRegisterExperiencesRequest(BaseModel):
     life_experience_ids: list[str] = Field(min_length=1)
+    relationship_status: str | None = None
+    family_role_ids: list[str] = Field(default_factory=list)
     custom_experiences: list[str] = Field(default_factory=list)
 
 
@@ -190,6 +194,9 @@ class ListenerProfileResponse(BaseModel):
     city: str | None = None
     language_ids: list[str] = Field(default_factory=list)
     life_experiences: list[str] = Field(default_factory=list)
+    relationship_status: str | None = None
+    family_role_ids: list[str] = Field(default_factory=list)
+    custom_experiences: list[str] = Field(default_factory=list)
     comfort_areas: list[str] = Field(default_factory=list)
     boundaries: list[str] = Field(default_factory=list)
     voice_intro_url: str | None = None
@@ -211,6 +218,8 @@ class ListenerProfileUpdate(BaseModel):
     city: str | None = Field(default=None, max_length=30)
     language_ids: list[str] | None = None
     life_experience_ids: list[str] | None = None
+    relationship_status: str | None = None
+    family_role_ids: list[str] | None = None
     custom_experiences: list[str] | None = None
     comfort_areas: list[str] | None = None
     boundaries: list[str] | None = None
