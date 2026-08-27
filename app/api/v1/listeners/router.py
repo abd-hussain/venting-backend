@@ -704,7 +704,7 @@ def listeners_list(
     summary="Listener sessions list",
 )
 def listener_sessions(
-    current_user: CurrentUser,
+    current_user: CurrentListener,
     db: DbSession,
     filter: str = Query("upcoming"),
     page: int = Query(1, ge=1),
@@ -724,7 +724,7 @@ def listener_sessions(
     responses={401: {"model": APIErrorResponse}},
     summary="Listener session stats",
 )
-def listener_session_stats(current_user: CurrentUser, db: DbSession):
+def listener_session_stats(current_user: CurrentListener, db: DbSession):
     from app.api.v1.sessions.service import session_stats
 
     data = session_stats(db, current_user)
@@ -737,7 +737,7 @@ def listener_session_stats(current_user: CurrentUser, db: DbSession):
     responses={401: {"model": APIErrorResponse}},
     summary="Pending session requests",
 )
-def listener_session_requests(current_user: CurrentUser, db: DbSession):
+def listener_session_requests(current_user: CurrentListener, db: DbSession):
     from app.api.v1.sessions.service import list_session_requests
 
     data = list_session_requests(db, current_user)
@@ -752,7 +752,7 @@ def listener_session_requests(current_user: CurrentUser, db: DbSession):
 )
 def listener_accept_request(
     request_id: UUID,
-    current_user: CurrentUser,
+    current_user: CurrentListener,
     db: DbSession,
 ):
     from app.api.v1.sessions.service import accept_session_request
@@ -769,7 +769,7 @@ def listener_accept_request(
 )
 def listener_decline_request(
     request_id: UUID,
-    current_user: CurrentUser,
+    current_user: CurrentListener,
     db: DbSession,
     body: DeclineRequestBody | None = None,
 ):

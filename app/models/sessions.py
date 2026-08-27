@@ -140,6 +140,7 @@ class Session(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     call_channel_id = Column(String(128), nullable=True)
     cancelled_at = Column(DateTime(timezone=True), nullable=True)
     cancel_reason = Column(Text, nullable=True)
+    ended_by = Column(String(16), nullable=True)
 
     __table_args__ = (
         Index("ix_sessions_ventor_status_scheduled", "ventor_id", "status", "scheduled_at"),

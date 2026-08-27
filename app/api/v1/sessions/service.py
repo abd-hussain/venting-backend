@@ -42,8 +42,10 @@ from app.core.config import Settings
 from app.core.errors import conflict, forbidden, not_found, offer_expired, validation_error
 from app.core.pagination import clamp_page
 from app.models.auth import User
+from app.models.availability import ListenerAvailabilitySlot
 from app.models.enums import (
     CallMode,
+    DayOfWeek,
     PaymentStatus,
     ReportReason,
     ReportedRole,
@@ -100,6 +102,51 @@ def _payment_for(db: Session, session_id: UUID) -> SessionPayment | None:
         .filter(SessionPayment.session_id == session_id)
         .one_or_none()
     )
+
+
+_WEEKDAY_TO_DAY: dict[int, DayOfWeek] = {
+    0: DayOfWeek.mon,
+    1: DayOfWeek.tue,
+    2: DayOfWeek.wed,
+    3: DayOfWeek.thu,
+    4: DayOfWeek.fri,
+    5: DayOfWeek.sat,
+    6: DayOfWeek.sun,
+}
+
+
+def _resolve_nearest_slot(db: Session, listener_id: UUID) -> datetime | None:
+    slots = (
+        db.query(ListenerAvailabilitySlot)
+        .filter(ListenerAvailabilitySlot.listener_id == listener_id)
+        .all()
+    )
+    if not slots:
+        return None
+    slots_by_day: dict[DayOfWeek, list[ListenerAvailabilitySlot]] = {}
+    for slot in slots:
+        slots_by_day.setdefault(slot.day, []).append(slot)
+
+    now = _utc_now()
+    for offset in range(8):
+        day_date = now.date() + timedelta(days=offset)
+        day_enum = _WEEKDAY_TO_DAY[day_date.weekday()]
+        for slot in sorted(slots_by_day.get(day_enum, []), key=lambda row: row.start_time):
+            candidate = datetime.combine(day_date, slot.start_time, tzinfo=timezone.utc)
+            if candidate > now:
+                return candidate
+    return None
+
+
+def _ventor_avg_rating(db: Session, ventor_id: UUID) -> float | None:
+    value = (
+        db.query(func.avg(SessionListenerFeedback.stars))
+        .filter(SessionListenerFeedback.ventor_id == ventor_id)
+        .scalar()
+    )
+    if value is None:
+        return None
+    return round(float(value), 1)
 
 
 def _booked_session(
@@ -225,6 +272,13 @@ def book_session(
     scheduled_at = _parse_scheduled_at(payload.scheduled_at)
     if payload.time_mode == SessionTimeMode.scheduled and scheduled_at is None:
         raise validation_error("scheduled_at is required for scheduled sessions")
+    if payload.time_mode == SessionTimeMode.nearest:
+        scheduled_at = _resolve_nearest_slot(db, listener_id)
+        if scheduled_at is None:
+            raise validation_error(
+                "No availability found for nearest booking",
+                ar="لا يوجد موعد متاح للحجز الأقرب",
+            )
 
     promo = None
     if payload.promo_code:
@@ -255,11 +309,11 @@ def book_session(
         offer=offer,
     )
 
-    is_instant = payload.time_mode.value == "instant"
+    is_instant = payload.time_mode == SessionTimeMode.instant
     request = SessionRequest(
         ventor_id=ventor.id,
         listener_id=listener_id,
-        status=SessionRequestStatus.accepted,
+        status=SessionRequestStatus.pending if is_instant else SessionRequestStatus.accepted,
         duration_minutes=payload.duration_minutes,
         time_mode=SessionTimeMode(payload.time_mode.value),
         scheduled_at=scheduled_at or (_utc_now() if is_instant else None),
@@ -274,19 +328,42 @@ def book_session(
     db.add(request)
     db.flush()
 
+    if is_instant:
+        db.commit()
+        db.refresh(request)
+        return VentorBookedSession(
+            id=str(request.id),
+            listener_id=str(listener_id),
+            listener_name=listener.full_name,
+            listener_avatar_url=listener.avatar_url,
+            duration_minutes=payload.duration_minutes,
+            status="pending",
+            call_mode=payload.call_mode.value,
+            speech_language=payload.speech_language,
+            amount_paid=float(amount),
+            voice_change_enabled=payload.voice_change_enabled,
+            scheduled_at=_iso(request.scheduled_at),
+            is_instant=True,
+            payment=PaymentInfo(
+                amount_paid=float(amount),
+                voice_change_fee=float(voice_fee),
+                discount_amount=float(discount),
+            ),
+        )
+
     session = VentingSession(
         request_id=request.id,
         ventor_id=ventor.id,
         listener_id=listener_id,
-        status=SessionStatus.live if is_instant else SessionStatus.upcoming,
+        status=SessionStatus.upcoming,
         duration_minutes=payload.duration_minutes,
         time_mode=SessionTimeMode(payload.time_mode.value),
         scheduled_at=scheduled_at or _utc_now(),
-        started_at=_utc_now() if is_instant else None,
+        started_at=None,
         call_mode=CallMode(payload.call_mode.value),
         speech_language=payload.speech_language,
         voice_change_enabled=payload.voice_change_enabled,
-        is_instant=is_instant,
+        is_instant=payload.time_mode == SessionTimeMode.instant,
         call_channel_id=f"venting-{secrets.token_hex(8)}",
     )
     db.add(session)
@@ -449,7 +526,7 @@ def list_listener_sessions(
                 can_join_now=can_join and session.status != SessionStatus.cancelled,
                 is_instant=session.is_instant,
                 is_video_call=session.call_mode == CallMode.video,
-                ventor_rating=None,
+                ventor_rating=_ventor_avg_rating(db, session.ventor_id),
                 status_label=session.status.value,
                 session_cost=float(payment.amount_paid) if payment else None,
                 is_missed=session.status == SessionStatus.missed,
@@ -526,7 +603,7 @@ def list_session_requests(db: Session, listener: User) -> SessionRequestsRespons
                 speech_language=req.speech_language,
                 is_instant=req.is_instant,
                 is_video_call=req.call_mode == CallMode.video,
-                ventor_rating=None,
+                ventor_rating=_ventor_avg_rating(db, session.ventor_id),
             )
         )
     return SessionRequestsResponse(items=items)
@@ -537,6 +614,8 @@ def accept_session_request(
     listener: User,
     request_id: UUID,
 ) -> AcceptRequestResponse:
+    if listener.role != UserRole.listener:
+        raise forbidden()
     req = db.get(SessionRequest, request_id)
     if req is None:
         raise not_found("Session request")
@@ -592,6 +671,25 @@ def accept_session_request(
             reward_offer_id=req.reward_offer_id,
         )
     )
+    if req.promo_code_id is not None:
+        promo = db.get(PromoCode, req.promo_code_id)
+        if promo is not None:
+            promo.redemption_count = (promo.redemption_count or 0) + 1
+            db.add(
+                PromoRedemption(
+                    promo_code_id=promo.id,
+                    ventor_id=req.ventor_id,
+                    session_id=session.id,
+                    discount_amount=Decimal("0"),
+                )
+            )
+    if req.reward_offer_id is not None:
+        ventor_profile = db.get(VentorProfile, req.ventor_id)
+        if (
+            ventor_profile is not None
+            and ventor_profile.active_reward_offer_id == req.reward_offer_id
+        ):
+            ventor_profile.active_reward_offer_id = None
     db.commit()
     return AcceptRequestResponse(session_id=str(session.id), status="accepted")
 
@@ -602,6 +700,8 @@ def decline_session_request(
     request_id: UUID,
     reason: str | None = None,
 ) -> OkResponse:
+    if listener.role != UserRole.listener:
+        raise forbidden()
     req = db.get(SessionRequest, request_id)
     if req is None or (req.listener_id and req.listener_id != listener.id):
         raise not_found("Session request")
@@ -674,6 +774,8 @@ def end_session(
     session.ended_at = _utc_now()
     if payload and payload.duration_seconds is not None:
         session.actual_duration_seconds = payload.duration_seconds
+    if payload and payload.ended_by:
+        session.ended_by = payload.ended_by
     listener = db.get(ListenerProfile, session.listener_id)
     if listener is not None:
         listener.session_count = (listener.session_count or 0) + 1

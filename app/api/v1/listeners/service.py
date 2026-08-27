@@ -1115,7 +1115,7 @@ def update_listener_profile(
             else _catalog_experience_ids(db, profile.user_id)
         )
         custom_labels = (
-            data["custom_experiences"]
+            list(data["custom_experiences"] or [])
             if "custom_experiences" in data
             else _custom_experience_labels(db, profile.user_id)
         )

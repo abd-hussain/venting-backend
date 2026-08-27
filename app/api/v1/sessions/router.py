@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, status
 
-from app.api.deps import CurrentUser, DbSession, SettingsDep
+from app.api.deps import CurrentVentor, CurrentUser, DbSession, SettingsDep
 from app.api.v1.sessions.schemas import (
     BookSessionRequest,
     EndSessionRequest,
@@ -41,7 +41,7 @@ router = APIRouter()
 )
 def post_instant_match(
     body: InstantMatchRequest,
-    current_user: CurrentUser,
+    current_user: CurrentVentor,
     db: DbSession,
 ):
     data = instant_match(db, current_user, body)
@@ -61,7 +61,7 @@ def post_instant_match(
 )
 def post_session(
     body: BookSessionRequest,
-    current_user: CurrentUser,
+    current_user: CurrentVentor,
     db: DbSession,
 ):
     data = book_session(db, current_user, body)

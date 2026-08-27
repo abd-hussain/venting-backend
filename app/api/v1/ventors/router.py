@@ -431,7 +431,7 @@ def notification_preferences_put(
     summary="Ventor booked sessions",
 )
 def ventor_sessions(
-    current_user: CurrentUser,
+    current_user: CurrentVentor,
     db: DbSession,
     status_filter: str | None = Query(None, alias="status"),
     page: int = Query(1, ge=1),
@@ -453,7 +453,7 @@ def ventor_sessions(
 )
 def ventor_session_detail(
     session_id: UUID,
-    current_user: CurrentUser,
+    current_user: CurrentVentor,
     db: DbSession,
 ):
     from app.api.v1.sessions.service import get_ventor_session
@@ -470,7 +470,7 @@ def ventor_session_detail(
 )
 def ventor_session_cancel(
     session_id: UUID,
-    current_user: CurrentUser,
+    current_user: CurrentVentor,
     db: DbSession,
     body: CancelSessionRequest | None = None,
 ):

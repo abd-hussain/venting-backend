@@ -788,7 +788,7 @@ Legacy array form is still accepted (`["job_loss", "widowed", …]` or `[{ "id":
 | `life_experience_ids` | string[] | Catalog experience tag ids from `#76` only (`job_loss`, `grief_loss`, …) |
 | `relationship_status` | string \| null | Client enum: `single` \| `in_relationship` \| `married` \| `divorced` \| `widowed` |
 | `family_role_ids` | string[] | Client enums: `parent`, `single_parent`, `caregiver` |
-| `custom_experiences` | string[] | Optional free-text experiences (plain labels, **not** `custom_*` slugs) |
+| `custom_experiences` | string[] | Free-text experiences (plain labels). Send `[]` to clear all custom rows. |
 | `comfort_area_ids` | string[] | Comfort area ids from `#74` |
 | `custom_comfort_area_text` | string \| null | Required when `other` comfort area is selected |
 | `boundary_ids` | string[] | Boundary ids from `#77` |
@@ -797,7 +797,7 @@ Legacy array form is still accepted (`["job_loss", "widowed", …]` or `[{ "id":
 > **Experiences PATCH:** Same split as registration step **experiences** (`#22`):
 > - `life_experience_ids` — ids from `#76 GET /v1/catalog/life-experiences` only
 > - `relationship_status` + `family_role_ids` — client-local enums (see `#76` rules); **do not** put these in `life_experience_ids`
-> - `custom_experiences` — user-typed labels; API assigns `custom_*` slugs server-side
+> - `custom_experiences` — user-typed labels; API assigns `custom_*` slugs server-side. Send `[]` to remove all custom rows without changing catalog ids.
 >
 > Backend must **replace** all experience rows for the listener (delete then insert). Do **not** accept `custom_*` slugs from the client.
 
