@@ -316,14 +316,11 @@ class DashboardResponse(BaseModel):
 
 
 class ListenerPrivacySettings(BaseModel):
-    show_online_status: bool
-    show_languages: bool
-    show_comfort_areas: bool
-    show_experience_and_ratings: bool
-    show_boundaries: bool
-    visible_in_all_countries: bool
-    visible_countries: list[str] | None = None
-    allow_search_indexing: bool
+    profile_visible: bool = True
+    show_online_status: bool = True
+    visible_in_all_countries: bool = True
+    visible_countries: list[str] = Field(default_factory=list)
+    allow_search_indexing: bool = True
 
 
 class ListenerNotificationPreferences(BaseModel):

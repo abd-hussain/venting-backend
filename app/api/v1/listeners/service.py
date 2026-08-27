@@ -985,6 +985,30 @@ def list_reviews(
     )
 
 
+def _privacy_row(
+    db: Session,
+    listener_id: UUID,
+) -> ListenerPrivacySettingsRow:
+    row = db.get(ListenerPrivacySettingsRow, listener_id)
+    if row is None:
+        row = ListenerPrivacySettingsRow(listener_id=listener_id)
+        db.add(row)
+        db.flush()
+    return row
+
+
+def _listener_is_discoverable(
+    db: Session,
+    listener_id: UUID,
+    *,
+    viewer: User | None = None,
+) -> bool:
+    if viewer is not None and viewer.role == UserRole.listener and viewer.id == listener_id:
+        return True
+    row = db.get(ListenerPrivacySettingsRow, listener_id)
+    return row is None or row.profile_visible
+
+
 def get_public_listener(
     db: Session,
     listener_id: UUID,
@@ -994,7 +1018,10 @@ def get_public_listener(
     profile = db.get(ListenerProfile, listener_id)
     if profile is None or profile.profile_status == ProfileStatus.incomplete:
         raise not_found("Listener")
+    if not _listener_is_discoverable(db, listener_id, viewer=viewer):
+        raise not_found("Listener")
 
+    privacy = db.get(ListenerPrivacySettingsRow, listener_id)
     tags = _load_tag_ids(db, listener_id)
     is_favorite = False
     if viewer.role == UserRole.ventor:
@@ -1007,6 +1034,11 @@ def get_public_listener(
             .first()
             is not None
         )
+
+    is_online = profile.is_online
+    if viewer.role != UserRole.listener or viewer.id != listener_id:
+        if privacy is not None and not privacy.show_online_status:
+            is_online = False
 
     return ListenerPublicResponse(
         id=str(profile.user_id),
@@ -1022,7 +1054,7 @@ def get_public_listener(
         bio=profile.bio or profile.about_me,
         help_with=tags["comfort"],
         voice_preview_seconds=profile.voice_intro_seconds,
-        is_online=profile.is_online,
+        is_online=is_online,
         is_verified=profile.is_verified,
         rating_breakdown=profile.rating_breakdown,
         country=profile.country,
@@ -1147,20 +1179,14 @@ def get_dashboard(db: Session, profile: ListenerProfile) -> DashboardResponse:
 
 
 def get_privacy(db: Session, profile: ListenerProfile) -> ListenerPrivacySettings:
-    row = db.get(ListenerPrivacySettingsRow, profile.user_id)
-    if row is None:
-        row = ListenerPrivacySettingsRow(listener_id=profile.user_id)
-        db.add(row)
-        db.commit()
-        db.refresh(row)
+    row = _privacy_row(db, profile.user_id)
+    db.commit()
+    db.refresh(row)
     return ListenerPrivacySettings(
+        profile_visible=row.profile_visible,
         show_online_status=row.show_online_status,
-        show_languages=row.show_languages,
-        show_comfort_areas=row.show_comfort_areas,
-        show_experience_and_ratings=row.show_experience_and_ratings,
-        show_boundaries=row.show_boundaries,
         visible_in_all_countries=row.visible_in_all_countries,
-        visible_countries=list(row.visible_countries) if row.visible_countries else None,
+        visible_countries=list(row.visible_countries or []),
         allow_search_indexing=row.allow_search_indexing,
     )
 
@@ -1170,17 +1196,17 @@ def update_privacy(
     profile: ListenerProfile,
     payload: ListenerPrivacySettings,
 ) -> ListenerPrivacySettings:
-    row = db.get(ListenerPrivacySettingsRow, profile.user_id)
-    if row is None:
-        row = ListenerPrivacySettingsRow(listener_id=profile.user_id)
-        db.add(row)
+    if not payload.visible_in_all_countries and not payload.visible_countries:
+        raise validation_error(
+            "visible_countries is required when visible_in_all_countries is false",
+            ar="يجب تحديد الدول عند تعطيل الظهور في جميع الدول",
+        )
+
+    row = _privacy_row(db, profile.user_id)
+    row.profile_visible = payload.profile_visible
     row.show_online_status = payload.show_online_status
-    row.show_languages = payload.show_languages
-    row.show_comfort_areas = payload.show_comfort_areas
-    row.show_experience_and_ratings = payload.show_experience_and_ratings
-    row.show_boundaries = payload.show_boundaries
     row.visible_in_all_countries = payload.visible_in_all_countries
-    row.visible_countries = payload.visible_countries
+    row.visible_countries = payload.visible_countries or None
     row.allow_search_indexing = payload.allow_search_indexing
     db.commit()
     db.refresh(row)

@@ -382,10 +382,12 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 
 | | |
 |--|--|
-| **Auth** | Bearer |
-| **Screen** | Ventor / Listener profile settings |
-| **Body** | optional `refresh_token` |
-| **Response** | `{ "ok": true }` |
+| **Auth** | `Authorization: Bearer {access_token}` |
+| **Screen** | Shared destructive confirm sheet (ventor + listener settings) |
+| **Body** | optional `refresh_token` (to revoke that session server-side) |
+| **Response** | `{ "status": "success", "data": { "ok": true } }` |
+
+Mobile: on success clear local session and go to welcome.
 
 ---
 
@@ -393,10 +395,12 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 
 | | |
 |--|--|
-| **Auth** | Bearer |
-| **Screen** | Delete account confirm |
+| **Auth** | `Authorization: Bearer {access_token}` |
+| **Screen** | Shared destructive confirm sheet (ventor + listener settings) |
 | **Body** | optional `password` |
-| **Response** | `{ "ok": true }` |
+| **Response** | `{ "status": "success", "data": { "ok": true } }` |
+
+Mobile: on success clear local session and go to welcome.
 
 ---
 
@@ -404,10 +408,16 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 
 | | |
 |--|--|
-| **Auth** | Bearer |
-| **Screen** | Listener change password |
+| **Auth** | `Authorization: Bearer {access_token}` — JWT access token only; **do not** send `refresh_token` in header or body |
+| **Screen** | Shared change password (ventor + listener settings) |
 | **Body** | `current_password`, `new_password` |
-| **Response** | `{ "ok": true }` |
+| **Response** | `{ "status": "success", "data": { "ok": true } }` |
+
+**Mobile contract:**
+
+- Read `access_token` from secure storage (`SavedConstants.accessToken`) and send as `Authorization: Bearer {access_token}` on every request (repository header + Dio interceptor).
+- `401` on this endpoint means wrong `current_password` or invalid/missing access token — **must not** trigger `#3` token refresh (unlike `#7` / profile APIs).
+- `refresh_token` is only used by `#3 POST /v1/auth/refresh`, never for change-password.
 
 ---
 
@@ -451,6 +461,8 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 `saved.languages`: `{ language_ids[] }`  
 `saved.interests`: `{ interest_ids[], other_interest_text? }`
 
+Each step `PATCH` returns the **same progress envelope** as `#8a`.
+
 #### 8b. `PATCH /v1/ventors/register/steps/profile`
 
 | Field | Required | Notes |
@@ -460,7 +472,7 @@ Password rules (UI): min 8, 1 uppercase, 1 number.
 | `avatar` | no | Multipart file when gallery photo chosen |
 | `avatar_preset_index` | no | 0-based preset when no gallery photo |
 
-JSON or multipart (multipart when uploading `avatar`). Marks step `profile` complete.
+JSON or multipart (multipart when uploading `avatar`).
 
 #### 8c. `PATCH /v1/ventors/register/steps/languages`
 
@@ -477,10 +489,14 @@ JSON or multipart (multipart when uploading `avatar`). Marks step `profile` comp
 
 #### 8e. `POST /v1/ventors/register/complete`
 
+Finalizes ventor registration. JSON body.
+
 | Field | Required | Notes |
 |-------|----------|-------|
-| `notifications_enabled` | yes | Result of OS permission on step 4 |
-| `fcm_token` | no | Omit when permission denied |
+| `notifications_enabled` | yes | `true` when OS notification permission was granted (or provisional on iOS); `false` when denied |
+| `fcm_token` | no | Include when the app has a non-empty FCM device token; omit the field entirely when unavailable. Registration must succeed without it |
+
+**FCM storage:** When `fcm_token` is present, the server upserts into `user_push_tokens` for the authenticated user.
 
 **Response:** Ventor profile (#9). Sets `users.registration_complete = true`.
 
@@ -651,7 +667,8 @@ JSON or multipart (multipart when uploading `avatar`). Marks step `profile` comp
 | **Response** | `{ registration_complete, profile_status?, next_step, completed_steps[], saved: { profile?, identity?, about?, … } }` |
 
 `next_step`: `profile` \| `identity` \| `about` \| `experiences` \| `comfort-areas` \| `boundaries` \| `voice-intro` \| `availability` \| `notifications`  
-`saved.*` returns previously saved field values and media URLs for resume.
+`saved.*` returns previously saved field values and media URLs for resume.  
+Each step `PATCH` returns the **same progress envelope** as `#22a`.
 
 #### Step payloads (save on Continue)
 
@@ -672,9 +689,13 @@ Multipart steps: omit file parts when the user did not change an already-uploade
 
 #### 22j. `POST /v1/listeners/register/complete`
 
+Finalizes listener registration after all step saves. JSON body.
+
 | Field | Required | Notes |
 |-------|----------|-------|
-| `fcm_token` | no | Omit when notifications permission denied |
+| `fcm_token` | no | Include when the app has a non-empty FCM device token; omit the field entirely when unavailable. Registration must succeed without it |
+
+**FCM storage:** When `fcm_token` is present, the server upserts into `user_push_tokens` for the authenticated user.
 
 **Response:** `{ listener_id, profile_status: "under_review" }`. Requires all prior steps complete. Sets `users.registration_complete = true`.
 
@@ -820,7 +841,34 @@ Multipart steps: omit file parts when the user did not change an already-uploade
 |--|--|
 | **Auth** | Bearer |
 | **Screen** | Privacy & visibility |
-| **Response** | `{ show_online_status, show_languages, show_comfort_areas, show_experience_and_ratings, show_boundaries, visible_in_all_countries, visible_countries, allow_search_indexing }` |
+| **Response** | `{ profile_visible, show_online_status, visible_in_all_countries, visible_countries, allow_search_indexing }` |
+
+**Fields**
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `profile_visible` | bool | `true` | When `false`, listener is hidden from in-app discovery and browse |
+| `show_online_status` | bool | `true` | Show online indicator to ventors |
+| `visible_in_all_countries` | bool | `true` | When `false`, only `visible_countries` apply |
+| `visible_countries` | string[] | `[]` | ISO 3166-1 alpha-2 codes; required (non-empty) when `visible_in_all_countries` is `false` |
+| `allow_search_indexing` | bool | `true` | Allow public search-engine indexing of profile |
+
+Profile information (languages, comfort areas, experience, boundaries) is **always shown** on the listener profile when `profile_visible` is `true` — not configurable via this endpoint.
+
+**Example**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "profile_visible": true,
+    "show_online_status": true,
+    "visible_in_all_countries": true,
+    "visible_countries": [],
+    "allow_search_indexing": true
+  }
+}
+```
 
 ---
 
@@ -831,6 +879,11 @@ Multipart steps: omit file parts when the user did not change an already-uploade
 | **Auth** | Bearer |
 | **Body** | Same fields as #33 (`visible_countries` = ISO codes[]) |
 | **Response** | Updated privacy object |
+
+**Validation**
+
+- `400` if `visible_in_all_countries` is `false` and `visible_countries` is empty
+- When `profile_visible` is `false`, `show_online_status` and country targeting are ignored server-side (listener hidden from app)
 
 ---
 

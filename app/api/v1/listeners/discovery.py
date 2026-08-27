@@ -15,6 +15,7 @@ from app.models.auth import User
 from app.models.enums import Gender, ProfileStatus, UserRole
 from app.models.lookups import ListenerComfortArea, ListenerLanguage
 from app.models.profiles import ListenerProfile
+from app.models.settings import ListenerPrivacySettings
 from app.models.ventor_wellness import VentorFavorite
 
 
@@ -36,8 +37,19 @@ def list_listeners(
 ) -> ListenerListResponse:
     page, page_size = clamp_page(page, page_size)
 
-    query = db.query(ListenerProfile).filter(
-        ListenerProfile.profile_status == ProfileStatus.approved
+    query = (
+        db.query(ListenerProfile)
+        .outerjoin(
+            ListenerPrivacySettings,
+            ListenerPrivacySettings.listener_id == ListenerProfile.user_id,
+        )
+        .filter(
+            ListenerProfile.profile_status == ProfileStatus.approved,
+            or_(
+                ListenerPrivacySettings.profile_visible.is_(True),
+                ListenerPrivacySettings.listener_id.is_(None),
+            ),
+        )
     )
 
     if q:

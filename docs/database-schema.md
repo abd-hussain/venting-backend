@@ -248,7 +248,7 @@ Used by `#2b forgot-password` / `#2c reset-password`. Store **hash only**, never
 
 ### 2d. `user_push_tokens`
 
-Optional FCM device tokens from `#8` / `#22` registration (`fcm_token`). Registration succeeds without a token.
+Optional FCM device tokens from ventor `#8e` / listener `#22j` registration complete (`fcm_token`). Registration succeeds without a token.
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -577,15 +577,16 @@ Catalog.
 | Column | Type | Notes |
 |--------|------|-------|
 | `listener_id` | UUID | **PK, FK** |
-| `show_online_status` | BOOLEAN | |
-| `show_languages` | BOOLEAN | |
-| `show_comfort_areas` | BOOLEAN | |
-| `show_experience_and_ratings` | BOOLEAN | |
-| `show_boundaries` | BOOLEAN | |
+| `profile_visible` | BOOLEAN | default true — when false, hide listener from in-app discovery |
+| `show_online_status` | BOOLEAN | default true |
 | `visible_in_all_countries` | BOOLEAN | default true |
 | `visible_countries` | CHAR(2)[] | ISO list when not all |
-| `allow_search_indexing` | BOOLEAN | default false |
+| `allow_search_indexing` | BOOLEAN | default true |
 | `updated_at` | TIMESTAMPTZ | |
+
+**Removed columns** (v2): `show_languages`, `show_comfort_areas`, `show_experience_and_ratings`, `show_boundaries` — profile information is always visible when the listener profile is shown in the app.
+
+**Migration:** `ALTER TABLE listener_privacy_settings ADD COLUMN profile_visible BOOLEAN NOT NULL DEFAULT true;` then drop the four `show_*` columns; `ALTER COLUMN allow_search_indexing SET DEFAULT true`.
 
 ### 23. `ventor_notification_preferences`
 

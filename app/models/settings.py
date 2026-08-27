@@ -37,14 +37,11 @@ class ListenerPrivacySettings(Base):
         ForeignKey("listener_profiles.user_id", ondelete="CASCADE"),
         primary_key=True,
     )
+    profile_visible = Column(Boolean, nullable=False, server_default="true")
     show_online_status = Column(Boolean, nullable=False, server_default="true")
-    show_languages = Column(Boolean, nullable=False, server_default="true")
-    show_comfort_areas = Column(Boolean, nullable=False, server_default="true")
-    show_experience_and_ratings = Column(Boolean, nullable=False, server_default="true")
-    show_boundaries = Column(Boolean, nullable=False, server_default="true")
     visible_in_all_countries = Column(Boolean, nullable=False, server_default="true")
     visible_countries = Column(ARRAY(String(2)), nullable=True)
-    allow_search_indexing = Column(Boolean, nullable=False, server_default="false")
+    allow_search_indexing = Column(Boolean, nullable=False, server_default="true")
     updated_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
