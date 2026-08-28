@@ -356,6 +356,10 @@ def social_login(
 
     user.last_login_at = datetime.now(timezone.utc)
     access_token, refresh_token = _issue_tokens(db, user, settings)
+    if is_new:
+        from app.services.inbox_notifications import send_welcome_notification
+
+        send_welcome_notification(db, user)
     db.commit()
     db.refresh(user)
 
@@ -443,6 +447,9 @@ def register_user(
     db.flush()
 
     access_token, refresh_token = _issue_tokens(db, user, settings)
+    from app.services.inbox_notifications import send_welcome_notification
+
+    send_welcome_notification(db, user)
     db.commit()
     db.refresh(user)
 

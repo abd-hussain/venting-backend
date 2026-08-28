@@ -361,6 +361,9 @@ async def register_ventor(
     )
     upsert_push_token(db, user.id, fcm_token)
     user.registration_complete = True
+    from app.services.inbox_notifications import send_book_first_session_ventor
+
+    send_book_first_session_ventor(db, user)
     db.commit()
     db.refresh(profile)
     return _profile_response(db, user, profile)

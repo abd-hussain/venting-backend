@@ -133,6 +133,9 @@ class InviteStatus(str, enum.Enum):
 
 
 class NotificationType(str, enum.Enum):
+    welcome = "welcome"
+    complete_registration = "complete_registration"
+    book_first_session = "book_first_session"
     session_request = "session_request"
     session_reminder = "session_reminder"
     review = "review"

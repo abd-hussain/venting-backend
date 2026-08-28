@@ -1358,13 +1358,69 @@ Tier ids: `starter` ($15) → `rising` ($20) → `trusted` ($25) → `expert` ($
 
 ## 9. Notifications
 
+Inbox notifications are stored in `notifications` (`user_id`, `type`, `title`, `body`, `data`, `is_read`).  
+Mobile reads them via role-specific inbox endpoints below and uses `data.action` (+ optional `data.next_step`) for deep links.
+
+### Notification types
+
+| `type` | Audience | Purpose |
+|--------|----------|---------|
+| `welcome` | ventor, listener | First inbox message after account creation |
+| `complete_registration` | ventor, listener | Nudge to finish an incomplete registration wizard |
+| `book_first_session` | ventor, listener | Nudge to book / accept a first session after registration is complete |
+| `session_request` | listener | Incoming session request |
+| `session_reminder` | listener | Upcoming session reminder |
+| `review` | listener | New review received |
+| `payout` | listener | Payout completed |
+| `rewards` | ventor | Rewards / points update |
+| `system` | both | Generic product message |
+
+### `data` payload (deep link)
+
+Optional JSON on each item. Mobile maps `data.action` to navigation:
+
+| `data.action` | Mobile behavior |
+|---------------|-----------------|
+| `open_registration` | Open role registration flow; optional `data.next_step` jumps to saved step |
+| `book_first_session` | Ventor → Sessions tab; Listener → Availability tab |
+| `open_availability` | Listener → Availability tab |
+| `open_discover_listeners` | Ventor → Sessions tab (discover / book) |
+| `open_training` | Listener → Training bottom sheet |
+
+`data.next_step` (listener only): registration slug from `#22a` — `profile`, `identity`, `about`, `experiences`, `comfort-areas`, `boundaries`, `voice-intro`, `availability`.
+
+### Welcome & onboarding triggers (server)
+
+Backend should **create inbox rows** (and optional push) on these events. Do not duplicate the same `type` for the same user while an earlier unread copy still exists.
+
+| Trigger | Who | `type` | `data.action` | When |
+|---------|-----|--------|---------------|------|
+| Account created (`#1` register or first social login with `is_new = true`) | ventor / listener | `welcome` | `open_registration` | Immediately |
+| `registration_complete = false` and user inactive ≥ 24h | ventor / listener | `complete_registration` | `open_registration` | Scheduled job; include `next_step` from register progress (`#8a` / `#22a`) |
+| Ventor registration complete (`#8` complete) and zero completed sessions | ventor | `book_first_session` | `book_first_session` | On complete + optional 48h reminder |
+| Listener approved (`profile_status = approved`) and zero completed sessions | listener | `book_first_session` | `open_availability` | On approval + optional 48h reminder |
+
+**Suggested copy (EN — localize server-side or via CMS later):**
+
+| `type` | Example `title` | Example `body` |
+|--------|-----------------|----------------|
+| `welcome` | Welcome to Venting | Complete your profile so you can start connecting. |
+| `complete_registration` | Finish setting up | You're almost there — pick up where you left off. |
+| `book_first_session` (ventor) | Book your first session | Find a listener who's ready when you are. |
+| `book_first_session` (listener) | You're approved — go online | Set your availability and start helping people. |
+
+---
+
 ### 68. `GET /v1/listeners/me/notifications`
 
 | | |
 |--|--|
 | **Auth** | Bearer |
 | **Query** | `unread_only` (bool) |
-| **Response** | `{ items: [{ id, type: "session_request" \| "session_reminder" \| "review" \| "payout" \| "system", title, body, created_at, is_read }] }` |
+| **Response** | `{ status, data: { items: [{ id, type, title, body, created_at, is_read, data? }] } }` |
+
+`type`: see table above.  
+`data`: optional deep-link object (`action`, `next_step?`).
 
 ---
 
@@ -1373,7 +1429,7 @@ Tier ids: `starter` ($15) → `rising` ($20) → `trusted` ($25) → `expert` ($
 | | |
 |--|--|
 | **Auth** | Bearer |
-| **Response** | `{ "ok": true, updated_count }` |
+| **Response** | `{ status, data: { ok: true, updated_count } }` |
 
 ---
 
@@ -1382,7 +1438,35 @@ Tier ids: `starter` ($15) → `rising` ($20) → `trusted` ($25) → `expert` ($
 | | |
 |--|--|
 | **Auth** | Bearer |
-| **Response** | `{ "ok": true }` |
+| **Response** | `{ status, data: { ok: true } }` |
+
+---
+
+### 70a. `GET /v1/ventors/me/notifications`
+
+| | |
+|--|--|
+| **Auth** | Bearer |
+| **Query** | `unread_only` (bool) |
+| **Response** | Same envelope as `#68` |
+
+---
+
+### 70b. `POST /v1/ventors/me/notifications/read-all`
+
+| | |
+|--|--|
+| **Auth** | Bearer |
+| **Response** | Same envelope as `#69` |
+
+---
+
+### 70c. `DELETE /v1/ventors/me/notifications/{notificationId}`
+
+| | |
+|--|--|
+| **Auth** | Bearer |
+| **Response** | Same envelope as `#70` |
 
 ---
 
@@ -2220,6 +2304,9 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | 68 | GET | `/v1/listeners/me/notifications` |
 | 69 | POST | `/v1/listeners/me/notifications/read-all` |
 | 70 | DELETE | `/v1/listeners/me/notifications/{notificationId}` |
+| 70a | GET | `/v1/ventors/me/notifications` |
+| 70b | POST | `/v1/ventors/me/notifications/read-all` |
+| 70c | DELETE | `/v1/ventors/me/notifications/{notificationId}` |
 | 71 | GET | `/v1/listeners/me/training` |
 | 72 | POST | `/v1/listeners/me/training/{moduleId}/complete` |
 | 73 | POST | `/v1/promo/validate` |

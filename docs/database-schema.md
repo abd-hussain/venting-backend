@@ -163,7 +163,7 @@ erDiagram
 | `reward_offer_kind` | `percent_off`, `free_minutes`, `priority_match` |
 | `earnings_tier` | `starter`, `rising`, `trusted`, `expert`, `elite` |
 | `invite_status` | `pending`, `joined`, `first_session`, `booked_call` |
-| `notification_type` | `session_request`, `session_reminder`, `review`, `payout`, `system`, `rewards` |
+| `notification_type` | `welcome`, `complete_registration`, `book_first_session`, `session_request`, `session_reminder`, `review`, `payout`, `system`, `rewards` |
 | `training_status` | `not_started`, `in_progress`, `completed` |
 | `mood_kind` | `great`, `okay`, `anxious`, `sad`, `angry` |
 
@@ -300,8 +300,6 @@ Optional FCM device tokens from ventor `#8e` / listener `#22j` registration comp
 | `city` | VARCHAR(30) | ? |
 | `gender` | `gender` | ? |
 | `bio` | TEXT | ? public short bio |
-| `relationship_status` | VARCHAR(32) | ? client enum: `single`, `in_relationship`, `married`, `divorced`, `widowed` |
-| `family_role_ids` | JSONB | default `[]` — client enums: `parent`, `single_parent`, `caregiver` |
 | `voice_intro_url` | TEXT | ? |
 | `voice_intro_seconds` | INT | ? |
 | `is_online` | BOOLEAN | default false **IDX** |

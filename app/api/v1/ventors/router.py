@@ -547,3 +547,58 @@ def invites_refresh(profile: CurrentVentorProfile, db: DbSession):
 
     data = refresh_invite_code(db, profile)
     return success_response(data.model_dump(mode="json"))
+
+
+@router.get(
+    "/me/notifications",
+    response_model=APISuccessResponse,
+    responses={401: {"model": APIErrorResponse}, 403: {"model": APIErrorResponse}},
+    summary="List ventor notifications",
+)
+def notifications_list(
+    current_user: CurrentVentor,
+    db: DbSession,
+    unread_only: bool = Query(False),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=50),
+):
+    from app.services.inbox_notifications import list_notifications
+
+    data = list_notifications(
+        db, current_user.id, unread_only=unread_only, page=page, page_size=page_size
+    )
+    return success_response(data.model_dump(mode="json"))
+
+
+@router.post(
+    "/me/notifications/read-all",
+    response_model=APISuccessResponse,
+    responses={401: {"model": APIErrorResponse}, 403: {"model": APIErrorResponse}},
+    summary="Mark all ventor notifications read",
+)
+def notifications_read_all(current_user: CurrentVentor, db: DbSession):
+    from app.services.inbox_notifications import mark_all_read
+
+    data = mark_all_read(db, current_user.id)
+    return success_response(data.model_dump(mode="json"))
+
+
+@router.delete(
+    "/me/notifications/{notification_id}",
+    response_model=APISuccessResponse,
+    responses={
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        404: {"model": APIErrorResponse},
+    },
+    summary="Soft-delete a ventor notification",
+)
+def notifications_delete(
+    notification_id: UUID,
+    current_user: CurrentVentor,
+    db: DbSession,
+):
+    from app.services.inbox_notifications import delete_notification
+
+    data = delete_notification(db, current_user.id, notification_id)
+    return success_response(data.model_dump(mode="json"))

@@ -24,14 +24,13 @@ from app.api.v1.admin.reports.schemas import RatingItem, RatingList
 from app.core.errors import not_found
 from app.core.pagination import Paginated, clamp_page
 from app.models.auth import User
-from app.models.enums import NotificationType, ProfileStatus, SetupStepStatus
+from app.models.enums import ProfileStatus, SetupStepStatus
 from app.models.lookups import (
     ListenerBoundary,
     ListenerComfortArea,
     ListenerLanguage,
     ListenerLifeExperience,
 )
-from app.models.notifications import Notification
 from app.models.profiles import ListenerIdentityVerification, ListenerProfile
 from app.models.sessions import SessionRating
 
@@ -291,15 +290,9 @@ def approve_listener(
     profile.reviewed_at = now
     profile.rejection_reason = None
     profile.setup_identity_status = SetupStepStatus.done
-    db.add(
-        Notification(
-            user_id=profile.user_id,
-            type=NotificationType.system,
-            title="Listener profile approved",
-            body="Your listener profile has been approved.",
-            data={"profile_status": ProfileStatus.approved.value},
-        )
-    )
+    from app.services.inbox_notifications import send_book_first_session_listener
+
+    send_book_first_session_listener(db, profile.user_id)
     write_audit(
         db,
         admin_user_id=admin.id,
