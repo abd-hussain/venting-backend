@@ -511,7 +511,7 @@ def setup_progress(profile: CurrentListenerProfile, db: DbSession):
         403: {"model": APIErrorResponse},
         422: {"model": APIErrorResponse},
     },
-    summary="Acknowledge first-session tutorial",
+    summary="Acknowledge first session with Venting (setup step book_first_session)",
 )
 def first_session_tutorial(
     body: TutorialAckRequest,

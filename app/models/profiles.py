@@ -133,6 +133,7 @@ class ListenerProfile(Base, TimestampMixin):
         server_default="locked",
     )
     first_session_tutorial_acked_at = Column(DateTime(timezone=True), nullable=True)
+    book_first_session_acked_at = Column(DateTime(timezone=True), nullable=True)
     agreed_to_terms_at = Column(DateTime(timezone=True), nullable=True)
     reviewed_by_admin_id = Column(
         UUID(as_uuid=True),

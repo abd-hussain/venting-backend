@@ -2,7 +2,8 @@
 
 > **Status:** Proposed from a full UI/screen audit.  
 > **Live HTTP calls in the app today:** `0` (Dio client exists; screens use mocks + `TODO` placeholders).  
-> **Purpose:** Single reference for backend + mobile to implement the same contract.
+> **Purpose:** Single reference for backend + mobile to implement the same contract.  
+> **Live Swagger UI:** [venting-3a5ebaed4621.herokuapp.com/docs](https://venting-3a5ebaed4621.herokuapp.com/docs#/)
 
 ---
 
@@ -59,27 +60,67 @@ List responses may include:
 
 ---
 
-## Quick index
+## Table of contents
 
-| Domain | Count | Master list # |
-|--------|------:|---------------|
-| Auth & account | 11 | 0–7, 1b, 2b–2c |
-| Ventor profile / home / wellness | 14 | 8–21 |
-| Listener profile / onboarding / dashboard | 16 | 22–36 |
-| Listener availability | 3 | 37–39 |
-| Discovery & sessions | 13 | 40–52 |
-| Call feedback & reports | 3 | 53–55 |
-| Listener earnings & payouts | 7 | 56–62 |
-| Ventor rewards & invites | 5 | 63–67 |
-| Notifications | 3 | 68–70 |
-| Training | 2 | 71–72 |
-| Promo | 1 | 73 |
-| Catalog / categories | 2 | 74–75 |
-| **Total** | **79** | |
+Endpoints are grouped like [Swagger tags](https://venting-3a5ebaed4621.herokuapp.com/docs#/) — **Shared**, **Ventor**, and **Listener**. Each row links to the detailed section below.
+
+### Shared (both roles)
+
+| Group | # | Endpoints |
+|-------|---|-----------|
+| [Auth & account](#shared-auth--account) | 0–7, 1b, 2b–2c | check-email, register, login, social, refresh, logout, delete account, change password, me |
+| [Catalog](#shared-catalog) | 74–77 | categories, languages, life-experiences, boundaries |
+| [Promo](#shared-promo) | 73 | validate promo code |
+| [Discovery](#shared-discovery) | 40 | list / filter listeners |
+| [Sessions — lifecycle](#shared-sessions--lifecycle) | 41–42, 51–52 | instant-match, book session, join, end |
+| [Sessions — feedback & reports](#shared-sessions--feedback--reports) | 53–55 | rating, feedback, report |
+
+### Ventor APIs
+
+| Group | # | Endpoints |
+|-------|---|-----------|
+| [Registration](#ventor-registration) | 8a–8e | register progress + step saves + complete |
+| [Profile & home](#ventor-profile--home) | 9–11 | me, patch profile, home aggregate |
+| [Wellness & mood](#ventor-wellness--mood) | 12–13 | mood check-ins, mood journey |
+| [Favorites](#ventor-favorites) | 14–16 | list, add, remove favorite listeners |
+| [Achievements & privacy](#ventor-achievements--privacy) | 17–19 | achievements, privacy get/put |
+| [Notification preferences](#ventor-notification-preferences) | 20–21 | get/put notification prefs |
+| [Sessions](#ventor-sessions) | 43–45 | list sessions, session detail, cancel |
+| [Rewards & invites](#ventor-rewards--invites) | 63–67 | rewards, redeem, trades, invites |
+| [Notifications inbox](#ventor-notifications-inbox) | 70a–70c | list, read-all, delete |
+
+### Listener APIs
+
+| Group | # | Endpoints |
+|-------|---|-----------|
+| [Registration](#listener-registration) | 22a–22j | register progress + step saves + complete |
+| [Identity resubmit](#listener-identity-resubmit) | 23 | KYC resubmit after admin rejection |
+| [Profile & media](#listener-profile--media) | 24–28 | me, patch, avatar, voice intro, reviews, public profile |
+| [Setup & onboarding](#listener-setup--onboarding) | 29–30 | setup-progress, first-session ack |
+| [Dashboard & online status](#listener-dashboard--online-status) | 31–32 | online-status, dashboard aggregate |
+| [Privacy & notification prefs](#listener-privacy--notification-prefs) | 33–36 | privacy get/put, notification prefs get/put |
+| [Availability](#listener-availability) | 37–39 | get/put schedule, per-day patch |
+| [Sessions & requests](#listener-sessions--requests) | 46–50 | sessions, stats, requests accept/decline |
+| [Earnings & payouts](#listener-earnings--payouts) | 56–62 | earnings, chart, balances, methods, payouts |
+| [Training](#listener-training) | 71–72 | training modules, complete module |
+| [Notifications inbox](#listener-notifications-inbox) | 68–70 | list, read-all, delete |
+
+### Cross-cutting
+
+| Section | Description |
+|---------|-------------|
+| [Notifications — types & triggers](#notifications-types--triggers) | Shared `type` enum, deep links, welcome/onboarding server rules |
+| [Media URLs](#media-urls-static-uploads) | `/static/uploads/…` prefix rules |
+| [Efficiency guidelines](#efficiency-guidelines-for-implementers) | Aggregates, PATCH, pagination |
+| [Master checklist](#master-checklist-method--path) | Flat method + path index |
+
+**Totals:** 92 unique REST endpoints · 82 in the original numbered index (some steps share one `#`).
 
 ---
 
-## 1. Auth & account
+# API reference
+
+## Shared · Auth & account {#shared-auth--account}
 
 ### 0. `POST /v1/auth/check-email` *(proposed)*
 
@@ -434,9 +475,7 @@ Mobile: on success clear local session and go to welcome.
 
 ---
 
-## 2. Ventor profile / home / wellness
-
-### 8. Ventor registration (step-based)
+## Ventor · Registration {#ventor-registration}
 
 > **Replaces** the old one-shot `POST /v1/ventors/register`. Each wizard step saves independently so the user can **Skip** and finish later.
 
@@ -507,6 +546,10 @@ Finalizes ventor registration. JSON body.
 3. **Skip** → home without calling the current step (prior saved steps remain).  
 4. Notifications step → `#8e` → ventor home.
 
+---
+
+## Ventor · Profile & home {#ventor-profile--home}
+
 ### 9. `GET /v1/ventors/me`
 
 | | |
@@ -538,6 +581,8 @@ Finalizes ventor registration. JSON body.
 
 ---
 
+## Ventor · Wellness & mood {#ventor-wellness--mood}
+
 ### 12. `POST /v1/ventors/me/mood-checkins`
 
 | | |
@@ -559,6 +604,8 @@ Finalizes ventor registration. JSON body.
 | **Response** | `{ points: [{ day_index, mood }] }` — mood `0` sad → `1` happy |
 
 ---
+
+## Ventor · Favorites {#ventor-favorites}
 
 ### 14. `GET /v1/ventors/me/favorites`
 
@@ -590,6 +637,8 @@ Finalizes ventor registration. JSON body.
 
 ---
 
+## Ventor · Achievements & privacy {#ventor-achievements--privacy}
+
 ### 17. `GET /v1/ventors/me/achievements`
 
 | | |
@@ -620,6 +669,8 @@ Finalizes ventor registration. JSON body.
 
 ---
 
+## Ventor · Notification preferences {#ventor-notification-preferences}
+
 ### 20. `GET /v1/ventors/me/notification-preferences`
 
 | | |
@@ -640,7 +691,7 @@ Finalizes ventor registration. JSON body.
 
 ---
 
-## 3. Listener profile / onboarding / dashboard
+## Listener · Registration {#listener-registration}
 
 ### 22. Listener registration (step-based)
 
@@ -708,6 +759,8 @@ Finalizes listener registration after all step saves. JSON body.
 
 ---
 
+## Listener · Identity resubmit {#listener-identity-resubmit}
+
 ### 23. `POST /v1/listeners/me/identity-verification`
 
 > **Purpose:** Resubmit KYC / identity documents **after an admin rejects** the listener’s previous verification.  
@@ -736,6 +789,8 @@ Finalizes listener registration after all step saves. JSON body.
 - [ ] Field names match `#22` (`identity_document` + `selfie`)
 
 ---
+
+## Listener · Profile & media {#listener-profile--media}
 
 ### 24. `GET /v1/listeners/me`
 
@@ -869,6 +924,8 @@ Mirror **#26** voice intro, but for images:
 
 ---
 
+## Listener · Setup & onboarding {#listener-setup--onboarding}
+
 ### 29. `GET /v1/listeners/me/setup-progress`
 
 | | |
@@ -904,7 +961,7 @@ Mirror **#26** voice intro, but for images:
 | 8 | `availability` | `availability` |
 | 9 | `notifications` | `#22j` complete |
 | 10 | `training` | — |
-| 11 | `book_first_session` | Listener sets availability / schedules first onboarding session |
+| 11 | `book_first_session` | **First session with us** — listener acknowledges; team calls based on availability to assess skills before profile approval |
 
 #### Step `status` values
 
@@ -1013,7 +1070,11 @@ Mirror **#26** voice intro, but for images:
 | **Body** | `{ "acknowledged": true }` |
 | **Response** | Updated setup progress (#29) |
 
+Marks setup step `book_first_session` as **done** (listener acknowledges the first assessment call with the Venting team). Requires training (#10) complete.
+
 ---
+
+## Listener · Dashboard & online status {#listener-dashboard--online-status}
 
 ### 31. `PATCH /v1/listeners/me/online-status`
 
@@ -1041,6 +1102,8 @@ Mirror **#26** voice intro, but for images:
 | **Response** | `{ display_name, setup_progress, impact: { sessions_today, minutes_today, chart: [{ label, value }] }, next_upcoming_session?, is_online, reminder? }` |
 
 ---
+
+## Listener · Privacy & notification prefs {#listener-privacy--notification-prefs}
 
 ### 33. `GET /v1/listeners/me/privacy`
 
@@ -1114,7 +1177,7 @@ Profile information (languages, comfort areas, experience, boundaries) is **alwa
 
 ---
 
-## 4. Listener availability
+## Listener · Availability {#listener-availability}
 
 ### 37. `GET /v1/listeners/me/availability`
 
@@ -1181,7 +1244,7 @@ Mobile sends the full current availability object whenever instant calls, sessio
 
 ---
 
-## 5. Discovery & sessions
+## Shared · Discovery {#shared-discovery}
 
 ### 40. `GET /v1/listeners`
 
@@ -1193,6 +1256,8 @@ Mobile sends the full current availability object whenever instant calls, sessio
 | **Response** | `{ items: [ListenerPublic (#28)], total }` |
 
 ---
+
+## Shared · Sessions — lifecycle {#shared-sessions--lifecycle}
 
 ### 41. `POST /v1/sessions/instant-match`
 
@@ -1215,6 +1280,8 @@ Mobile sends the full current availability object whenever instant calls, sessio
 | **Response** | `VentorBookedSession` + `payment: { amount_paid, currency, voice_change_fee, discount_amount }` |
 
 ---
+
+## Ventor · Sessions {#ventor-sessions}
 
 ### 43. `GET /v1/ventors/me/sessions`
 
@@ -1247,6 +1314,8 @@ Mobile sends the full current availability object whenever instant calls, sessio
 | **Response** | `{ session, refunded_to_balance }` — UI expects **full** `amount_paid` refund |
 
 ---
+
+## Listener · Sessions & requests {#listener-sessions--requests}
 
 ### 46. `GET /v1/listeners/me/sessions`
 
@@ -1319,7 +1388,7 @@ Mobile sends the full current availability object whenever instant calls, sessio
 
 ---
 
-## 6. Call feedback & reports
+## Shared · Sessions — feedback & reports {#shared-sessions--feedback--reports}
 
 ### 53. `POST /v1/sessions/{sessionId}/rating`
 
@@ -1358,7 +1427,7 @@ Listener reasons: `inappropriate_behavior`, `harassment`, `hate_speech`, `safety
 
 ---
 
-## 7. Listener earnings & payouts
+## Listener · Earnings & payouts {#listener-earnings--payouts}
 
 ### 56. `GET /v1/listeners/me/earnings`
 
@@ -1433,7 +1502,7 @@ Tier ids: `starter` ($15) → `rising` ($20) → `trusted` ($25) → `expert` ($
 
 ---
 
-## 8. Ventor rewards & invites
+## Ventor · Rewards & invites {#ventor-rewards--invites}
 
 ### 63. `GET /v1/ventors/me/rewards`
 
@@ -1484,7 +1553,7 @@ Tier ids: `starter` ($15) → `rising` ($20) → `trusted` ($25) → `expert` ($
 
 ---
 
-## 9. Notifications
+## Notifications — types & triggers {#notifications-types--triggers}
 
 Inbox notifications are stored in `notifications` (`user_id`, `type`, `title`, `body`, `data`, `is_read`).  
 Mobile reads them via role-specific inbox endpoints below and uses `data.action` (+ optional `data.next_step`) for deep links.
@@ -1540,6 +1609,8 @@ Backend should **create inbox rows** (and optional push) on these events. Do not
 
 ---
 
+## Listener · Notifications inbox {#listener-notifications-inbox}
+
 ### 68. `GET /v1/listeners/me/notifications`
 
 | | |
@@ -1571,6 +1642,8 @@ Backend should **create inbox rows** (and optional push) on these events. Do not
 
 ---
 
+## Ventor · Notifications inbox {#ventor-notifications-inbox}
+
 ### 70a. `GET /v1/ventors/me/notifications`
 
 | | |
@@ -1599,7 +1672,7 @@ Backend should **create inbox rows** (and optional push) on these events. Do not
 
 ---
 
-## 10. Training
+## Listener · Training {#listener-training}
 
 ### 71. `GET /v1/listeners/me/training`
 
@@ -1622,7 +1695,7 @@ Module ids used in UI: `art_of_listening`, `empathy`, `boundaries`, `difficult_s
 
 ---
 
-## 11. Promo
+## Shared · Promo {#shared-promo}
 
 ### 73. `POST /v1/promo/validate`
 
@@ -1637,7 +1710,7 @@ Demo codes in UI today: `SAVE10`, `VENT5`, `WELCOME15` (replace with real catalo
 
 ---
 
-## 12. Catalog / categories *(proposed)*
+## Shared · Catalog {#shared-catalog}
 
 > Shared lookup lists for registration and filters. Seeded in DB (`comfort_areas`, `languages`, …).  
 > Mobile **must not** hardcode category labels long-term — fetch from here.
@@ -2261,7 +2334,7 @@ Empty → `200` + `items: []`. Do **not** 404.
 
 ---
 
-## Media URLs (static uploads)
+## Media URLs (static uploads) {#media-urls-static-uploads}
 
 Uploaded listener media (`avatar_url`, `voice_intro_url`, registration identity docs, etc.) is stored on disk and exposed as **relative** paths:
 
@@ -2280,7 +2353,7 @@ Catalog CDN assets (`flag_url`, category `icon_url`) are **absolute HTTPS** URLs
 
 ---
 
-## Efficiency guidelines (for implementers)
+## Efficiency guidelines (for implementers) {#efficiency-guidelines-for-implementers}
 
 1. **Prefer aggregates** — `#11` ventor home and `#32` listener dashboard load one screen in one round-trip.
 2. **Prefer `PATCH` partial updates** — listener/ventor profile text fields via JSON `#25` / `#10`; do not re-send the whole profile for one field.
@@ -2325,23 +2398,39 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 
 ## Endpoint count
 
-| Category | Count |
-|----------|------:|
-| Auth & account | 8 |
-| Ventor profile / home / wellness | 14 |
-| Listener profile / onboarding / dashboard | 16 |
-| Listener availability | 3 |
-| Discovery & sessions | 13 |
-| Call feedback & reports | 3 |
-| Earnings & payouts | 7 |
-| Rewards & invites | 5 |
-| Notifications | 3 |
-| Training | 2 |
-| Promo | 1 |
-| Catalog / categories | 4 |
-| **Total unique API endpoints** | **82** |
+| Area | Group | Count |
+|------|-------|------:|
+| **Shared** | Auth & account | 11 |
+| **Shared** | Catalog | 4 |
+| **Shared** | Promo | 1 |
+| **Shared** | Discovery | 1 |
+| **Shared** | Sessions — lifecycle | 4 |
+| **Shared** | Sessions — feedback & reports | 3 |
+| **Ventor** | Registration | 5 |
+| **Ventor** | Profile & home | 3 |
+| **Ventor** | Wellness & mood | 2 |
+| **Ventor** | Favorites | 3 |
+| **Ventor** | Achievements & privacy | 3 |
+| **Ventor** | Notification preferences | 2 |
+| **Ventor** | Sessions | 3 |
+| **Ventor** | Rewards & invites | 5 |
+| **Ventor** | Notifications inbox | 3 |
+| **Listener** | Registration | 10 |
+| **Listener** | Identity resubmit | 1 |
+| **Listener** | Profile & media | 6 |
+| **Listener** | Setup & onboarding | 2 |
+| **Listener** | Dashboard & online status | 2 |
+| **Listener** | Privacy & notification prefs | 4 |
+| **Listener** | Availability | 3 |
+| **Listener** | Sessions & requests | 5 |
+| **Listener** | Earnings & payouts | 7 |
+| **Listener** | Training | 2 |
+| **Listener** | Notifications inbox | 3 |
+| | **Total unique API endpoints** | **92** |
 
 ### Master checklist (method + path)
+
+#### Shared · Auth & account
 
 | # | Method | Path |
 |---|--------|------|
@@ -2356,6 +2445,11 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | 5 | DELETE | `/v1/auth/account` |
 | 6 | POST | `/v1/auth/change-password` |
 | 7 | GET | `/v1/auth/me` |
+
+#### Ventor APIs
+
+| # | Method | Path |
+|---|--------|------|
 | 8a | GET | `/v1/ventors/register/progress` |
 | 8b | PATCH | `/v1/ventors/register/steps/profile` |
 | 8c | PATCH | `/v1/ventors/register/steps/languages` |
@@ -2374,6 +2468,22 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | 19 | PUT | `/v1/ventors/me/privacy` |
 | 20 | GET | `/v1/ventors/me/notification-preferences` |
 | 21 | PUT | `/v1/ventors/me/notification-preferences` |
+| 43 | GET | `/v1/ventors/me/sessions` |
+| 44 | GET | `/v1/ventors/me/sessions/{sessionId}` |
+| 45 | POST | `/v1/ventors/me/sessions/{sessionId}/cancel` |
+| 63 | GET | `/v1/ventors/me/rewards` |
+| 64 | POST | `/v1/ventors/me/rewards/redeem` |
+| 65 | GET | `/v1/ventors/me/rewards/trades` |
+| 66 | GET | `/v1/ventors/me/invites` |
+| 67 | POST | `/v1/ventors/me/invites/refresh-code` |
+| 70a | GET | `/v1/ventors/me/notifications` |
+| 70b | POST | `/v1/ventors/me/notifications/read-all` |
+| 70c | DELETE | `/v1/ventors/me/notifications/{notificationId}` |
+
+#### Listener APIs
+
+| # | Method | Path |
+|---|--------|------|
 | 22a | GET | `/v1/listeners/register/progress` |
 | 22b | PATCH | `/v1/listeners/register/steps/profile` |
 | 22c | PATCH | `/v1/listeners/register/steps/identity` |
@@ -2402,22 +2512,11 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | 37 | GET | `/v1/listeners/me/availability` |
 | 38 | PUT | `/v1/listeners/me/availability` |
 | 39 | PUT | `/v1/listeners/me/availability/days/{day}` |
-| 40 | GET | `/v1/listeners` |
-| 41 | POST | `/v1/sessions/instant-match` |
-| 42 | POST | `/v1/sessions` |
-| 43 | GET | `/v1/ventors/me/sessions` |
-| 44 | GET | `/v1/ventors/me/sessions/{sessionId}` |
-| 45 | POST | `/v1/ventors/me/sessions/{sessionId}/cancel` |
 | 46 | GET | `/v1/listeners/me/sessions` |
 | 47 | GET | `/v1/listeners/me/session-stats` |
 | 48 | GET | `/v1/listeners/me/session-requests` |
 | 49 | POST | `/v1/listeners/me/session-requests/{requestId}/accept` |
 | 50 | POST | `/v1/listeners/me/session-requests/{requestId}/decline` |
-| 51 | POST | `/v1/sessions/{sessionId}/join` |
-| 52 | POST | `/v1/sessions/{sessionId}/end` |
-| 53 | POST | `/v1/sessions/{sessionId}/rating` |
-| 54 | POST | `/v1/sessions/{sessionId}/feedback` |
-| 55 | POST | `/v1/sessions/{sessionId}/reports` |
 | 56 | GET | `/v1/listeners/me/earnings` |
 | 57 | GET | `/v1/listeners/me/earnings/chart` |
 | 58 | GET | `/v1/listeners/me/payout-balances` |
@@ -2425,19 +2524,24 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | 60 | PUT | `/v1/listeners/me/payout-methods` |
 | 61 | GET | `/v1/listeners/me/payouts` |
 | 62 | POST | `/v1/listeners/me/payouts` |
-| 63 | GET | `/v1/ventors/me/rewards` |
-| 64 | POST | `/v1/ventors/me/rewards/redeem` |
-| 65 | GET | `/v1/ventors/me/rewards/trades` |
-| 66 | GET | `/v1/ventors/me/invites` |
-| 67 | POST | `/v1/ventors/me/invites/refresh-code` |
+| 71 | GET | `/v1/listeners/me/training` |
+| 72 | POST | `/v1/listeners/me/training/{moduleId}/complete` |
 | 68 | GET | `/v1/listeners/me/notifications` |
 | 69 | POST | `/v1/listeners/me/notifications/read-all` |
 | 70 | DELETE | `/v1/listeners/me/notifications/{notificationId}` |
-| 70a | GET | `/v1/ventors/me/notifications` |
-| 70b | POST | `/v1/ventors/me/notifications/read-all` |
-| 70c | DELETE | `/v1/ventors/me/notifications/{notificationId}` |
-| 71 | GET | `/v1/listeners/me/training` |
-| 72 | POST | `/v1/listeners/me/training/{moduleId}/complete` |
+
+#### Shared · Discovery, sessions, promo, catalog
+
+| # | Method | Path |
+|---|--------|------|
+| 40 | GET | `/v1/listeners` |
+| 41 | POST | `/v1/sessions/instant-match` |
+| 42 | POST | `/v1/sessions` |
+| 51 | POST | `/v1/sessions/{sessionId}/join` |
+| 52 | POST | `/v1/sessions/{sessionId}/end` |
+| 53 | POST | `/v1/sessions/{sessionId}/rating` |
+| 54 | POST | `/v1/sessions/{sessionId}/feedback` |
+| 55 | POST | `/v1/sessions/{sessionId}/reports` |
 | 73 | POST | `/v1/promo/validate` |
 | 74 | GET | `/v1/catalog/categories` *(proposed)* |
 | 75 | GET | `/v1/catalog/languages` *(proposed)* |

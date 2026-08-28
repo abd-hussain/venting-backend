@@ -857,7 +857,10 @@ def _mark_current_setup_step(
 
 
 def _book_first_session_setup_done(profile: ListenerProfile) -> bool:
-    return (profile.session_count or 0) > 0
+    return (
+        profile.book_first_session_acked_at is not None
+        or profile.first_session_tutorial_acked_at is not None
+    )
 
 
 def _apply_post_registration_locks(
@@ -1561,8 +1564,16 @@ def acknowledge_tutorial(
             "acknowledged must be true",
             ar="يجب تأكيد الإقرار",
         )
+    if profile.setup_training_status != SetupStepStatus.done:
+        raise validation_error(
+            "Complete training before acknowledging your first session",
+            ar="أكمل التدريب قبل تأكيد جلستك الأولى",
+        )
+    now = _utc_now()
     profile.setup_tutorial_status = SetupStepStatus.done
-    profile.first_session_tutorial_acked_at = _utc_now()
+    profile.first_session_tutorial_acked_at = now
+    profile.book_first_session_acked_at = now
+    clear_refill_step(profile, SetupStepId.book_first_session.value)
     db.commit()
     db.refresh(profile)
     user = db.get(User, profile.user_id)
