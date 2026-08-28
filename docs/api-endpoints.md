@@ -917,6 +917,8 @@ Mirror **#26** voice intro, but for images:
 
 > **Do not** return `pending` after the user has uploaded `identity_document` + `selfie`. That incorrectly shows “Pending” even though documents were submitted. Use `in_progress` until approved or rejected.
 
+While `identity_verification` is `in_progress` (under review), the mobile app **skips** it for **Continue Setup** and lets the listener complete any remaining registration / training steps. Only when status is `pending` after a **rejection** should the listener be prompted to resubmit.
+
 `progress_percent` should be `0–100` based on all **11** steps (server-calculated; mobile may display this value directly).
 
 **Example response**
