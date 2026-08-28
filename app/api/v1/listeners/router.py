@@ -498,8 +498,8 @@ def reviews(
     responses={401: {"model": APIErrorResponse}, 403: {"model": APIErrorResponse}},
     summary="Listener setup progress",
 )
-def setup_progress(profile: CurrentListenerProfile):
-    data = get_setup_progress(profile)
+def setup_progress(profile: CurrentListenerProfile, db: DbSession):
+    data = get_setup_progress(db, profile)
     return success_response(data.model_dump(mode="json"))
 
 

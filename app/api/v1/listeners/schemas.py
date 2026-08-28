@@ -22,13 +22,20 @@ class IdentityStatusOut(str, Enum):
 class SetupStepStatusOut(str, Enum):
     done = "done"
     in_progress = "in_progress"
+    pending = "pending"
     locked = "locked"
 
 
 class SetupStepId(str, Enum):
-    identity_verified = "identity_verified"
-    profile_info = "profile_info"
+    create_account = "create_account"
+    identity_verification = "identity_verification"
+    about_you = "about_you"
+    experience = "experience"
+    comfort_areas = "comfort_areas"
+    boundaries = "boundaries"
+    voice_intro = "voice_intro"
     availability = "availability"
+    notifications = "notifications"
     training = "training"
     first_session_tutorial = "first_session_tutorial"
 

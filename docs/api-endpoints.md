@@ -874,11 +874,75 @@ Mirror **#26** voice intro, but for images:
 | | |
 |--|--|
 | **Auth** | Bearer |
-| **Screen** | Listener dashboard setup |
+| **Screen** | Listener dashboard — **Complete your setup** checklist |
 | **Response** | `{ profile_approved, progress_percent, steps: [{ id, status }] }` |
 
-`id`: `identity_verified` \| `profile_info` \| `availability` \| `training` \| `first_session_tutorial`  
-`status`: `done` \| `in_progress` \| `locked`
+**Contract:** The server **must always return all 11 steps** below (one entry per step). The mobile app renders the full checklist in this fixed order; omitted steps are treated as a client-side fallback only and should not happen in production.
+
+| # | Step `id` | Maps to registration `#22` slug | Notes |
+|---|-----------|----------------------------------|-------|
+| 1 | `create_account` | `profile` | Account + avatar |
+| 2 | `identity_verification` | `identity` | KYC document + selfie |
+| 3 | `about_you` | `about` | |
+| 4 | `experience` | `experiences` | |
+| 5 | `comfort_areas` | `comfort-areas` | |
+| 6 | `boundaries` | `boundaries` | |
+| 7 | `voice_intro` | `voice-intro` | |
+| 8 | `availability` | `availability` | |
+| 9 | `notifications` | *(registration complete `#22j`)* | |
+| 10 | `training` | — | Listener training modules |
+| 11 | `first_session_tutorial` | — | In-app first-session walkthrough ack |
+
+**Aliases accepted by mobile** (prefer canonical `id` in API responses): registration slugs (`profile`, `identity`, `about`, `experiences`, `comfort-areas`, `voice-intro`) and legacy ids (`expertise` → `comfort_areas`).
+
+**`status` values:** `done` \| `in_progress` \| `pending` \| `locked`
+
+| Status | Meaning |
+|--------|---------|
+| `done` | Step fully complete (e.g. identity **approved** by admin) |
+| `in_progress` | Actively in progress **or** submitted and awaiting review (see identity rules below) |
+| `pending` | Not started, or skipped earlier in registration — user **may tap** to resume |
+| `locked` | Not yet available (e.g. `training` before registration complete, `first_session_tutorial` before training done) |
+
+**Aliases accepted by mobile for `status`:** `completed`/`approved` → `done`; `under_review`/`submitted`/`awaiting_review` → `in_progress`; `not_started` → `pending`.
+
+#### Identity verification (`identity_verification`) — important
+
+| Listener state | Required `status` | Mobile label |
+|----------------|-------------------|--------------|
+| No documents uploaded yet | `pending` | Pending |
+| Documents uploaded via `#22c`, admin not decided yet | **`in_progress`** | **Under Review** |
+| Admin approved identity | `done` | Done |
+| Admin rejected — user must resubmit (`#23`) | `pending` | Pending |
+
+> **Do not** return `pending` after the user has uploaded `identity_document` + `selfie`. That incorrectly shows “Pending” even though documents were submitted. Use `in_progress` until approved or rejected.
+
+`progress_percent` should be `0–100` based on all **11** steps (server-calculated; mobile may display this value directly).
+
+**Example response**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "profile_approved": false,
+    "progress_percent": 45,
+    "steps": [
+      { "id": "create_account", "status": "done" },
+      { "id": "identity_verification", "status": "in_progress" },
+      { "id": "about_you", "status": "done" },
+      { "id": "experience", "status": "done" },
+      { "id": "comfort_areas", "status": "pending" },
+      { "id": "boundaries", "status": "locked" },
+      { "id": "voice_intro", "status": "locked" },
+      { "id": "availability", "status": "locked" },
+      { "id": "notifications", "status": "locked" },
+      { "id": "training", "status": "locked" },
+      { "id": "first_session_tutorial", "status": "locked" }
+    ]
+  }
+}
+```
 
 ---
 

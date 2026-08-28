@@ -69,7 +69,7 @@ def _training_response(
     return TrainingResponse(
         modules=items,
         all_completed=all_completed,
-        setup_progress=get_setup_progress(profile) if include_setup or all_completed else None,
+        setup_progress=get_setup_progress(db, profile) if include_setup or all_completed else None,
     )
 
 
