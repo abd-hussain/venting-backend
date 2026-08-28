@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from app.api.v1.listeners.schemas import SetupProgressResponse
-from app.api.v1.listeners.service import get_setup_progress
+from app.api.v1.listeners.schemas import SetupProgressResponse, SetupStepId
+from app.api.v1.listeners.service import clear_refill_step, get_setup_progress
 from app.core.errors import not_found
 from app.models.enums import SetupStepStatus, TrainingStatus
 from app.models.profiles import ListenerProfile
@@ -118,6 +118,7 @@ def complete_training_module(
     result = _training_response(db, profile, include_setup=True)
     if result.all_completed:
         profile.setup_training_status = SetupStepStatus.done
+        clear_refill_step(profile, SetupStepId.training.value)
         # Unlock tutorial step when training finishes.
         if profile.setup_tutorial_status == SetupStepStatus.locked:
             profile.setup_tutorial_status = SetupStepStatus.in_progress

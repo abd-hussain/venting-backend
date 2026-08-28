@@ -20,8 +20,9 @@ from app.api.v1.admin.listeners.schemas import (
     ListenerReviewResponse,
     RejectListenerRequest,
 )
+from app.api.v1.listeners.schemas import SetupStepId
 from app.api.v1.admin.reports.schemas import RatingItem, RatingList
-from app.core.errors import not_found
+from app.core.errors import not_found, validation_error
 from app.core.pagination import Paginated, clamp_page
 from app.models.auth import User
 from app.models.enums import ProfileStatus, SetupStepStatus
@@ -289,6 +290,7 @@ def approve_listener(
     profile.reviewed_by_admin_id = admin.id
     profile.reviewed_at = now
     profile.rejection_reason = None
+    profile.steps_to_refill = []
     profile.setup_identity_status = SetupStepStatus.done
     from app.services.inbox_notifications import send_book_first_session_listener
 
@@ -330,7 +332,15 @@ def reject_listener(
     profile.reviewed_by_admin_id = admin.id
     profile.reviewed_at = now
     profile.rejection_reason = payload.reason.strip()
-    profile.setup_identity_status = SetupStepStatus.in_progress
+    valid_step_ids = {step.value for step in SetupStepId}
+    refill = [step_id for step_id in payload.steps_to_refill if step_id in valid_step_ids]
+    if payload.steps_to_refill and len(refill) != len(payload.steps_to_refill):
+        invalid = [step_id for step_id in payload.steps_to_refill if step_id not in valid_step_ids]
+        raise validation_error(
+            f"Invalid setup step ids: {', '.join(invalid)}",
+            ar="معرّفات خطوات الإعداد غير صالحة",
+        )
+    profile.steps_to_refill = refill
     write_audit(
         db,
         admin_user_id=admin.id,
@@ -343,6 +353,7 @@ def reject_listener(
             "is_verified": False,
             "rejection_reason": profile.rejection_reason,
             "needs_more_info": payload.needs_more_info,
+            "steps_to_refill": refill,
         },
     )
     db.commit()

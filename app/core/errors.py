@@ -44,6 +44,19 @@ def forbidden() -> MainAPIException:
     )
 
 
+def profile_not_approved() -> MainAPIException:
+    return MainAPIException(
+        type="profile",
+        code=120,
+        message="profile_not_approved",
+        localized_message={
+            "en": "Your listener profile must be approved before going online",
+            "ar": "يجب اعتماد ملف المستمع قبل الاتصال بالإنترنت",
+        },
+        http_status=status.HTTP_403_FORBIDDEN,
+    )
+
+
 def email_already_registered() -> MainAPIException:
     return MainAPIException(
         type="auth",

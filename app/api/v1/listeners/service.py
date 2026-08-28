@@ -49,7 +49,7 @@ from app.api.v1.listeners.schemas import (
 from fastapi import status
 
 from app.core.config import Settings
-from app.core.errors import conflict, forbidden, not_found, validation_error
+from app.core.errors import conflict, forbidden, not_found, profile_not_approved, validation_error
 from app.core.exceptions import MainAPIException
 from app.models.auth import User
 from app.models.availability import ListenerAvailabilitySettings, ListenerAvailabilitySlot
@@ -787,25 +787,37 @@ def _map_identity_status(status: ProfileStatus) -> IdentityStatusOut:
 
 def _identity_verification_setup_status(
     db: Session,
+    user: User,
     profile: ListenerProfile,
+    refill_ids: set[str],
 ) -> SetupStepStatusOut:
-    if profile.setup_identity_status == SetupStepStatus.done or profile.is_verified:
+    if SetupStepId.identity_verification.value in refill_ids:
+        return SetupStepStatusOut.pending
+    if _registration_step_done(user, "identity"):
         return SetupStepStatusOut.done
-
     latest = (
         db.query(ListenerIdentityVerification)
         .filter(ListenerIdentityVerification.listener_id == profile.user_id)
         .order_by(ListenerIdentityVerification.created_at.desc())
         .first()
     )
-    if latest is None:
-        return SetupStepStatusOut.pending
-
-    if latest.status == ProfileStatus.approved:
+    if latest is not None:
         return SetupStepStatusOut.done
-    if latest.status == ProfileStatus.rejected:
-        return SetupStepStatusOut.pending
-    return SetupStepStatusOut.in_progress
+    return SetupStepStatusOut.pending
+
+
+def _refill_step_ids(profile: ListenerProfile) -> set[str]:
+    raw = profile.steps_to_refill
+    if not raw or not isinstance(raw, list):
+        return set()
+    return {str(item) for item in raw}
+
+
+def clear_refill_step(profile: ListenerProfile, step_id: str) -> None:
+    refill = _refill_step_ids(profile)
+    if step_id not in refill:
+        return
+    profile.steps_to_refill = sorted(refill - {step_id})
 
 
 def _registration_step_done(user: User, slug: str) -> bool:
@@ -829,7 +841,23 @@ def _apply_setup_locking(statuses: list[SetupStepStatusOut]) -> list[SetupStepSt
     return result
 
 
+def _mark_current_setup_step(
+    statuses: list[SetupStepStatusOut],
+    *,
+    has_refill_steps: bool,
+) -> list[SetupStepStatusOut]:
+    if has_refill_steps:
+        return statuses
+    result = list(statuses)
+    for index, status in enumerate(result):
+        if status == SetupStepStatusOut.pending:
+            result[index] = SetupStepStatusOut.in_progress
+            break
+    return result
+
+
 def _setup_progress(db: Session, user: User, profile: ListenerProfile) -> SetupProgressResponse:
+    refill_ids = _refill_step_ids(profile)
     registration_steps: list[tuple[SetupStepId, str | None]] = [
         (SetupStepId.create_account, "profile"),
         (SetupStepId.identity_verification, "identity"),
@@ -844,8 +872,12 @@ def _setup_progress(db: Session, user: User, profile: ListenerProfile) -> SetupP
 
     raw_statuses: list[SetupStepStatusOut] = []
     for step_id, slug in registration_steps:
-        if step_id == SetupStepId.identity_verification:
-            raw_statuses.append(_identity_verification_setup_status(db, profile))
+        if step_id.value in refill_ids:
+            raw_statuses.append(SetupStepStatusOut.pending)
+        elif step_id == SetupStepId.identity_verification:
+            raw_statuses.append(
+                _identity_verification_setup_status(db, user, profile, refill_ids)
+            )
         elif step_id == SetupStepId.notifications:
             raw_statuses.append(
                 SetupStepStatusOut.done
@@ -859,6 +891,8 @@ def _setup_progress(db: Session, user: User, profile: ListenerProfile) -> SetupP
 
     if not user.registration_complete:
         raw_statuses.append(SetupStepStatusOut.locked)
+    elif SetupStepId.training.value in refill_ids:
+        raw_statuses.append(SetupStepStatusOut.pending)
     elif profile.setup_training_status == SetupStepStatus.done:
         raw_statuses.append(SetupStepStatusOut.done)
     elif profile.setup_training_status == SetupStepStatus.in_progress:
@@ -868,6 +902,8 @@ def _setup_progress(db: Session, user: User, profile: ListenerProfile) -> SetupP
 
     if profile.setup_training_status != SetupStepStatus.done:
         raw_statuses.append(SetupStepStatusOut.locked)
+    elif SetupStepId.first_session_tutorial.value in refill_ids:
+        raw_statuses.append(SetupStepStatusOut.pending)
     elif (
         profile.setup_tutorial_status == SetupStepStatus.done
         or profile.first_session_tutorial_acked_at is not None
@@ -879,22 +915,33 @@ def _setup_progress(db: Session, user: User, profile: ListenerProfile) -> SetupP
         raw_statuses.append(SetupStepStatusOut.pending)
 
     final_statuses = _apply_setup_locking(raw_statuses)
-    # Post-registration steps keep their explicit lock rules.
     if not user.registration_complete:
         final_statuses[-2] = SetupStepStatusOut.locked
     if profile.setup_training_status != SetupStepStatus.done:
         final_statuses[-1] = SetupStepStatusOut.locked
 
+    final_statuses = _mark_current_setup_step(
+        final_statuses,
+        has_refill_steps=bool(refill_ids),
+    )
+
+    all_steps = registration_steps + [
+        (SetupStepId.training, None),
+        (SetupStepId.first_session_tutorial, None),
+    ]
     steps = [
         SetupStepItem(id=step_id, status=status)
-        for (step_id, _), status in zip(registration_steps + [
-            (SetupStepId.training, None),
-            (SetupStepId.first_session_tutorial, None),
-        ], final_statuses)
+        for (step_id, _), status in zip(all_steps, final_statuses)
     ]
     done = sum(1 for step in steps if step.status == SetupStepStatusOut.done)
+    profile_status = ProfileStatusOut(profile.profile_status.value)
+    approved = profile.profile_status == ProfileStatus.approved
     return SetupProgressResponse(
-        profile_approved=profile.profile_status == ProfileStatus.approved,
+        profile_approved=approved,
+        profile_status=profile_status,
+        can_go_online=approved,
+        steps_to_refill=sorted(refill_ids) if profile.profile_status == ProfileStatus.rejected else [],
+        rejection_reason=profile.rejection_reason or "",
         progress_percent=int(round((done / len(steps)) * 100)),
         steps=steps,
     )
@@ -1201,6 +1248,7 @@ async def submit_identity_verification(
     profile.setup_identity_status = SetupStepStatus.in_progress
     profile.profile_status = ProfileStatus.under_review
     profile.is_verified = False
+    clear_refill_step(profile, SetupStepId.identity_verification.value)
     db.commit()
     return IdentityVerificationResponse(status=IdentityStatusOut.pending)
 
@@ -1443,7 +1491,9 @@ def get_public_listener(
         )
 
     is_online = profile.is_online
-    if viewer.role != UserRole.listener or viewer.id != listener_id:
+    if profile.profile_status != ProfileStatus.approved:
+        is_online = False
+    elif viewer.role != UserRole.listener or viewer.id != listener_id:
         if privacy is not None and not privacy.show_online_status:
             is_online = False
 
@@ -1493,6 +1543,7 @@ def acknowledge_tutorial(
         )
     profile.setup_tutorial_status = SetupStepStatus.done
     profile.first_session_tutorial_acked_at = _utc_now()
+    clear_refill_step(profile, SetupStepId.first_session_tutorial.value)
     db.commit()
     db.refresh(profile)
     user = db.get(User, profile.user_id)
@@ -1507,6 +1558,8 @@ def set_online_status(
     *,
     is_online: bool,
 ) -> OnlineStatusResponse:
+    if is_online and profile.profile_status != ProfileStatus.approved:
+        raise profile_not_approved()
     profile.is_online = is_online
     db.commit()
     return OnlineStatusResponse(is_online=profile.is_online)
@@ -1575,10 +1628,14 @@ def get_dashboard(db: Session, profile: ListenerProfile) -> DashboardResponse:
     if user is None:
         raise not_found("User")
     progress = _setup_progress(db, user, profile)
-    if not progress.profile_approved:
+    if progress.profile_status == ProfileStatusOut.rejected:
+        reminder = progress.rejection_reason or "Please update the flagged setup steps"
+    elif not progress.profile_approved:
         reminder = "Your profile is under review"
     elif any(step.status != SetupStepStatusOut.done for step in progress.steps):
         reminder = "Finish setup to unlock more sessions"
+
+    display_online = profile.is_online if progress.can_go_online else False
 
     return DashboardResponse(
         display_name=profile.full_name,
@@ -1589,7 +1646,7 @@ def get_dashboard(db: Session, profile: ListenerProfile) -> DashboardResponse:
             chart=chart,
         ),
         next_upcoming_session=next_session,
-        is_online=profile.is_online,
+        is_online=display_online,
         reminder=reminder,
     )
 

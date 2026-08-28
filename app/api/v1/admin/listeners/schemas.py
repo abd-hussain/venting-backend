@@ -58,6 +58,7 @@ class IdentityVerificationDetail(BaseModel):
 class RejectListenerRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=2000)
     needs_more_info: bool = False
+    steps_to_refill: list[str] = Field(default_factory=list)
 
 
 class IdentityDecision(str, Enum):

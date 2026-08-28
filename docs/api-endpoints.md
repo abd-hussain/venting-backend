@@ -875,66 +875,76 @@ Mirror **#26** voice intro, but for images:
 |--|--|
 | **Auth** | Bearer |
 | **Screen** | Listener dashboard — **Complete your setup** checklist |
-| **Response** | `{ profile_approved, progress_percent, steps: [{ id, status }] }` |
+| **Response** | See fields below |
 
-**Contract:** The server **must always return all 11 steps** below (one entry per step). The mobile app renders the full checklist in this fixed order; omitted steps are treated as a client-side fallback only and should not happen in production.
+**Contract:** Return **all 11 setup steps** plus **profile review state**. Step statuses reflect **listener completion only** (data saved). **Profile approval** is separate and applies to the **whole profile** (all registration fields + identity docs + tags + media), not individual step admin sign-off.
 
-| # | Step `id` | Maps to registration `#22` slug | Notes |
-|---|-----------|----------------------------------|-------|
-| 1 | `create_account` | `profile` | Account + avatar |
-| 2 | `identity_verification` | `identity` | KYC document + selfie |
-| 3 | `about_you` | `about` | |
-| 4 | `experience` | `experiences` | |
-| 5 | `comfort_areas` | `comfort-areas` | |
-| 6 | `boundaries` | `boundaries` | |
-| 7 | `voice_intro` | `voice-intro` | |
-| 8 | `availability` | `availability` | |
-| 9 | `notifications` | *(registration complete `#22j`)* | |
-| 10 | `training` | — | Listener training modules |
-| 11 | `first_session_tutorial` | — | In-app first-session walkthrough ack |
+| Field | Type | Notes |
+|-------|------|-------|
+| `profile_approved` | bool | `true` when `profile_status == approved` |
+| `profile_status` | string | `incomplete` \| `under_review` \| `approved` \| `rejected` |
+| `can_go_online` | bool | `false` until `profile_status == approved`. Listener may finish setup while `under_review` but stays **hidden/offline** to ventors |
+| `steps_to_refill` | string[] | Present when `rejected` — setup step ids the admin flagged for correction (same ids as `steps[].id`) |
+| `rejection_reason` | string? | Optional admin note shown to listener |
+| `progress_percent` | int | `0–100` over all 11 steps |
+| `steps` | array | `{ id, status }` — always **11 items** |
 
-**Aliases accepted by mobile** (prefer canonical `id` in API responses): registration slugs (`profile`, `identity`, `about`, `experiences`, `comfort-areas`, `voice-intro`) and legacy ids (`expertise` → `comfort_areas`).
+#### Setup step ids (fixed order)
 
-**`status` values:** `done` \| `in_progress` \| `pending` \| `locked`
+| # | Step `id` | Registration slug `#22` |
+|---|-----------|-------------------------|
+| 1 | `create_account` | `profile` |
+| 2 | `identity_verification` | `identity` |
+| 3 | `about_you` | `about` |
+| 4 | `experience` | `experiences` |
+| 5 | `comfort_areas` | `comfort-areas` |
+| 6 | `boundaries` | `boundaries` |
+| 7 | `voice_intro` | `voice-intro` |
+| 8 | `availability` | `availability` |
+| 9 | `notifications` | `#22j` complete |
+| 10 | `training` | — |
+| 11 | `first_session_tutorial` | — |
+
+#### Step `status` values
 
 | Status | Meaning |
 |--------|---------|
-| `done` | Step fully complete (e.g. identity **approved** by admin) |
-| `in_progress` | Actively in progress **or** submitted and awaiting review (see identity rules below) |
-| `pending` | Not started, or skipped earlier in registration — user **may tap** to resume |
-| `locked` | Not yet available (e.g. `training` before registration complete, `first_session_tutorial` before training done) |
+| `done` | Listener completed/saved this step (includes identity **after upload** — review is profile-level) |
+| `in_progress` | Current editable step |
+| `pending` | Not done or **admin flagged for refill** (`needs_refill` alias) — tappable |
+| `locked` | Not yet available |
 
-**Aliases accepted by mobile for `status`:** `completed`/`approved` → `done`; `under_review`/`submitted`/`awaiting_review` → `in_progress`; `not_started` → `pending`.
+**Aliases:** `uploaded`/`submitted` → `done`; `needs_refill` → `pending`.
 
-#### Identity verification (`identity_verification`) — important
+#### Profile review vs step completion
 
-| Listener state | Required `status` | Mobile label |
-|----------------|-------------------|--------------|
-| No documents uploaded yet | `pending` | Pending |
-| Documents uploaded via `#22c`, admin not decided yet | **`in_progress`** | **Under Review** |
-| Admin approved identity | `done` | Done |
-| Admin rejected — user must resubmit (`#23`) | `pending` | Pending |
+| Event | `profile_status` | Identity step | Other incomplete steps | `can_go_online` |
+|-------|-------------------|---------------|------------------------|-----------------|
+| Listener uploads identity docs | unchanged / `under_review` after `#22j` | **`done`** | listener may continue | `false` |
+| Registration complete, awaiting admin | `under_review` | `done` (if uploaded) | may still be `pending`/`in_progress` | `false` |
+| Admin approves whole profile | `approved` | `done` | unchanged | **`true`** |
+| Admin rejects profile | `rejected` | `done` unless in `steps_to_refill` → `pending` | flagged steps → `pending` | `false` |
 
-> **Do not** return `pending` after the user has uploaded `identity_document` + `selfie`. That incorrectly shows “Pending” even though documents were submitted. Use `in_progress` until approved or rejected.
+> **Do not** keep identity at `in_progress`/`under_review` after upload. Admin review applies to the **entire profile dossier**, not a per-step identity queue in the mobile checklist.
 
-While `identity_verification` is `in_progress` (under review), the mobile app **skips** it for **Continue Setup** and lets the listener complete any remaining registration / training steps. Only when status is `pending` after a **rejection** should the listener be prompted to resubmit.
-
-`progress_percent` should be `0–100` based on all **11** steps (server-calculated; mobile may display this value directly).
-
-**Example response**
+**Example — under review, identity uploaded, still finishing comfort areas**
 
 ```json
 {
   "status": "success",
   "data": {
     "profile_approved": false,
-    "progress_percent": 45,
+    "profile_status": "under_review",
+    "can_go_online": false,
+    "steps_to_refill": [],
+    "rejection_reason": "",
+    "progress_percent": 55,
     "steps": [
       { "id": "create_account", "status": "done" },
-      { "id": "identity_verification", "status": "in_progress" },
+      { "id": "identity_verification", "status": "done" },
       { "id": "about_you", "status": "done" },
       { "id": "experience", "status": "done" },
-      { "id": "comfort_areas", "status": "pending" },
+      { "id": "comfort_areas", "status": "in_progress" },
       { "id": "boundaries", "status": "locked" },
       { "id": "voice_intro", "status": "locked" },
       { "id": "availability", "status": "locked" },
@@ -943,6 +953,21 @@ While `identity_verification` is `in_progress` (under review), the mobile app **
       { "id": "first_session_tutorial", "status": "locked" }
     ]
   }
+}
+```
+
+**Example — rejected, admin wants identity + voice intro fixed**
+
+```json
+{
+  "profile_status": "rejected",
+  "can_go_online": false,
+  "steps_to_refill": ["identity_verification", "voice_intro"],
+  "rejection_reason": "Selfie was unclear. Please re-upload ID and record a new voice intro.",
+  "steps": [
+    { "id": "identity_verification", "status": "pending" },
+    { "id": "voice_intro", "status": "pending" }
+  ]
 }
 ```
 
@@ -964,9 +989,15 @@ While `identity_verification` is `in_progress` (under review), the mobile app **
 | | |
 |--|--|
 | **Auth** | Bearer |
-| **Screen** | Listener dashboard availability toggle |
+| **Screen** | Listener dashboard / availability online toggle |
 | **Body** | `{ "is_online": true }` |
 | **Response** | `{ "is_online": true }` |
+
+**Rules**
+
+- Reject `is_online: true` with **403** `profile_not_approved` when `listener_profiles.profile_status != approved` (or `can_go_online == false` from `#29`).
+- Listener may set `is_online: false` at any time.
+- While profile is `under_review` or `rejected`, listener stays **offline to ventors** even if they configured availability.
 
 ---
 

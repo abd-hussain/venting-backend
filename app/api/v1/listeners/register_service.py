@@ -45,6 +45,7 @@ from app.api.v1.listeners.service import (
     _utc_now,
     _validate_family_role_ids,
     _validate_relationship_status,
+    clear_refill_step,
     get_availability_payload,
 )
 from app.core.config import Settings
@@ -66,6 +67,25 @@ from app.services.registration_progress import (
     next_step_for,
     require_steps_done,
 )
+
+
+REGISTER_SLUG_TO_SETUP_STEP: dict[str, str] = {
+    "profile": "create_account",
+    "identity": "identity_verification",
+    "about": "about_you",
+    "experiences": "experience",
+    "comfort-areas": "comfort_areas",
+    "boundaries": "boundaries",
+    "voice-intro": "voice_intro",
+    "availability": "availability",
+    "notifications": "notifications",
+}
+
+
+def _clear_refill_for_slug(profile: ListenerProfile, slug: str) -> None:
+    step_id = REGISTER_SLUG_TO_SETUP_STEP.get(slug)
+    if step_id is not None:
+        clear_refill_step(profile, step_id)
 
 
 def _get_profile(db: Session, user_id) -> ListenerProfile | None:
@@ -217,6 +237,7 @@ async def save_register_profile_step(
         profile.avatar_url = avatar_url
 
     mark_step_done(user, "profile", LISTENER_REGISTER_STEPS)
+    _clear_refill_for_slug(profile, "profile")
     db.commit()
     return get_register_progress(db, user)
 
@@ -278,6 +299,7 @@ async def save_register_identity_step(
     db.add(row)
     profile.setup_identity_status = SetupStepStatus.in_progress
     mark_step_done(user, "identity", LISTENER_REGISTER_STEPS)
+    _clear_refill_for_slug(profile, "identity")
     db.commit()
     return get_register_progress(db, user)
 
@@ -316,6 +338,7 @@ def save_register_about_step(
     _replace_tags(db, listener_id=user.id, language_ids=language_ids)
     profile.setup_profile_status = SetupStepStatus.done
     mark_step_done(user, "about", LISTENER_REGISTER_STEPS)
+    _clear_refill_for_slug(profile, "about")
     db.commit()
     return get_register_progress(db, user)
 
@@ -348,6 +371,7 @@ def save_register_experiences_step(
     )
 
     mark_step_done(user, "experiences", LISTENER_REGISTER_STEPS)
+    _clear_refill_for_slug(profile, "experiences")
     db.commit()
     return get_register_progress(db, user)
 
@@ -375,6 +399,7 @@ def save_register_comfort_areas_step(
         custom_comfort_area_text=payload.custom_comfort_area_text,
     )
     mark_step_done(user, "comfort-areas", LISTENER_REGISTER_STEPS)
+    _clear_refill_for_slug(profile, "comfort-areas")
     db.commit()
     return get_register_progress(db, user)
 
@@ -402,6 +427,7 @@ def save_register_boundaries_step(
         custom_boundary_text=payload.custom_boundary_text,
     )
     mark_step_done(user, "boundaries", LISTENER_REGISTER_STEPS)
+    _clear_refill_for_slug(profile, "boundaries")
     db.commit()
     return get_register_progress(db, user)
 
@@ -440,6 +466,7 @@ async def save_register_voice_intro_step(
     profile.voice_intro_url = voice_url
     profile.voice_intro_seconds = payload.voice_intro_seconds
     mark_step_done(user, "voice-intro", LISTENER_REGISTER_STEPS)
+    _clear_refill_for_slug(profile, "voice-intro")
     db.commit()
     return get_register_progress(db, user)
 
@@ -476,6 +503,7 @@ def save_register_availability_step(
     )
     profile.setup_availability_status = SetupStepStatus.done
     mark_step_done(user, "availability", LISTENER_REGISTER_STEPS)
+    _clear_refill_for_slug(profile, "availability")
     db.commit()
     return get_register_progress(db, user)
 
@@ -546,6 +574,7 @@ def complete_register(
     profile.agreed_to_terms_at = _utc_now()
     upsert_push_token(db, user.id, payload.fcm_token)
     mark_step_done(user, "notifications", LISTENER_REGISTER_STEPS)
+    _clear_refill_for_slug(profile, "notifications")
     user.registration_complete = True
     db.commit()
 

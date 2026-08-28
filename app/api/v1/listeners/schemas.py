@@ -357,6 +357,10 @@ class SetupStepItem(BaseModel):
 
 class SetupProgressResponse(BaseModel):
     profile_approved: bool
+    profile_status: ProfileStatusOut
+    can_go_online: bool
+    steps_to_refill: list[str] = Field(default_factory=list)
+    rejection_reason: str = ""
     progress_percent: int
     steps: list[SetupStepItem]
 

@@ -304,7 +304,9 @@ Optional FCM device tokens from ventor `#8e` / listener `#22j` registration comp
 | `voice_intro_seconds` | INT | ? |
 | `is_online` | BOOLEAN | default false **IDX** |
 | `is_verified` | BOOLEAN | default false |
-| `profile_status` | `profile_status` | **IDX** |
+| `profile_status` | `profile_status` | **IDX** — whole-profile review state |
+| `profile_rejection_reason` | TEXT | ? Last admin reject note (mirrors `#29` `rejection_reason`) |
+| `steps_to_refill` | JSONB | string[] of setup step ids flagged on reject (mirrors `#29`) |
 | `accept_instant_calls` | BOOLEAN | default true |
 | `session_length_minutes` | INT | default 30 |
 | `break_length_minutes` | INT | default 15 |

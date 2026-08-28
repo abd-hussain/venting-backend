@@ -141,6 +141,7 @@ class ListenerProfile(Base, TimestampMixin):
     )
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     rejection_reason = Column(Text, nullable=True)
+    steps_to_refill = Column(JSONB, nullable=False, server_default="[]")
 
     user = relationship("User", back_populates="listener_profile")
     identity_verifications = relationship(
