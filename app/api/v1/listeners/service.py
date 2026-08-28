@@ -856,13 +856,6 @@ def _mark_current_setup_step(
     return result
 
 
-def _tutorial_setup_done(profile: ListenerProfile) -> bool:
-    return (
-        profile.setup_tutorial_status == SetupStepStatus.done
-        or profile.first_session_tutorial_acked_at is not None
-    )
-
-
 def _book_first_session_setup_done(profile: ListenerProfile) -> bool:
     return (profile.session_count or 0) > 0
 
@@ -872,20 +865,15 @@ def _apply_post_registration_locks(
     *,
     registration_complete: bool,
     training_done: bool,
-    tutorial_done: bool,
 ) -> list[SetupStepStatusOut]:
     result = list(statuses)
     training_index = 9
-    tutorial_index = 10
-    book_index = 11
+    book_index = 10
     if not registration_complete:
-        for index in (training_index, tutorial_index, book_index):
-            result[index] = SetupStepStatusOut.locked
+        result[training_index] = SetupStepStatusOut.locked
+        result[book_index] = SetupStepStatusOut.locked
         return result
     if not training_done:
-        for index in (tutorial_index, book_index):
-            result[index] = SetupStepStatusOut.locked
-    if not tutorial_done:
         result[book_index] = SetupStepStatusOut.locked
     return result
 
@@ -924,7 +912,6 @@ def _setup_progress(db: Session, user: User, profile: ListenerProfile) -> SetupP
             raw_statuses.append(SetupStepStatusOut.pending)
 
     training_done = profile.setup_training_status == SetupStepStatus.done
-    tutorial_done = _tutorial_setup_done(profile)
 
     if not user.registration_complete:
         raw_statuses.append(SetupStepStatusOut.locked)
@@ -939,17 +926,6 @@ def _setup_progress(db: Session, user: User, profile: ListenerProfile) -> SetupP
 
     if not user.registration_complete or not training_done:
         raw_statuses.append(SetupStepStatusOut.locked)
-    elif SetupStepId.first_session_tutorial.value in refill_ids:
-        raw_statuses.append(SetupStepStatusOut.pending)
-    elif tutorial_done:
-        raw_statuses.append(SetupStepStatusOut.done)
-    elif profile.setup_tutorial_status == SetupStepStatus.in_progress:
-        raw_statuses.append(SetupStepStatusOut.in_progress)
-    else:
-        raw_statuses.append(SetupStepStatusOut.pending)
-
-    if not user.registration_complete or not tutorial_done:
-        raw_statuses.append(SetupStepStatusOut.locked)
     elif SetupStepId.book_first_session.value in refill_ids:
         raw_statuses.append(SetupStepStatusOut.pending)
     elif _book_first_session_setup_done(profile):
@@ -962,7 +938,6 @@ def _setup_progress(db: Session, user: User, profile: ListenerProfile) -> SetupP
         final_statuses,
         registration_complete=user.registration_complete,
         training_done=training_done,
-        tutorial_done=tutorial_done,
     )
     final_statuses = _mark_current_setup_step(
         final_statuses,
@@ -971,7 +946,6 @@ def _setup_progress(db: Session, user: User, profile: ListenerProfile) -> SetupP
 
     all_steps = registration_steps + [
         (SetupStepId.training, None),
-        (SetupStepId.first_session_tutorial, None),
         (SetupStepId.book_first_session, None),
     ]
     steps = [
@@ -1589,7 +1563,6 @@ def acknowledge_tutorial(
         )
     profile.setup_tutorial_status = SetupStepStatus.done
     profile.first_session_tutorial_acked_at = _utc_now()
-    clear_refill_step(profile, SetupStepId.first_session_tutorial.value)
     db.commit()
     db.refresh(profile)
     user = db.get(User, profile.user_id)

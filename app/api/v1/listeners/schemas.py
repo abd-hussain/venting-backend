@@ -37,7 +37,6 @@ class SetupStepId(str, Enum):
     availability = "availability"
     notifications = "notifications"
     training = "training"
-    first_session_tutorial = "first_session_tutorial"
     book_first_session = "book_first_session"
 
 

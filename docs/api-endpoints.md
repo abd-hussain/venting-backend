@@ -877,18 +877,18 @@ Mirror **#26** voice intro, but for images:
 | **Screen** | Listener dashboard — **Complete your setup** checklist |
 | **Response** | See fields below |
 
-**Contract:** Return **all 12 setup steps** plus **profile review state**. Step statuses reflect **listener completion only** (data saved). **Profile approval** is separate and applies to the **whole profile** (all registration fields + identity docs + tags + media), not individual step admin sign-off.
+**Contract:** Return **all 11 setup steps** plus **profile review state**. Step statuses reflect **listener completion only** (data saved). **Profile approval** is separate and applies to the **whole profile** (all registration fields + identity docs + tags + media), not individual step admin sign-off.
 
 | Field | Type | Notes |
 |-------|------|-------|
 | `profile_approved` | bool | `true` when `profile_status == approved` |
 | `profile_status` | string | `incomplete` \| `under_review` \| `approved` \| `rejected` |
 | `can_go_online` | bool | `false` until `profile_status == approved`. Listener may finish setup while `under_review` but stays **hidden/offline** to ventors |
-| `registration_complete` | bool | `true` after `#22j` complete — unlocks steps 10–12 (training, tutorial, book first session) even when `profile_status == under_review` |
+| `registration_complete` | bool | `true` after `#22j` complete — unlocks steps 10–11 (training, book first session) even when `profile_status == under_review` |
 | `steps_to_refill` | string[] | Present when `rejected` — setup step ids the admin flagged for correction (same ids as `steps[].id`) |
 | `rejection_reason` | string? | Optional admin note shown to listener |
-| `progress_percent` | int | `0–100` over all 12 steps |
-| `steps` | array | `{ id, status }` — always **12 items** |
+| `progress_percent` | int | `0–100` over all 11 steps |
+| `steps` | array | `{ id, status }` — always **11 items** |
 
 #### Setup step ids (fixed order)
 
@@ -904,8 +904,7 @@ Mirror **#26** voice intro, but for images:
 | 8 | `availability` | `availability` |
 | 9 | `notifications` | `#22j` complete |
 | 10 | `training` | — |
-| 11 | `first_session_tutorial` | — |
-| 12 | `book_first_session` | Listener sets availability / schedules first onboarding session |
+| 11 | `book_first_session` | Listener sets availability / schedules first onboarding session |
 
 #### Step `status` values
 
@@ -923,7 +922,7 @@ Mirror **#26** voice intro, but for images:
 | Event | `profile_status` | Identity step | Other incomplete steps | `can_go_online` |
 |-------|-------------------|---------------|------------------------|-----------------|
 | Listener uploads identity docs | unchanged / `under_review` after `#22j` | **`done`** | listener may continue | `false` |
-| Registration complete, awaiting admin | `under_review` | `done` (if uploaded) | registration steps `done`; **training / tutorial / book_first_session** available (`pending`/`in_progress`) | `false` |
+| Registration complete, awaiting admin | `under_review` | `done` (if uploaded) | registration steps `done`; **training / book_first_session** available (`pending`/`in_progress`) | `false` |
 | Admin approves whole profile | `approved` | `done` | unchanged | **`true`** |
 | Admin rejects profile | `rejected` | `done` unless in `steps_to_refill` → `pending` | flagged steps → `pending` | `false` |
 
@@ -952,7 +951,6 @@ Mirror **#26** voice intro, but for images:
       { "id": "availability", "status": "locked" },
       { "id": "notifications", "status": "locked" },
       { "id": "training", "status": "locked" },
-      { "id": "first_session_tutorial", "status": "locked" },
       { "id": "book_first_session", "status": "locked" }
     ]
   }
@@ -983,7 +981,6 @@ Mirror **#26** voice intro, but for images:
       { "id": "availability", "status": "done" },
       { "id": "notifications", "status": "done" },
       { "id": "training", "status": "in_progress" },
-      { "id": "first_session_tutorial", "status": "locked" },
       { "id": "book_first_session", "status": "locked" }
     ]
   }
