@@ -264,7 +264,6 @@ def run_book_first_session_reminders(db: Session, *, after_hours: int = 48) -> i
         if send_book_first_session_ventor(db, user) is not None:
             created += 1
 
-    from app.models.enums import ProfileStatus
     from app.models.profiles import ListenerProfile
 
     listeners = (
