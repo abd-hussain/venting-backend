@@ -1,6 +1,6 @@
 """Add onboarding notification types
 
-Revision ID: 027_notification_onboarding_types
+Revision ID: 027_onboarding_notif_types
 Revises: 026_availability_session_minutes
 Create Date: 2026-08-28 17:40:00.000000
 
@@ -10,7 +10,7 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "027_notification_onboarding_types"
+revision: str = "027_onboarding_notif_types"
 down_revision: Union[str, Sequence[str], None] = "026_availability_session_minutes"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
