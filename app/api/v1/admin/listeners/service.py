@@ -294,7 +294,7 @@ def approve_listener(
     profile.setup_identity_status = SetupStepStatus.done
     from app.services.inbox_notifications import send_book_first_session_listener
 
-    send_book_first_session_listener(db, profile.user_id)
+    send_book_first_session_listener(db, profile.user_id, skip_if_exists=True)
     write_audit(
         db,
         admin_user_id=admin.id,

@@ -576,6 +576,9 @@ def complete_register(
     mark_step_done(user, "notifications", LISTENER_REGISTER_STEPS)
     _clear_refill_for_slug(profile, "notifications")
     user.registration_complete = True
+    from app.services.inbox_notifications import send_book_first_session_listener
+
+    send_book_first_session_listener(db, user.id)
     db.commit()
 
     return RegisterListenerResponse(

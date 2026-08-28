@@ -38,6 +38,7 @@ class SetupStepId(str, Enum):
     notifications = "notifications"
     training = "training"
     first_session_tutorial = "first_session_tutorial"
+    book_first_session = "book_first_session"
 
 
 class DayOfWeekOut(str, Enum):
@@ -359,6 +360,7 @@ class SetupProgressResponse(BaseModel):
     profile_approved: bool
     profile_status: ProfileStatusOut
     can_go_online: bool
+    registration_complete: bool
     steps_to_refill: list[str] = Field(default_factory=list)
     rejection_reason: str = ""
     progress_percent: int

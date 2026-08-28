@@ -35,8 +35,8 @@ BOOK_FIRST_SESSION_VENTOR_COPY = (
     "Find a listener who's ready when you are.",
 )
 BOOK_FIRST_SESSION_LISTENER_COPY = (
-    "You're approved — go online",
-    "Set your availability and start helping people.",
+    "Finish onboarding",
+    "Complete training and set your availability for your first session.",
 )
 
 
@@ -83,6 +83,23 @@ def has_unread_of_type(
             Notification.user_id == user_id,
             Notification.type == notification_type,
             Notification.is_read.is_(False),
+            Notification.deleted_at.is_(None),
+        )
+        .first()
+        is not None
+    )
+
+
+def has_notification_of_type(
+    db: Session,
+    user_id: UUID,
+    notification_type: NotificationType,
+) -> bool:
+    return (
+        db.query(Notification.id)
+        .filter(
+            Notification.user_id == user_id,
+            Notification.type == notification_type,
             Notification.deleted_at.is_(None),
         )
         .first()
@@ -182,8 +199,17 @@ def send_book_first_session_ventor(db: Session, user: User) -> Notification | No
     )
 
 
-def send_book_first_session_listener(db: Session, user_id: UUID) -> Notification | None:
+def send_book_first_session_listener(
+    db: Session,
+    user_id: UUID,
+    *,
+    skip_if_exists: bool = False,
+) -> Notification | None:
     if _listener_has_completed_sessions(db, user_id):
+        return None
+    if skip_if_exists and has_notification_of_type(
+        db, user_id, NotificationType.book_first_session
+    ):
         return None
     return create_inbox_notification(
         db,
@@ -247,9 +273,8 @@ def run_book_first_session_reminders(db: Session, *, after_hours: int = 48) -> i
         .filter(
             User.deleted_at.is_(None),
             User.role == UserRole.listener,
-            ListenerProfile.profile_status == ProfileStatus.approved,
-            ListenerProfile.reviewed_at.isnot(None),
-            ListenerProfile.reviewed_at <= cutoff,
+            User.registration_complete.is_(True),
+            User.updated_at <= cutoff,
         )
         .all()
     )
