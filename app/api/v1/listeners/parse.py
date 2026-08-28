@@ -44,6 +44,51 @@ def form_json_list_raw(form: Any, name: str) -> str | None:
     return _scalar(form, name)
 
 
+def parse_session_minutes_list(raw: str | int | list[int] | None) -> list[int]:
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return [int(item) for item in raw]
+    if isinstance(raw, int):
+        return [raw]
+
+    text = str(raw).strip()
+    if not text:
+        return []
+
+    if text.startswith("["):
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise validation_error(
+                "session_minutes must be an integer or JSON array of integers",
+                ar="session_minutes يجب أن يكون عددًا صحيحًا أو مصفوفة",
+            ) from exc
+        if not isinstance(parsed, list):
+            raise validation_error(
+                "session_minutes must be an integer or JSON array of integers",
+                ar="session_minutes يجب أن يكون عددًا صحيحًا أو مصفوفة",
+            )
+        numbers: list[int] = []
+        for item in parsed:
+            try:
+                numbers.append(int(item))
+            except (TypeError, ValueError) as exc:
+                raise validation_error(
+                    "session_minutes must be an integer or JSON array of integers",
+                    ar="session_minutes يجب أن يكون عددًا صحيحًا أو مصفوفة",
+                ) from exc
+        return numbers
+
+    try:
+        return [int(text)]
+    except ValueError as exc:
+        raise validation_error(
+            "session_minutes must be an integer or JSON array of integers",
+            ar="session_minutes يجب أن يكون عددًا صحيحًا أو مصفوفة",
+        ) from exc
+
+
 def parse_session_minutes(raw: str | int | None) -> int | None:
     if raw is None:
         return None
@@ -110,7 +155,7 @@ def parse_register_form(form: Any) -> dict[str, Any]:
         "custom_boundary_text": _scalar(form, "custom_boundary_text"),
         "availability_raw": _scalar(form, "availability"),
         "accept_instant_calls": _scalar(form, "accept_instant_calls"),
-        "session_minutes": parse_session_minutes(session_raw),
+        "session_minutes": parse_session_minutes_list(session_raw),
         "fcm_token": _scalar(form, "fcm_token"),
         "voice_intro_seconds": parse_session_minutes(_scalar(form, "voice_intro_seconds")),
         "avatar": _upload(form.get("avatar")),

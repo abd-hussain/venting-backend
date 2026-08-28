@@ -13,6 +13,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.v1.listeners.schemas import (
+    ALLOWED_BREAK_MINUTES,
+    ALLOWED_SESSION_MINUTES,
     AvailabilityDay,
     AvailabilityPayload,
     DashboardImpact,
@@ -156,6 +158,42 @@ def _parse_availability(raw: str | None) -> AvailabilityPayload:
             "Invalid availability payload",
             ar="بيانات التوفر غير صالحة",
         ) from exc
+
+
+def _validate_session_minutes(values: list[int]) -> list[int]:
+    seen: list[int] = []
+    for value in values:
+        if value in seen:
+            continue
+        if value not in ALLOWED_SESSION_MINUTES:
+            raise validation_error(
+                "session_minutes must be empty or contain only 30, 45, or 60",
+                ar="session_minutes يجب أن يكون فارغًا أو يحتوي على 30 أو 45 أو 60 فقط",
+            )
+        seen.append(value)
+    if len(seen) > 2:
+        raise validation_error(
+            "session_minutes allows at most 2 values",
+            ar="session_minutes يسمح بقيمتين كحد أقصى",
+        )
+    return seen
+
+
+def _primary_session_length(session_minutes: list[int], *, fallback: int = 30) -> int:
+    return session_minutes[0] if session_minutes else fallback
+
+
+def _stored_session_minutes(settings_row, profile) -> list[int]:
+    if settings_row is not None and settings_row.session_minutes is not None:
+        return [int(value) for value in settings_row.session_minutes]
+    legacy = (
+        settings_row.session_length_minutes
+        if settings_row is not None
+        else (profile.session_length_minutes if profile is not None else None)
+    )
+    if legacy is None:
+        return []
+    return [int(legacy)]
 
 
 def _parse_bool(raw: str | bool | None, *, field: str, default: bool | None = None) -> bool:
@@ -543,17 +581,26 @@ def _apply_availability(
     availability: AvailabilityPayload,
     *,
     accept_instant_calls: bool | None = None,
-    session_minutes: int | None = None,
+    session_minutes: list[int] | None = None,
 ) -> None:
     accept = (
         accept_instant_calls
         if accept_instant_calls is not None
         else availability.accept_instant_calls
     )
-    session_length = (
-        session_minutes
+    minutes_list = _validate_session_minutes(
+        list(session_minutes)
         if session_minutes is not None
-        else availability.session_length_minutes
+        else list(availability.session_minutes)
+    )
+    if availability.break_length_minutes not in ALLOWED_BREAK_MINUTES:
+        raise validation_error(
+            "break_length_minutes must be one of 0, 5, 10, 15, 30, or 60",
+            ar="مدة الاستراحة غير صالحة",
+        )
+    session_length = _primary_session_length(
+        minutes_list,
+        fallback=availability.session_length_minutes or 30,
     )
     settings_row = db.get(ListenerAvailabilitySettings, listener_id)
     if settings_row is None:
@@ -561,6 +608,7 @@ def _apply_availability(
             listener_id=listener_id,
             accept_instant_calls=accept,
             session_length_minutes=session_length,
+            session_minutes=minutes_list,
             break_length_minutes=availability.break_length_minutes,
             time_zone_id=availability.time_zone_id or "UTC",
         )
@@ -568,6 +616,7 @@ def _apply_availability(
     else:
         settings_row.accept_instant_calls = accept
         settings_row.session_length_minutes = session_length
+        settings_row.session_minutes = minutes_list
         settings_row.break_length_minutes = availability.break_length_minutes
         settings_row.time_zone_id = availability.time_zone_id or settings_row.time_zone_id
 
@@ -643,7 +692,6 @@ def _load_tag_ids(db: Session, listener_id: UUID) -> dict[str, list[str]]:
 def get_availability_payload(db: Session, listener_id: UUID) -> AvailabilityPayload:
     settings_row = db.get(ListenerAvailabilitySettings, listener_id)
     profile = db.get(ListenerProfile, listener_id)
-    tags = _load_tag_ids(db, listener_id)
     slots = (
         db.query(ListenerAvailabilitySlot)
         .filter(ListenerAvailabilitySlot.listener_id == listener_id)
@@ -658,25 +706,28 @@ def get_availability_payload(db: Session, listener_id: UUID) -> AvailabilityPayl
     days = [
         AvailabilityDay(day=DayOfWeekOut(day), slots=by_day[day])
         for day in by_day
-        if by_day[day]
     ]
+    minutes_list = _stored_session_minutes(settings_row, profile)
+    legacy_minutes = None
+    if not minutes_list:
+        legacy_minutes = (
+            settings_row.session_length_minutes
+            if settings_row
+            else (profile.session_length_minutes if profile else 30)
+        )
     return AvailabilityPayload(
         accept_instant_calls=(
             settings_row.accept_instant_calls
             if settings_row
             else bool(profile.accept_instant_calls if profile else True)
         ),
-        session_length_minutes=(
-            settings_row.session_length_minutes
-            if settings_row
-            else (profile.session_length_minutes if profile else 30)
-        ),
+        session_minutes=minutes_list,
+        session_length_minutes=legacy_minutes,
         break_length_minutes=(
             settings_row.break_length_minutes
             if settings_row
             else (profile.break_length_minutes if profile else 15)
         ),
-        language_ids=tags["languages"],
         time_zone_id=(
             settings_row.time_zone_id
             if settings_row
@@ -808,7 +859,7 @@ async def register_listener(
     custom_boundary_text: str | None,
     availability_raw: str | None,
     accept_instant_calls: str | bool | None,
-    session_minutes: int | None,
+    session_minutes: list[int] | None,
     fcm_token: str | None,
     avatar: UploadFile | None,
     identity_document: UploadFile | None,
@@ -854,8 +905,11 @@ async def register_listener(
             ar="يجب تضمين يوم واحد على الأقل في التوفر",
         )
     accept_instant = _parse_bool(accept_instant_calls, field="accept_instant_calls")
-    if session_minutes is None:
-        raise validation_error("session_minutes is required", ar="session_minutes مطلوب")
+    session_minutes_list = _validate_session_minutes(
+        session_minutes
+        if isinstance(session_minutes, list)
+        else ([] if session_minutes is None else [session_minutes])
+    )
     if voice_intro_seconds is None:
         raise validation_error(
             "voice_intro_seconds is required",
@@ -912,7 +966,7 @@ async def register_listener(
     )
 
     tz = availability.time_zone_id or "UTC"
-    session_length = session_minutes
+    session_length = _primary_session_length(session_minutes_list)
     push_enabled = bool((fcm_token or "").strip())
 
     profile = ListenerProfile(
@@ -985,7 +1039,7 @@ async def register_listener(
         user.id,
         availability,
         accept_instant_calls=accept_instant,
-        session_minutes=session_length,
+        session_minutes=session_minutes_list,
     )
     db.add(ListenerPrivacySettingsRow(listener_id=user.id))
     db.add(

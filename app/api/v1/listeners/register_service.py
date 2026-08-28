@@ -143,7 +143,7 @@ def get_register_progress(db: Session, user: User) -> ListenerRegisterProgressRe
             availability = get_availability_payload(db, user.id)
             saved.availability = ListenerSavedAvailability(
                 accept_instant_calls=availability.accept_instant_calls,
-                session_minutes=availability.session_length_minutes,
+                session_minutes=list(availability.session_minutes),
                 availability=availability,
             )
 

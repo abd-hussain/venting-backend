@@ -12,7 +12,7 @@ from sqlalchemy import (
     String,
     Time,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import func
 
 from app.db.base import Base, UUIDPrimaryKeyMixin
@@ -29,6 +29,7 @@ class ListenerAvailabilitySettings(Base):
     )
     accept_instant_calls = Column(Boolean, nullable=False, server_default="true")
     session_length_minutes = Column(Integer, nullable=False, server_default="30")
+    session_minutes = Column(JSONB, nullable=True)
     break_length_minutes = Column(Integer, nullable=False, server_default="15")
     time_zone_id = Column(String(64), nullable=False)
     updated_at = Column(

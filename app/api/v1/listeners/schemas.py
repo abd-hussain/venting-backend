@@ -3,7 +3,7 @@
 from enum import Enum
 from typing import Any, Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ProfileStatusOut(str, Enum):
@@ -53,13 +53,51 @@ class AvailabilityDay(BaseModel):
     slots: list[TimeSlot] = Field(default_factory=list)
 
 
+ALLOWED_SESSION_MINUTES = frozenset({30, 45, 60})
+ALLOWED_BREAK_MINUTES = frozenset({0, 5, 10, 15, 30, 60})
+
+
 class AvailabilityPayload(BaseModel):
     accept_instant_calls: bool = True
-    session_length_minutes: int = 30
+    session_minutes: list[int] = Field(default_factory=list)
+    session_length_minutes: int | None = None
     break_length_minutes: int = 15
-    language_ids: list[str] = Field(default_factory=list)
+    language_ids: list[str] | None = None
     time_zone_id: str = "UTC"
     days: list[AvailabilityDay] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def legacy_session_length_minutes(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "session_minutes" not in data:
+            legacy = data.get("session_length_minutes")
+            if legacy is not None:
+                data = {**data, "session_minutes": [legacy]}
+        return data
+
+    @field_validator("session_minutes")
+    @classmethod
+    def normalize_session_minutes(cls, values: list[int]) -> list[int]:
+        seen: list[int] = []
+        for value in values:
+            if value not in seen:
+                seen.append(value)
+        return seen
+
+    @model_validator(mode="after")
+    def validate_availability(self) -> Self:
+        if len(self.session_minutes) > 2:
+            raise ValueError("session_minutes allows at most 2 values")
+        invalid = [value for value in self.session_minutes if value not in ALLOWED_SESSION_MINUTES]
+        if invalid:
+            raise ValueError(
+                "session_minutes must be empty or contain only 30, 45, or 60"
+            )
+        if self.break_length_minutes not in ALLOWED_BREAK_MINUTES:
+            raise ValueError(
+                "break_length_minutes must be one of 0, 5, 10, 15, 30, or 60"
+            )
+        return self
 
 
 class RegisterListenerResponse(BaseModel):
@@ -110,7 +148,7 @@ class ListenerSavedVoiceIntro(BaseModel):
 
 class ListenerSavedAvailability(BaseModel):
     accept_instant_calls: bool
-    session_minutes: int
+    session_minutes: list[int] = Field(default_factory=list)
     availability: AvailabilityPayload
 
 
@@ -182,7 +220,7 @@ class ListenerRegisterVoiceIntroRequest(BaseModel):
 
 class ListenerRegisterAvailabilityRequest(BaseModel):
     accept_instant_calls: bool
-    session_minutes: int
+    session_minutes: list[int] = Field(default_factory=list)
     availability: AvailabilityPayload
 
 

@@ -681,7 +681,7 @@ Each step `PATCH` returns the **same progress envelope** as `#22a`.
 | **comfort-areas** | `comfort_area_ids[]`, optional `custom_comfort_area_text` |
 | **boundaries** | `boundary_ids[]` (≥1), optional `custom_boundary_text` |
 | **voice-intro** | `voice_intro` (file), `voice_intro_seconds` |
-| **availability** | `accept_instant_calls`, `session_minutes` (int), `availability` object (`#37` shape) |
+| **availability** | `accept_instant_calls`, `session_minutes` (int[] — empty = any; max 2 of `30`/`45`/`60`), `availability` object (`#37` shape) |
 
 **Do not send:** `agreed_to_terms`, `notifications_enabled`, `document_front`, `document_back`.
 
@@ -994,7 +994,37 @@ Profile information (languages, comfort areas, experience, boundaries) is **alwa
 |--|--|
 | **Auth** | Bearer |
 | **Screen** | Availability tab |
-| **Response** | `{ accept_instant_calls, session_length_minutes, break_length_minutes, language_ids, time_zone_id, days: [{ day: "mon", slots: [{ start: "09:00", end: "12:00" }] }] }` |
+| **Response** | `{ accept_instant_calls, session_minutes, break_length_minutes, time_zone_id, days: [{ day: "mon", slots: [{ start: "09:00", end: "12:00" }] }] }` |
+
+**Fields**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `accept_instant_calls` | bool | Whether listener accepts instant sessions |
+| `session_minutes` | int[] | Preferred session lengths in minutes. Empty array = any duration. Allowed values: `30`, `45`, `60` (max 2 selections) |
+| `session_length_minutes` | int? | **Deprecated read fallback** when `session_minutes` is absent |
+| `break_length_minutes` | int | Break between sessions. Allowed: `0`, `5`, `10`, `15`, `30`, `60` (`0` = no break) |
+| `time_zone_id` | string | IANA time zone id, e.g. `Asia/Beirut` |
+| `days` | array | Weekly schedule. `day` = `mon`…`sun`; `slots` use 24h `HH:mm` in listener local time |
+| `language_ids` | string[]? | Optional legacy field; not edited on availability tab |
+
+**Example**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "accept_instant_calls": true,
+    "session_minutes": [30, 45],
+    "break_length_minutes": 15,
+    "time_zone_id": "Asia/Beirut",
+    "days": [
+      { "day": "mon", "slots": [{ "start": "09:00", "end": "12:00" }, { "start": "18:00", "end": "22:00" }] },
+      { "day": "sun", "slots": [] }
+    ]
+  }
+}
+```
 
 ---
 
@@ -1003,9 +1033,11 @@ Profile information (languages, comfort areas, experience, boundaries) is **alwa
 | | |
 |--|--|
 | **Auth** | Bearer |
-| **Screen** | Persist session length / break / languages / instant / full week |
+| **Screen** | Persist instant calls / session lengths / break / full week |
 | **Body** | Full availability object (#37) |
-| **Response** | Updated availability |
+| **Response** | Updated availability (#37) |
+
+Mobile sends the full current availability object whenever instant calls, session lengths, or break length change.
 
 ---
 
@@ -1016,8 +1048,8 @@ Profile information (languages, comfort areas, experience, boundaries) is **alwa
 | **Auth** | Bearer |
 | **Screen** | Day schedule bottom sheet |
 | **Args** | path `day` = `mon`…`sun` |
-| **Body** | `{ slots: [{ start, end }] }` |
-| **Response** | Updated day |
+| **Body** | `{ slots: [{ start, end }] }` — empty `slots` = day off |
+| **Response** | `{ day, slots }` updated day |
 
 ---
 

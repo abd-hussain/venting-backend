@@ -618,7 +618,7 @@ def availability_get(profile: CurrentListenerProfile, db: DbSession):
     from app.api.v1.listeners.service import get_availability
 
     data = get_availability(db, profile)
-    return success_response(data.model_dump(mode="json"))
+    return success_response(data.model_dump(mode="json", exclude_none=True))
 
 
 @router.put(
@@ -635,7 +635,7 @@ def availability_put(
     from app.api.v1.listeners.service import put_availability
 
     data = put_availability(db, profile, body)
-    return success_response(data.model_dump(mode="json"))
+    return success_response(data.model_dump(mode="json", exclude_none=True))
 
 
 @router.put(
