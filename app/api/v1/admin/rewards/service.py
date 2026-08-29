@@ -10,6 +10,10 @@ from sqlalchemy.orm import Session
 from app.api.v1.admin.audit import write_audit
 from app.api.v1.admin.deps import AdminPrincipal
 from app.api.v1.admin.rewards.schemas import (
+    PointPackageCreateRequest,
+    PointPackageList,
+    PointPackageResponse,
+    PointPackageUpdateRequest,
     PromoCodeCreateRequest,
     PromoCodeList,
     PromoCodeResponse,
@@ -26,7 +30,7 @@ from app.api.v1.admin.rewards.schemas import (
 from app.core.errors import conflict, not_found
 from app.core.pagination import clamp_page
 from app.models.promo import PromoCode, PromoRedemption
-from app.models.rewards import RewardOffer, RewardTrade
+from app.models.rewards import PointPackage, RewardOffer, RewardTrade
 from app.services.reward_offers import normalize_expires_at, utc_now
 
 
@@ -317,3 +321,116 @@ def list_promo_redemptions(
         page=page,
         page_size=page_size,
     )
+
+
+def _point_package_response(row: PointPackage) -> PointPackageResponse:
+    return PointPackageResponse(
+        id=str(row.id),
+        code=row.code,
+        points=row.points,
+        price_usd=Decimal(row.price_usd),
+        bonus_percent=row.bonus_percent,
+        sort_order=row.sort_order,
+        is_active=row.is_active,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _point_package_snapshot(row: PointPackage) -> dict[str, Any]:
+    return _point_package_response(row).model_dump(mode="json")
+
+
+def list_point_packages(
+    db: Session,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+    active_only: bool = False,
+) -> PointPackageList:
+    page, page_size = clamp_page(page, page_size)
+    query = db.query(PointPackage)
+    if active_only:
+        query = query.filter(PointPackage.is_active.is_(True))
+    total = query.with_entities(func.count(PointPackage.id)).scalar() or 0
+    rows = (
+        query.order_by(PointPackage.sort_order.asc(), PointPackage.code.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return PointPackageList(
+        items=[_point_package_response(row) for row in rows],
+        total=int(total),
+        page=page,
+        page_size=page_size,
+    )
+
+
+def create_point_package(
+    db: Session,
+    payload: PointPackageCreateRequest,
+    admin: AdminPrincipal,
+) -> PointPackageResponse:
+    code = payload.code.strip()
+    duplicate = db.query(PointPackage.id).filter(PointPackage.code == code).first()
+    if duplicate is not None:
+        raise conflict("Point package code already exists")
+    row = PointPackage(
+        code=code,
+        points=payload.points,
+        price_usd=payload.price_usd,
+        bonus_percent=payload.bonus_percent,
+        sort_order=payload.sort_order,
+        is_active=payload.is_active,
+    )
+    db.add(row)
+    db.flush()
+    write_audit(
+        db,
+        admin_user_id=admin.id,
+        action="point_package.create",
+        entity_type="point_package",
+        entity_id=row.id,
+        after=_point_package_snapshot(row),
+    )
+    db.commit()
+    db.refresh(row)
+    return _point_package_response(row)
+
+
+def update_point_package(
+    db: Session,
+    package_id: UUID,
+    payload: PointPackageUpdateRequest,
+    admin: AdminPrincipal,
+) -> PointPackageResponse:
+    row = db.get(PointPackage, package_id)
+    if row is None:
+        raise not_found("Point package")
+    before = _point_package_snapshot(row)
+    changes = payload.model_dump(exclude_unset=True)
+    if "code" in changes:
+        code = changes["code"].strip()
+        duplicate = (
+            db.query(PointPackage.id)
+            .filter(PointPackage.code == code, PointPackage.id != package_id)
+            .first()
+        )
+        if duplicate is not None:
+            raise conflict("Point package code already exists")
+        changes["code"] = code
+    for field, value in changes.items():
+        setattr(row, field, value)
+    write_audit(
+        db,
+        admin_user_id=admin.id,
+        action="point_package.update",
+        entity_type="point_package",
+        entity_id=row.id,
+        before=before,
+        after=_point_package_snapshot(row),
+    )
+    db.commit()
+    db.refresh(row)
+    return _point_package_response(row)

@@ -132,6 +132,12 @@ class InviteStatus(str, enum.Enum):
     booked_call = "booked_call"
 
 
+class PointPurchaseStatus(str, enum.Enum):
+    completed = "completed"
+    pending = "pending"
+    failed = "failed"
+
+
 class NotificationType(str, enum.Enum):
     welcome = "welcome"
     complete_registration = "complete_registration"

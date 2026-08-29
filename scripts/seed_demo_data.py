@@ -56,7 +56,7 @@ from app.models.lookups import (
 from app.models.notifications import Notification
 from app.models.profiles import ListenerProfile, VentorProfile
 from app.models.promo import PromoCode
-from app.models.rewards import InviteCode, InviteEvent, RewardOffer
+from app.models.rewards import InviteCode, InviteEvent, PointPackage, RewardOffer
 from app.models.sessions import Session as VentingSession
 from app.models.settings import (
     ListenerNotificationPreferences,
@@ -226,6 +226,39 @@ def seed_catalogs(db: Session) -> None:
                 is_active=True,
             )
         )
+
+    _upsert_by_id(
+        db,
+        PointPackage,
+        [
+            {
+                "id": uuid.UUID("44444444-4444-4444-4444-444444444441"),
+                "code": "pkg_500",
+                "points": 500,
+                "price_usd": Decimal("4.99"),
+                "sort_order": 1,
+                "is_active": True,
+            },
+            {
+                "id": uuid.UUID("44444444-4444-4444-4444-444444444442"),
+                "code": "pkg_1200",
+                "points": 1200,
+                "price_usd": Decimal("9.99"),
+                "bonus_percent": 20,
+                "sort_order": 2,
+                "is_active": True,
+            },
+            {
+                "id": uuid.UUID("44444444-4444-4444-4444-444444444443"),
+                "code": "pkg_2800",
+                "points": 2800,
+                "price_usd": Decimal("19.99"),
+                "bonus_percent": 40,
+                "sort_order": 3,
+                "is_active": True,
+            },
+        ],
+    )
 
     demo_promos = [
         (uuid.UUID("33333333-3333-3333-3333-333333333334"), "SAVE10", 10, None),

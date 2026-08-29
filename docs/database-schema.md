@@ -859,11 +859,45 @@ Append-only money movement (earnings chart + audit).
 
 **Indexes:** `IDX(inviter_ventor_id, status)`
 
+### 39. `point_packages`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | **PK** |
+| `code` | VARCHAR(64) | **UQ** stable id exposed to mobile, e.g. `pkg_500` |
+| `points` | INT | Points credited on purchase |
+| `price_usd` | NUMERIC(10,2) | Display + charge amount (USD for v1) |
+| `bonus_percent` | INT | ? optional badge, e.g. `20` for +20% |
+| `sort_order` | INT | default 0 — portal list order |
+| `is_active` | BOOLEAN | default true |
+| `created_at` | TIMESTAMPTZ | |
+| `updated_at` | TIMESTAMPTZ | |
+
+**Indexes:** `IDX(is_active, sort_order)`
+
+### 40. `point_purchases`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID | **PK** |
+| `ventor_id` | UUID | **FK** **IDX** |
+| `package_id` | UUID | **FK → point_packages** |
+| `package_code` | VARCHAR(64) | snapshot of `code` at purchase time |
+| `points_added` | INT | |
+| `price_usd` | NUMERIC(10,2) | snapshot |
+| `payment_provider` | VARCHAR(32) | ? `stripe`, `apple`, `google`, `sandbox` |
+| `payment_reference` | VARCHAR(128) | ? provider txn id — **UQ** when set |
+| `status` | `point_purchase_status` | `completed` \| `pending` \| `failed` |
+| `purchased_at` | TIMESTAMPTZ | |
+| `created_at` | TIMESTAMPTZ | |
+
+**Indexes:** `IDX(ventor_id, purchased_at DESC)`, `UQ(payment_reference)` where not null
+
 ---
 
 ## 10. Notifications
 
-### 39. `notifications`
+### 41. `notifications`
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -883,7 +917,7 @@ Append-only money movement (earnings chart + audit).
 
 ## 11. Training
 
-### 40. `training_modules`
+### 42. `training_modules`
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -893,7 +927,7 @@ Append-only money movement (earnings chart + audit).
 | `sort_order` | INT | |
 | `is_active` | BOOLEAN | |
 
-### 41. `listener_training_progress`
+### 43. `listener_training_progress`
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -907,7 +941,7 @@ Append-only money movement (earnings chart + audit).
 
 ## 12. Promo codes
 
-### 42. `promo_codes`
+### 44. `promo_codes`
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -922,7 +956,7 @@ Append-only money movement (earnings chart + audit).
 | `is_active` | BOOLEAN | |
 | `created_at` | TIMESTAMPTZ | |
 
-### 43. `promo_redemptions`
+### 45. `promo_redemptions`
 
 | Column | Type | Notes |
 |--------|------|-------|

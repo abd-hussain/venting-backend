@@ -10,6 +10,10 @@ from app.api.v1.admin.deps import (
     require_permission,
 )
 from app.api.v1.admin.rewards.schemas import (
+    PointPackageCreateRequest,
+    PointPackageList,
+    PointPackageResponse,
+    PointPackageUpdateRequest,
     PromoCodeCreateRequest,
     PromoCodeList,
     PromoCodeResponse,
@@ -22,12 +26,15 @@ from app.api.v1.admin.rewards.schemas import (
     RewardTradeList,
 )
 from app.api.v1.admin.rewards.service import (
+    create_point_package,
     create_promo_code,
     create_reward_offer,
+    list_point_packages,
     list_promo_codes,
     list_promo_redemptions,
     list_reward_offers,
     list_reward_trades,
+    update_point_package,
     update_promo_code,
     update_reward_offer,
 )
@@ -48,6 +55,65 @@ PromoReader = Annotated[
     Depends(require_any_permission("promo:write", "users:read")),
 ]
 PromoWriter = Annotated[AdminPrincipal, Depends(require_permission("promo:write"))]
+
+
+@router.get(
+    "/point-packages",
+    response_model=APISuccessResponse[PointPackageList],
+    responses={401: {"model": APIErrorResponse}, 403: {"model": APIErrorResponse}},
+)
+def point_packages_list(
+    db: DbSession,
+    _admin: RewardReader,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=50)] = 20,
+    active_only: bool = False,
+):
+    return success_response(
+        list_point_packages(
+            db, page=page, page_size=page_size, active_only=active_only
+        ).model_dump(mode="json")
+    )
+
+
+@router.post(
+    "/point-packages",
+    response_model=APISuccessResponse[PointPackageResponse],
+    responses={
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        409: {"model": APIErrorResponse},
+    },
+)
+def point_package_create(
+    body: PointPackageCreateRequest,
+    db: DbSession,
+    admin: RewardWriter,
+):
+    return success_response(
+        create_point_package(db, body, admin).model_dump(mode="json")
+    )
+
+
+@router.patch(
+    "/point-packages/{package_id}",
+    response_model=APISuccessResponse[PointPackageResponse],
+    responses={
+        401: {"model": APIErrorResponse},
+        403: {"model": APIErrorResponse},
+        404: {"model": APIErrorResponse},
+        409: {"model": APIErrorResponse},
+    },
+)
+def point_package_update(
+    package_id: UUID,
+    body: PointPackageUpdateRequest,
+    db: DbSession,
+    admin: RewardWriter,
+):
+    return success_response(
+        update_point_package(db, package_id, body, admin).model_dump(mode="json")
+    )
 
 
 @router.get(

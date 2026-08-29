@@ -1474,6 +1474,76 @@ Tier ids: `starter` ($15) → `rising` ($20) → `trusted` ($25) → `expert` ($
 
 ---
 
+### 67a. `GET /v1/ventors/me/rewards/point-packages`
+
+| | |
+|--|--|
+| **Auth** | Bearer |
+| **Screen** | Buy points bottom sheet |
+| **Response** | `{ packages: [{ id, points, price_usd, bonus_percent?, sort_order }] }` |
+| **Notes** | Returns **active** packages only, sorted by `sort_order` ascending. `id` is a stable catalog code (e.g. `pkg_500`) used by purchase and admin CMS. Prices are managed in the admin portal (`A65`–`A67`). |
+
+**Example response**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "packages": [
+      { "id": "pkg_500", "points": 500, "price_usd": 4.99, "sort_order": 1 },
+      { "id": "pkg_1200", "points": 1200, "price_usd": 9.99, "bonus_percent": 20, "sort_order": 2 },
+      { "id": "pkg_2800", "points": 2800, "price_usd": 19.99, "bonus_percent": 40, "sort_order": 3 }
+    ]
+  }
+}
+```
+
+---
+
+### 67b. `POST /v1/ventors/me/rewards/purchase-points`
+
+| | |
+|--|--|
+| **Auth** | Bearer |
+| **Screen** | Buy points bottom sheet — purchase CTA |
+| **Body** | `{ package_id }` — must match an active package `id` from **#67a** |
+| **Response** | `{ points, purchase: { id, package_id, points_added, price_usd, purchased_at } }` |
+| **Notes** | Credits `points_added` to the ventor balance and returns the new `points` total. Payment-provider charge (Stripe / IAP / etc.) is backend-owned; mobile calls this after checkout succeeds or in sandbox when payments are stubbed. Idempotent on `payment_reference` when the provider supplies one (future). |
+
+**Example request**
+
+```json
+{ "package_id": "pkg_1200" }
+```
+
+**Example response**
+
+```json
+{
+  "status": "success",
+  "data": {
+    "points": 2450,
+    "purchase": {
+      "id": "pp_01HX…",
+      "package_id": "pkg_1200",
+      "points_added": 1200,
+      "price_usd": 9.99,
+      "purchased_at": "2026-08-30T12:00:00Z"
+    }
+  }
+}
+```
+
+**Errors**
+
+| Code | When |
+|------|------|
+| `404` | Unknown or inactive `package_id` |
+| `402` | Payment failed / not completed *(when provider integrated)* |
+| `409` | Duplicate provider reference *(retry-safe)* |
+
+---
+
 ## 9. Notifications
 
 Inbox notifications are stored in `notifications` (`user_id`, `type`, `title`, `body`, `data`, `is_read`).  
@@ -2324,12 +2394,12 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | Discovery & sessions | 13 |
 | Call feedback & reports | 3 |
 | Earnings & payouts | 7 |
-| Rewards & invites | 5 |
+| Rewards & invites | 7 |
 | Notifications | 3 |
 | Training | 2 |
 | Promo | 1 |
 | Catalog / categories | 4 |
-| **Total unique API endpoints** | **82** |
+| **Total unique API endpoints** | **84** |
 
 ### Master checklist (method + path)
 
@@ -2419,6 +2489,8 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | 65 | GET | `/v1/ventors/me/rewards/trades` |
 | 66 | GET | `/v1/ventors/me/invites` |
 | 67 | POST | `/v1/ventors/me/invites/refresh-code` |
+| 67a | GET | `/v1/ventors/me/rewards/point-packages` |
+| 67b | POST | `/v1/ventors/me/rewards/purchase-points` |
 | 68 | GET | `/v1/listeners/me/notifications` |
 | 69 | POST | `/v1/listeners/me/notifications/read-all` |
 | 70 | DELETE | `/v1/listeners/me/notifications/{notificationId}` |
@@ -2437,7 +2509,7 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 
 ## Final count
 
-**Total unique API endpoints: 92**
+**Total unique API endpoints: 94**
 
 **Live / wired in the mobile app today: 0** (auth + catalog clients exist; backend contracts still proposed where marked). Static legal/help HTML is separate from this REST count.
 

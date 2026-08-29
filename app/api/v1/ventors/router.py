@@ -10,7 +10,7 @@ from app.api.deps import (
     SettingsDep,
 )
 from app.api.v1.sessions.schemas import CancelSessionRequest
-from app.api.v1.ventors.rewards_service import RedeemRequest
+from app.api.v1.ventors.rewards_service import PurchasePointsRequest, RedeemRequest
 from app.api.v1.ventors.schemas import (
     FavoritesResponse,
     Gender,
@@ -533,6 +533,41 @@ def invites_refresh(profile: CurrentVentorProfile, db: DbSession):
     from app.api.v1.ventors.rewards_service import refresh_invite_code
 
     data = refresh_invite_code(db, profile)
+    return success_response(data.model_dump(mode="json"))
+
+
+@router.get(
+    "/me/rewards/point-packages",
+    response_model=APISuccessResponse,
+    responses={401: {"model": APIErrorResponse}},
+    summary="List active point packages",
+)
+def rewards_point_packages(profile: CurrentVentorProfile, db: DbSession):
+    from app.api.v1.ventors.rewards_service import list_point_packages
+
+    data = list_point_packages(db)
+    return success_response(data.model_dump(mode="json"))
+
+
+@router.post(
+    "/me/rewards/purchase-points",
+    response_model=APISuccessResponse,
+    responses={
+        401: {"model": APIErrorResponse},
+        404: {"model": APIErrorResponse},
+        409: {"model": APIErrorResponse},
+        422: {"model": APIErrorResponse},
+    },
+    summary="Purchase a point package",
+)
+def rewards_purchase_points(
+    body: PurchasePointsRequest,
+    profile: CurrentVentorProfile,
+    db: DbSession,
+):
+    from app.api.v1.ventors.rewards_service import purchase_points
+
+    data = purchase_points(db, profile, body)
     return success_response(data.model_dump(mode="json"))
 
 

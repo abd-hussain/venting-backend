@@ -139,3 +139,45 @@ class PromoRedemptionResponse(BaseModel):
 
 class PromoRedemptionList(Paginated[PromoRedemptionResponse]):
     pass
+
+
+class PointPackageResponse(BaseModel):
+    id: str
+    code: str
+    points: int
+    price_usd: Decimal
+    bonus_percent: int | None = None
+    sort_order: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class PointPackageList(Paginated[PointPackageResponse]):
+    pass
+
+
+class PointPackageCreateRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=64)
+    points: int = Field(ge=1)
+    price_usd: Decimal = Field(gt=0, max_digits=10, decimal_places=2)
+    bonus_percent: int | None = Field(default=None, ge=1, le=100)
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class PointPackageUpdateRequest(BaseModel):
+    code: str | None = Field(default=None, min_length=1, max_length=64)
+    points: int | None = Field(default=None, ge=1)
+    price_usd: Decimal | None = Field(
+        default=None, gt=0, max_digits=10, decimal_places=2
+    )
+    bonus_percent: int | None = Field(default=None, ge=1, le=100)
+    sort_order: int | None = None
+    is_active: bool | None = None
+
+    @model_validator(mode="after")
+    def require_change(self) -> "PointPackageUpdateRequest":
+        if not self.model_fields_set:
+            raise ValueError("At least one field is required")
+        return self
