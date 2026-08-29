@@ -678,16 +678,26 @@ def _notif_response(row: VentorNotificationPreferences) -> NotificationPreferenc
     )
 
 
+def _default_notification_preferences() -> NotificationPreferences:
+    return NotificationPreferences(
+        push_enabled=True,
+        session_reminder_30_min=True,
+        session_reminder_15_min=True,
+        session_reminder_10_min=True,
+        session_reminder_5_min=True,
+        rewards_updates=True,
+        promotions_updates=True,
+        email_enabled=True,
+    )
+
+
 def get_notification_preferences(
     db: Session,
     profile: VentorProfile,
 ) -> NotificationPreferences:
     row = db.get(VentorNotificationPreferences, profile.user_id)
     if row is None:
-        row = VentorNotificationPreferences(ventor_id=profile.user_id)
-        db.add(row)
-        db.commit()
-        db.refresh(row)
+        return _default_notification_preferences()
     return _notif_response(row)
 
 

@@ -569,14 +569,14 @@ Written from ventor registration step `languages` (`PATCH /v1/ventors/register/s
 | Column | Type | Notes |
 |--------|------|-------|
 | `ventor_id` | UUID | **PK, FK** |
-| `push_enabled` | BOOLEAN | |
-| `session_reminder_30_min` | BOOLEAN | |
-| `session_reminder_15_min` | BOOLEAN | |
-| `session_reminder_10_min` | BOOLEAN | |
-| `session_reminder_5_min` | BOOLEAN | |
-| `rewards_updates` | BOOLEAN | |
-| `promotions_updates` | BOOLEAN | |
-| `email_enabled` | BOOLEAN | |
+| `push_enabled` | BOOLEAN | default true |
+| `session_reminder_30_min` | BOOLEAN | default true |
+| `session_reminder_15_min` | BOOLEAN | default true |
+| `session_reminder_10_min` | BOOLEAN | default true |
+| `session_reminder_5_min` | BOOLEAN | default true |
+| `rewards_updates` | BOOLEAN | default true |
+| `promotions_updates` | BOOLEAN | default true |
+| `email_enabled` | BOOLEAN | default true |
 | `updated_at` | TIMESTAMPTZ | |
 
 ### 24. `listener_notification_preferences`

@@ -617,6 +617,7 @@ Finalizes ventor registration. JSON body.
 | **Auth** | Bearer |
 | **Screen** | Ventor notification preferences |
 | **Response** | `{ push_enabled, session_reminder_30_min, session_reminder_15_min, session_reminder_10_min, session_reminder_5_min, rewards_updates, promotions_updates, email_enabled }` |
+| **Notes** | If no row exists yet for the ventor, return **all fields `true`** (opt-out model). Mobile uses the same defaults when fields are omitted. |
 
 ---
 
@@ -625,8 +626,8 @@ Finalizes ventor registration. JSON body.
 | | |
 |--|--|
 | **Auth** | Bearer |
-| **Body** | Same fields as #20 |
-| **Response** | Updated preferences |
+| **Body** | Same fields as **#19** (all bool) |
+| **Response** | Updated preferences object |
 
 ---
 
