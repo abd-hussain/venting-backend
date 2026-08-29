@@ -17,7 +17,6 @@ class VentorPrivacySettings(Base):
         primary_key=True,
     )
     show_mood_journey = Column(Boolean, nullable=False, server_default="true")
-    show_achievements = Column(Boolean, nullable=False, server_default="true")
     show_stats = Column(Boolean, nullable=False, server_default="true")
     show_favorite_listeners = Column(Boolean, nullable=False, server_default="true")
     allow_listener_discovery = Column(Boolean, nullable=False, server_default="true")

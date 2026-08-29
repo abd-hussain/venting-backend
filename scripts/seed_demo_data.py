@@ -65,7 +65,7 @@ from app.models.settings import (
     VentorPrivacySettings,
 )
 from app.models.training import ListenerTrainingProgress, TrainingModule
-from app.models.ventor_wellness import Achievement, MoodCheckin, VentorFavorite
+from app.models.ventor_wellness import MoodCheckin, VentorFavorite
 from app.models.admin import (
     AdminAuditLog,
     AdminNote,
@@ -168,16 +168,6 @@ def seed_catalogs(db: Session) -> None:
             {"id": "religion", "name_en": "Religion", "name_ar": "الدين", "icon_emoji": "📖", "icon_url": None, "sort_order": 60, "allows_custom_text": False, "is_active": True},
             {"id": "illegal_activities", "name_en": "Illegal activities", "name_ar": "أنشطة غير قانونية", "icon_emoji": "🚫", "icon_url": None, "sort_order": 70, "allows_custom_text": False, "is_active": True},
             {"id": "other", "name_en": "Other", "name_ar": "أخرى", "icon_emoji": "➕", "icon_url": None, "sort_order": 1000, "allows_custom_text": True, "is_active": True},
-        ],
-    )
-
-    _upsert_by_id(
-        db,
-        Achievement,
-        [
-            {"id": "first_session", "title_key": "achievements.first_session.title", "subtitle_key": "achievements.first_session.subtitle", "description_key": "achievements.first_session.description", "sort_order": 1, "is_active": True},
-            {"id": "mood_streak_3", "title_key": "achievements.mood_streak_3.title", "subtitle_key": "achievements.mood_streak_3.subtitle", "description_key": "achievements.mood_streak_3.description", "sort_order": 2, "is_active": True},
-            {"id": "invited_friend", "title_key": "achievements.invited_friend.title", "subtitle_key": "achievements.invited_friend.subtitle", "description_key": "achievements.invited_friend.description", "sort_order": 3, "is_active": True},
         ],
     )
 

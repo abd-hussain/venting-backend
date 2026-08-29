@@ -12,8 +12,6 @@ from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.v1.ventors.schemas import (
-    AchievementItem,
-    AchievementsResponse,
     FavoriteListenerItem,
     FavoritesResponse,
     Gender,
@@ -45,12 +43,7 @@ from app.models.sessions import Session as VentingSession
 from app.models.settings import VentorNotificationPreferences, VentorPrivacySettings
 from app.services.push_tokens import upsert_push_token
 from app.services.reward_offers import is_offer_expired
-from app.models.ventor_wellness import (
-    Achievement,
-    MoodCheckin,
-    VentorAchievement,
-    VentorFavorite,
-)
+from app.models.ventor_wellness import MoodCheckin, VentorFavorite
 
 MOOD_JOURNEY_SCORE: dict[MoodKind, float] = {
     MoodKind.sad: 0.0,
@@ -635,41 +628,9 @@ def remove_favorite(db: Session, profile: VentorProfile, listener_id: UUID) -> O
     return OkResponse(ok=True)
 
 
-def list_achievements(db: Session, profile: VentorProfile) -> AchievementsResponse:
-    unlocked = {
-        row.achievement_id: row.unlocked_at
-        for row in db.query(VentorAchievement)
-        .filter(VentorAchievement.ventor_id == profile.user_id)
-        .all()
-    }
-    catalog = (
-        db.query(Achievement)
-        .filter(Achievement.is_active.is_(True))
-        .order_by(Achievement.sort_order.asc(), Achievement.id.asc())
-        .all()
-    )
-    items = [
-        AchievementItem(
-            id=item.id,
-            title_key=item.title_key,
-            subtitle_key=item.subtitle_key,
-            description_key=item.description_key,
-            unlocked=item.id in unlocked,
-            unlocked_at=(
-                _as_utc(unlocked[item.id]).isoformat().replace("+00:00", "Z")
-                if item.id in unlocked
-                else None
-            ),
-        )
-        for item in catalog
-    ]
-    return AchievementsResponse(items=items)
-
-
 def _privacy_response(row: VentorPrivacySettings) -> PrivacySettings:
     return PrivacySettings(
         show_mood_journey=row.show_mood_journey,
-        show_achievements=row.show_achievements,
         show_stats=row.show_stats,
         show_favorite_listeners=row.show_favorite_listeners,
         allow_listener_discovery=row.allow_listener_discovery,
@@ -696,7 +657,6 @@ def update_privacy(
         row = VentorPrivacySettings(ventor_id=profile.user_id)
         db.add(row)
     row.show_mood_journey = payload.show_mood_journey
-    row.show_achievements = payload.show_achievements
     row.show_stats = payload.show_stats
     row.show_favorite_listeners = payload.show_favorite_listeners
     row.allow_listener_discovery = payload.allow_listener_discovery

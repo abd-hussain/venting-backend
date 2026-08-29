@@ -144,7 +144,7 @@ Implement one domain package at a time. Register each router in `app/api/v1/rout
 | Domain | API sections (endpoints) | Primary tables (schema doc) | Suggested package |
 |--------|--------------------------|-----------------------------|-------------------|
 | Auth & account | 1–7 | `users`, `refresh_tokens` | `api/v1/auth/` |
-| Ventors | 8–21, rewards/invites 63–67 | `ventor_profiles`, mood, favorites, achievements, settings | `api/v1/ventors/` |
+| Ventors | 8–21, rewards/invites 63–67 | `ventor_profiles`, mood, favorites, settings | `api/v1/ventors/` |
 | Listeners | 22–36, availability 37–39 | `listener_profiles`, identity, tags, settings | `api/v1/listeners/` |
 | Sessions / discovery | 40–55 | `session_requests`, `sessions`, payments, ratings, reports | `api/v1/sessions/` |
 | Earnings & payouts | 56–62 | wallets, ledger, `payout_methods`, `payouts` | `api/v1/earnings/` |

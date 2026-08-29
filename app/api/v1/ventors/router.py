@@ -12,7 +12,6 @@ from app.api.deps import (
 from app.api.v1.sessions.schemas import CancelSessionRequest
 from app.api.v1.ventors.rewards_service import RedeemRequest
 from app.api.v1.ventors.schemas import (
-    AchievementsResponse,
     FavoritesResponse,
     Gender,
     HomeResponse,
@@ -45,7 +44,6 @@ from app.api.v1.ventors.service import (
     get_notification_preferences,
     get_privacy,
     get_ventor_profile,
-    list_achievements,
     list_favorites,
     remove_favorite,
     update_notification_preferences,
@@ -350,17 +348,6 @@ def favorite_remove(
     db: DbSession,
 ):
     data = remove_favorite(db, profile, listener_id)
-    return success_response(data.model_dump(mode="json"))
-
-
-@router.get(
-    "/me/achievements",
-    response_model=APISuccessResponse[AchievementsResponse],
-    responses={401: {"model": APIErrorResponse}, 403: {"model": APIErrorResponse}},
-    summary="List achievements",
-)
-def achievements(profile: CurrentVentorProfile, db: DbSession):
-    data = list_achievements(db, profile)
     return success_response(data.model_dump(mode="json"))
 
 

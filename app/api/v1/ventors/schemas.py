@@ -140,22 +140,8 @@ class FavoritesResponse(BaseModel):
     items: list[FavoriteListenerItem]
 
 
-class AchievementItem(BaseModel):
-    id: str
-    title_key: str
-    subtitle_key: str
-    description_key: str
-    unlocked: bool
-    unlocked_at: str | None = None
-
-
-class AchievementsResponse(BaseModel):
-    items: list[AchievementItem]
-
-
 class PrivacySettings(BaseModel):
     show_mood_journey: bool
-    show_achievements: bool
     show_stats: bool
     show_favorite_listeners: bool
     allow_listener_discovery: bool

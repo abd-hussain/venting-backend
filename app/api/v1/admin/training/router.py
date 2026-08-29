@@ -10,22 +10,16 @@ from app.api.v1.admin.deps import (
     require_permission,
 )
 from app.api.v1.admin.training.schemas import (
-    AchievementResponse,
-    AchievementUpsertRequest,
     InviteStatsResponse,
     ListenerTrainingResponse,
     TrainingModuleResponse,
     TrainingModuleUpsertRequest,
-    VentorAchievementResponse,
 )
 from app.api.v1.admin.training.service import (
     force_complete_training,
     get_invite_stats,
     get_listener_training,
-    grant_achievement,
-    list_achievements,
     list_training_modules,
-    upsert_achievements,
     upsert_training_modules,
 )
 from app.core.responses import success_response
@@ -120,61 +114,6 @@ def listener_training_complete(
 ):
     return success_response(
         force_complete_training(db, listener_id, module_id, admin).model_dump(
-            mode="json"
-        )
-    )
-
-
-@router.get(
-    "/achievements",
-    response_model=APISuccessResponse[list[AchievementResponse]],
-    responses={401: {"model": APIErrorResponse}, 403: {"model": APIErrorResponse}},
-)
-def achievements_list(db: DbSession, _admin: UserReader):
-    return success_response(
-        [item.model_dump(mode="json") for item in list_achievements(db)]
-    )
-
-
-@router.put(
-    "/achievements",
-    response_model=APISuccessResponse[list[AchievementResponse]],
-    responses={
-        401: {"model": APIErrorResponse},
-        403: {"model": APIErrorResponse},
-        422: {"model": APIErrorResponse},
-    },
-)
-def achievements_upsert(
-    body: AchievementUpsertRequest | list[AchievementUpsertRequest],
-    db: DbSession,
-    admin: CatalogWriter,
-):
-    return success_response(
-        [
-            item.model_dump(mode="json")
-            for item in upsert_achievements(db, body, admin)
-        ]
-    )
-
-
-@router.post(
-    "/ventors/{ventor_id}/achievements/{achievement_id}",
-    response_model=APISuccessResponse[VentorAchievementResponse],
-    responses={
-        401: {"model": APIErrorResponse},
-        403: {"model": APIErrorResponse},
-        404: {"model": APIErrorResponse},
-    },
-)
-def ventor_achievement_grant(
-    ventor_id: UUID,
-    achievement_id: str,
-    db: DbSession,
-    admin: UserWriter,
-):
-    return success_response(
-        grant_achievement(db, ventor_id, achievement_id, admin).model_dump(
             mode="json"
         )
     )

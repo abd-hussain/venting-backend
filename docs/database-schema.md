@@ -51,30 +51,28 @@
 | 16 | `listener_availability_slots` | Availability |
 | 17 | `ventor_favorites` | Ventor |
 | 18 | `mood_checkins` | Wellness |
-| 19 | `achievements` | Catalog |
-| 20 | `ventor_achievements` | Ventor |
-| 21 | `ventor_privacy_settings` | Settings |
-| 22 | `listener_privacy_settings` | Settings |
-| 23 | `ventor_notification_preferences` | Settings |
-| 24 | `listener_notification_preferences` | Settings |
-| 25 | `session_requests` | Sessions |
-| 26 | `sessions` | Sessions |
-| 27 | `session_payments` | Money |
-| 28 | `session_ratings` | Feedback |
-| 29 | `session_listener_feedback` | Feedback |
-| 30 | `session_reports` | Safety |
-| 31 | `listener_wallets` | Earnings |
-| 32 | `wallet_ledger_entries` | Earnings |
-| 33 | `payout_methods` | Payouts |
-| 34 | `payouts` | Payouts |
-| 35 | `reward_offers` | Rewards |
-| 36 | `reward_trades` | Rewards |
-| 37 | `invite_codes` | Invites |
-| 38 | `invite_events` | Invites |
-| 39 | `notifications` | Notifications |
-| 40 | `training_modules` | Training |
-| 41 | `listener_training_progress` | Training |
-| 42 | `promo_codes` | Promo |
+| 19 | `ventor_privacy_settings` | Settings |
+| 20 | `listener_privacy_settings` | Settings |
+| 21 | `ventor_notification_preferences` | Settings |
+| 22 | `listener_notification_preferences` | Settings |
+| 23 | `session_requests` | Sessions |
+| 24 | `sessions` | Sessions |
+| 25 | `session_payments` | Money |
+| 26 | `session_ratings` | Feedback |
+| 27 | `session_listener_feedback` | Feedback |
+| 28 | `session_reports` | Safety |
+| 29 | `listener_wallets` | Earnings |
+| 30 | `wallet_ledger_entries` | Earnings |
+| 31 | `payout_methods` | Payouts |
+| 32 | `payouts` | Payouts |
+| 33 | `reward_offers` | Rewards |
+| 34 | `reward_trades` | Rewards |
+| 35 | `invite_codes` | Invites |
+| 36 | `invite_events` | Invites |
+| 37 | `notifications` | Notifications |
+| 38 | `training_modules` | Training |
+| 39 | `listener_training_progress` | Training |
+| 40 | `promo_codes` | Promo |
 | 43 | `promo_redemptions` | Promo |
 
 | Band | Count |
@@ -114,7 +112,6 @@ erDiagram
   comfort_areas ||--o{ ventor_interests : tagged
   comfort_areas ||--o{ listener_comfort_areas : tagged
   ventor_profiles ||--o| ventor_notification_preferences : has
-  ventor_profiles ||--o{ ventor_achievements : unlocks
   ventor_profiles ||--o| invite_codes : owns
   ventor_profiles ||--o{ reward_trades : redeems
 
@@ -536,39 +533,16 @@ Written from ventor registration step `languages` (`PATCH /v1/ventors/register/s
 | `checked_in_at` | TIMESTAMPTZ | |
 | `checkin_date` | DATE | UTC date for streak **UQ(ventor_id, checkin_date)** |
 
-### 19. `achievements`
-
-Catalog.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | VARCHAR(64) | **PK** |
-| `title_key` | VARCHAR(128) | l10n key |
-| `subtitle_key` | VARCHAR(128) | |
-| `description_key` | VARCHAR(128) | |
-| `sort_order` | INT | |
-| `is_active` | BOOLEAN | |
-
-### 20. `ventor_achievements`
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `ventor_id` | UUID | **FK** |
-| `achievement_id` | VARCHAR(64) | **FK** |
-| `unlocked_at` | TIMESTAMPTZ | |
-| | | **PK (ventor_id, achievement_id)** |
-
 ---
 
 ## 6. Settings
 
-### 21. `ventor_privacy_settings`
+### 19. `ventor_privacy_settings`
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `ventor_id` | UUID | **PK, FK** |
 | `show_mood_journey` | BOOLEAN | default true |
-| `show_achievements` | BOOLEAN | |
 | `show_stats` | BOOLEAN | |
 | `show_favorite_listeners` | BOOLEAN | |
 | `allow_listener_discovery` | BOOLEAN | |
@@ -1021,8 +995,8 @@ Append-only money movement (earnings chart + audit).
 
 | Metric | Value |
 |--------|------:|
-| **Total tables** | **43** |
-| Lookup / catalog tables | 6 (`languages`, `comfort_areas`, `life_experiences`, `boundaries`, `achievements`, `training_modules`, `reward_offers`, `promo_codes` → **8** catalogs if counted) |
+| **Total tables** | **41** |
+| Lookup / catalog tables | 5 (`languages`, `comfort_areas`, `life_experiences`, `boundaries`, `training_modules`, `reward_offers`, `promo_codes` → **7** catalogs if counted) |
 | Core transactional tables | `session_requests`, `sessions`, `session_payments`, `wallet_ledger_entries`, `payouts`, `reward_trades` |
 | 1:1 settings / wallet | 7 |
 

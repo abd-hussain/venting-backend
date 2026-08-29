@@ -10,21 +10,17 @@ from sqlalchemy.orm import Session
 from app.api.v1.admin.audit import write_audit
 from app.api.v1.admin.deps import AdminPrincipal
 from app.api.v1.admin.training.schemas import (
-    AchievementResponse,
-    AchievementUpsertRequest,
     InviteStatsResponse,
     ListenerTrainingItem,
     ListenerTrainingResponse,
     TrainingModuleResponse,
     TrainingModuleUpsertRequest,
-    VentorAchievementResponse,
 )
 from app.core.errors import not_found, validation_error
 from app.models.enums import InviteStatus, SetupStepStatus, TrainingStatus
-from app.models.profiles import ListenerProfile, VentorProfile
+from app.models.profiles import ListenerProfile
 from app.models.rewards import InviteCode, InviteEvent
 from app.models.training import ListenerTrainingProgress, TrainingModule
-from app.models.ventor_wellness import Achievement, VentorAchievement
 
 
 def _module_response(row: TrainingModule) -> TrainingModuleResponse:
@@ -39,21 +35,6 @@ def _module_response(row: TrainingModule) -> TrainingModuleResponse:
 
 def _module_snapshot(row: TrainingModule) -> dict[str, Any]:
     return _module_response(row).model_dump(mode="json")
-
-
-def _achievement_response(row: Achievement) -> AchievementResponse:
-    return AchievementResponse(
-        id=row.id,
-        title_key=row.title_key,
-        subtitle_key=row.subtitle_key,
-        description_key=row.description_key,
-        sort_order=row.sort_order,
-        is_active=row.is_active,
-    )
-
-
-def _achievement_snapshot(row: Achievement) -> dict[str, Any]:
-    return _achievement_response(row).model_dump(mode="json")
 
 
 def list_training_modules(db: Session) -> list[TrainingModuleResponse]:
@@ -198,92 +179,6 @@ def force_complete_training(
     )
     db.commit()
     return get_listener_training(db, listener_id)
-
-
-def list_achievements(db: Session) -> list[AchievementResponse]:
-    rows = (
-        db.query(Achievement)
-        .order_by(Achievement.sort_order.asc(), Achievement.id.asc())
-        .all()
-    )
-    return [_achievement_response(row) for row in rows]
-
-
-def upsert_achievements(
-    db: Session,
-    payload: AchievementUpsertRequest | list[AchievementUpsertRequest],
-    admin: AdminPrincipal,
-) -> list[AchievementResponse]:
-    items = payload if isinstance(payload, list) else [payload]
-    if not items:
-        raise validation_error("At least one achievement is required")
-    if len({item.id for item in items}) != len(items):
-        raise validation_error("Achievement IDs must be unique")
-    rows: list[Achievement] = []
-    for item in items:
-        row = db.get(Achievement, item.id)
-        before = _achievement_snapshot(row) if row is not None else None
-        if row is None:
-            row = Achievement(id=item.id)
-            db.add(row)
-        row.title_key = item.title_key
-        row.subtitle_key = item.subtitle_key
-        row.description_key = item.description_key
-        row.sort_order = item.sort_order
-        row.is_active = item.is_active
-        write_audit(
-            db,
-            admin_user_id=admin.id,
-            action="achievement.upsert",
-            entity_type="achievement",
-            entity_id=item.id,
-            before=before,
-            after=_achievement_snapshot(row),
-        )
-        rows.append(row)
-    db.commit()
-    for row in rows:
-        db.refresh(row)
-    return [_achievement_response(row) for row in rows]
-
-
-def grant_achievement(
-    db: Session,
-    ventor_id: UUID,
-    achievement_id: str,
-    admin: AdminPrincipal,
-) -> VentorAchievementResponse:
-    if db.get(VentorProfile, ventor_id) is None:
-        raise not_found("Ventor")
-    if db.get(Achievement, achievement_id) is None:
-        raise not_found("Achievement")
-    row = db.get(VentorAchievement, (ventor_id, achievement_id))
-    if row is None:
-        row = VentorAchievement(
-            ventor_id=ventor_id,
-            achievement_id=achievement_id,
-        )
-        db.add(row)
-        db.flush()
-        write_audit(
-            db,
-            admin_user_id=admin.id,
-            action="achievement.grant",
-            entity_type="ventor_achievement",
-            entity_id=f"{ventor_id}:{achievement_id}",
-            after={
-                "ventor_id": str(ventor_id),
-                "achievement_id": achievement_id,
-                "unlocked_at": row.unlocked_at.isoformat(),
-            },
-        )
-        db.commit()
-        db.refresh(row)
-    return VentorAchievementResponse(
-        ventor_id=str(row.ventor_id),
-        achievement_id=row.achievement_id,
-        unlocked_at=row.unlocked_at,
-    )
 
 
 def get_invite_stats(db: Session) -> InviteStatsResponse:
