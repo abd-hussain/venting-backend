@@ -1,187 +1,281 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex" />
   <title>Help & Support · Venting</title>
   <style>
-:root {
-  --bg: #0f0c14;
-  --bg2: #1a1524;
-  --card: #221c2e;
-  --text: #f4f0fa;
-  --muted: #a89bb8;
-  --accent: #8b5cf6;
-  --line: rgba(255,255,255,0.08);
-  --ok: #34d399;
-}
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body {
-  margin: 0;
-  font-family: Inter, "Segoe UI", Tahoma, system-ui, sans-serif;
-  background: linear-gradient(180deg, #16101f 0%, var(--bg) 40%, #0a0810 100%);
-  color: var(--text);
-  line-height: 1.65;
-  min-height: 100vh;
-}
-body.rtl { direction: rtl; font-family: "Segoe UI", Tahoma, "Noto Sans Arabic", sans-serif; }
-.wrap { max-width: 720px; margin: 0 auto; padding: 28px 20px 64px; }
-.brand {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-weight: 800; letter-spacing: 0.04em; font-size: 14px;
-  color: var(--accent); text-transform: uppercase; margin-bottom: 12px;
-}
-h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 8px; }
-.meta { color: var(--muted); font-size: 0.92rem; margin-bottom: 28px; }
-h2 {
-  font-size: 1.15rem; margin: 32px 0 10px; padding-top: 8px;
-  border-top: 1px solid var(--line);
-}
-h2:first-of-type { border-top: 0; padding-top: 0; }
-h3 { font-size: 1rem; margin: 18px 0 6px; color: #ddd6fe; }
-p, li { color: #e8e2f2; }
-ul { padding-inline-start: 1.2rem; }
-li { margin: 6px 0; }
-.note {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin: 16px 0 24px;
-  color: var(--muted);
-}
-.note strong { color: var(--ok); }
-.toc {
-  background: var(--bg2);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin: 0 0 28px;
-}
-.toc a { color: #c4b5fd; text-decoration: none; }
-.toc a:hover { text-decoration: underline; }
-.toc ul { margin: 8px 0 0; }
-.footer {
-  margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line);
-  color: var(--muted); font-size: 0.88rem;
-}
-a { color: #c4b5fd; }
-section[id] { scroll-margin-top: 16px; }
-</style>
+    :root {
+      --bg: #0f0c14;
+      --bg2: #1a1524;
+      --card: #221c2e;
+      --text: #f4f0fa;
+      --muted: #a89bb8;
+      --accent: #8b5cf6;
+      --line: rgba(255, 255, 255, 0.08);
+      --ok: #34d399;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, "Segoe UI", Tahoma, system-ui, sans-serif;
+      background: linear-gradient(180deg, #16101f 0%, var(--bg) 40%, #0a0810 100%);
+      color: var(--text);
+      line-height: 1.65;
+      min-height: 100vh;
+    }
+
+    body.rtl {
+      direction: rtl;
+      font-family: "Segoe UI", Tahoma, "Noto Sans Arabic", sans-serif;
+    }
+
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 28px 20px 64px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      font-size: 14px;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 1.85rem;
+      line-height: 1.25;
+      margin: 0 0 8px;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin-bottom: 28px;
+    }
+
+    h2 {
+      font-size: 1.15rem;
+      margin: 32px 0 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--line);
+    }
+
+    h2:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    h3 {
+      font-size: 1rem;
+      margin: 18px 0 6px;
+      color: #ddd6fe;
+    }
+
+    p,
+    li {
+      color: #e8e2f2;
+    }
+
+    ul {
+      padding-inline-start: 1.2rem;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    .note {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin: 16px 0 24px;
+      color: var(--muted);
+    }
+
+    .note strong {
+      color: var(--ok);
+    }
+
+    .toc {
+      background: var(--bg2);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin: 0 0 28px;
+    }
+
+    .toc a {
+      color: #c4b5fd;
+      text-decoration: none;
+    }
+
+    .toc a:hover {
+      text-decoration: underline;
+    }
+
+    .toc ul {
+      margin: 8px 0 0;
+    }
+
+    .footer {
+      margin-top: 40px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    a {
+      color: #c4b5fd;
+    }
+
+    section[id] {
+      scroll-margin-top: 16px;
+    }
+  </style>
 </head>
+
 <body>
   <main class="wrap">
     <div class="brand">Venting</div>
     <h1>Help & Support</h1>
     <p class="meta">Guides for Ventors and Listeners · Updated 25 August 2026</p>
-    
-<nav class="toc">
-  <strong>On this page</strong>
-  <ul>
-    <li><a href="#getting-started">Getting started</a></li>
-    <li><a href="#managing-sessions">Managing sessions</a></li>
-    <li><a href="#earnings-payouts">Earnings &amp; payouts</a></li>
-    <li><a href="#account-profile">Account &amp; profile</a></li>
-    <li><a href="#safety-boundaries">Safety &amp; boundaries</a></li>
-    <li><a href="#community-guidelines">Community guidelines</a></li>
-    <li><a href="#faqs">FAQs</a></li>
-    <li><a href="#app-technical">App &amp; technical</a></li>
-    <li><a href="#licenses">Licenses</a></li>
-  </ul>
-</nav>
 
-<section id="getting-started">
-  <h2>Getting started</h2>
-  <p>On Welcome, choose <strong>I want to vent</strong> (Ventor) or <strong>I want to listen</strong> (Listener), then sign in with Apple, Google, or email.</p>
-  <ul>
-    <li><strong>Ventors:</strong> set nickname, gender, avatar, speaking languages, and interests, then explore Listeners and book a session.</li>
-    <li><strong>Listeners:</strong> complete multi-step registration (photo, about you, languages, comfort areas, boundaries, availability, training). Your profile may stay <em>under review</em> until approved.</li>
-  </ul>
-  <p>Tagline to remember: <em>Speak freely. Stay private.</em></p>
-</section>
+    <nav class="toc">
+      <strong>On this page</strong>
+      <ul>
+        <li><a href="#getting-started">Getting started</a></li>
+        <li><a href="#managing-sessions">Managing sessions</a></li>
+        <li><a href="#earnings-payouts">Earnings &amp; payouts</a></li>
+        <li><a href="#account-profile">Account &amp; profile</a></li>
+        <li><a href="#safety-boundaries">Safety &amp; boundaries</a></li>
+        <li><a href="#community-guidelines">Community guidelines</a></li>
+        <li><a href="#faqs">FAQs</a></li>
+        <li><a href="#app-technical">App &amp; technical</a></li>
+        <li><a href="#licenses">Licenses</a></li>
+      </ul>
+    </nav>
 
-<section id="managing-sessions">
-  <h2>Managing sessions</h2>
-  <ul>
-    <li>Ventors can search/filter Listeners, favorite them, book scheduled or near-term sessions, or use instant match where available.</li>
-    <li>Before joining, confirm price, duration, voice/video mode, and optional add-ons.</li>
-    <li>Join from upcoming sessions when it is time; end the call from the in-call controls.</li>
-    <li>After a session, Ventors can rate and optionally tip or report. Listeners can leave feedback as prompted.</li>
-    <li>Cancel upcoming bookings from session details (refund rules appear in the app).</li>
-  </ul>
-</section>
+    <section id="getting-started">
+      <h2>Getting started</h2>
+      <p>On Welcome, choose <strong>I want to vent</strong> (Ventor) or <strong>I want to listen</strong> (Listener),
+        then sign in with Apple, Google, or email.</p>
+      <ul>
+        <li><strong>Ventors:</strong> set nickname, gender, avatar, speaking languages, and interests, then explore
+          Listeners and book a session.</li>
+        <li><strong>Listeners:</strong> complete multi-step registration (photo, about you, languages, comfort areas,
+          boundaries, availability, training). Your profile may stay <em>under review</em> until approved.</li>
+      </ul>
+      <p>Tagline to remember: <em>Speak freely. Stay private.</em></p>
+    </section>
 
-<section id="earnings-payouts">
-  <h2>Earnings &amp; payouts (Listeners)</h2>
-  <ul>
-    <li>Completed eligible sessions credit your listener wallet according to your tier/rate.</li>
-    <li>Track ledger entries, request payouts to a saved payout method, and watch for minimum thresholds or fees shown in-app.</li>
-    <li>Keep identity and payout details accurate to avoid delays.</li>
-  </ul>
-  <p>Ventors: rewards and invite bonuses appear under Rewards — redeem offers toward sessions when eligible.</p>
-</section>
+    <section id="managing-sessions">
+      <h2>Managing sessions</h2>
+      <ul>
+        <li>Ventors can search/filter Listeners, favorite them, and book scheduled or near-term sessions.</li>
+        <li>Before joining, confirm price, duration, voice/video mode, and optional add-ons.</li>
+        <li>Join from upcoming sessions when it is time; end the call from the in-call controls.</li>
+        <li>After a session, Ventors can rate and optionally tip or report. Listeners can leave feedback as prompted.
+        </li>
+        <li>Cancel upcoming bookings from session details (refund rules appear in the app).</li>
+      </ul>
+    </section>
 
-<section id="account-profile">
-  <h2>Account &amp; profile</h2>
-  <ul>
-    <li>Update nickname, avatar, languages, interests/comfort topics, and notification or privacy toggles from Profile → Settings.</li>
-    <li>Change password (email accounts) or manage linked social login from the device OS / provider.</li>
-    <li>Delete account from settings when you want to leave; some financial records may be retained as described in the Privacy Policy.</li>
-  </ul>
-</section>
+    <section id="earnings-payouts">
+      <h2>Earnings &amp; payouts (Listeners)</h2>
+      <ul>
+        <li>Completed eligible sessions credit your listener wallet according to your tier/rate.</li>
+        <li>Track ledger entries, request payouts to a saved payout method, and watch for minimum thresholds or fees
+          shown in-app.</li>
+        <li>Keep identity and payout details accurate to avoid delays.</li>
+      </ul>
+      <p>Ventors: rewards and invite bonuses appear under Rewards — redeem offers toward sessions when eligible.</p>
+    </section>
 
-<section id="safety-boundaries">
-  <h2>Safety &amp; boundaries</h2>
-  <ul>
-    <li>Listeners set comfort areas and hard boundaries during onboarding — Ventors should respect them.</li>
-    <li>You can leave a session at any time. Use in-app report tools for harassment or policy violations.</li>
-    <li>Venting is not emergency care. If you or someone else is in immediate danger, call local emergency services.</li>
-    <li>Do not share highly sensitive credentials, financial OTPs, or illegal content in sessions.</li>
-  </ul>
-</section>
+    <section id="account-profile">
+      <h2>Account &amp; profile</h2>
+      <ul>
+        <li>Update nickname, avatar, languages, interests/comfort topics, and notification or privacy toggles from
+          Profile → Settings.</li>
+        <li>Change password (email accounts) or manage linked social login from the device OS / provider.</li>
+        <li>Delete account from settings when you want to leave; some financial records may be retained as described in
+          the Privacy Policy.</li>
+      </ul>
+    </section>
 
-<section id="community-guidelines">
-  <h2>Community guidelines</h2>
-  <ul>
-    <li>Be respectful, non-judgmental, and confidential.</li>
-    <li>No hate, harassment, sexual solicitation, or exploitation.</li>
-    <li>No impersonation of licensed clinicians unless authorized.</li>
-    <li>No recording or resharing private sessions.</li>
-    <li>Follow platform decisions on warnings, suspensions, and bans.</li>
-  </ul>
-</section>
+    <section id="safety-boundaries">
+      <h2>Safety &amp; boundaries</h2>
+      <ul>
+        <li>Listeners set comfort areas and hard boundaries during onboarding — Ventors should respect them.</li>
+        <li>You can leave a session at any time. Use in-app report tools for harassment or policy violations.</li>
+        <li>Venting is not emergency care. If you or someone else is in immediate danger, call local emergency services.
+        </li>
+        <li>Do not share highly sensitive credentials, financial OTPs, or illegal content in sessions.</li>
+      </ul>
+    </section>
 
-<section id="faqs">
-  <h2>FAQs</h2>
-  <h3>Is Venting therapy?</h3>
-  <p>No. It is peer emotional support. Seek licensed professionals for clinical needs.</p>
-  <h3>Can one account be both Ventor and Listener?</h3>
-  <p>Not by default. Choose your role on Welcome; mismatch with an existing account is blocked.</p>
-  <h3>Why is my Listener profile under review?</h3>
-  <p>We review identity and onboarding quality before paid listening. You will see status updates in the app.</p>
-  <h3>Which languages are supported in the UI?</h3>
-  <p>English and Arabic. Speaking languages for matching come from the catalog managed by the platform.</p>
-</section>
+    <section id="community-guidelines">
+      <h2>Community guidelines</h2>
+      <ul>
+        <li>Be respectful, non-judgmental, and confidential.</li>
+        <li>No hate, harassment, sexual solicitation, or exploitation.</li>
+        <li>No impersonation of licensed clinicians unless authorized.</li>
+        <li>No recording or resharing private sessions.</li>
+        <li>Follow platform decisions on warnings, suspensions, and bans.</li>
+      </ul>
+    </section>
 
-<section id="app-technical">
-  <h2>App &amp; technical</h2>
-  <ul>
-    <li>Use the latest App Store / Play Store version for bug fixes.</li>
-    <li>Grant microphone (and camera for video) permissions for calls.</li>
-    <li>Stable internet improves call quality; switch networks if audio drops.</li>
-    <li>Still stuck? Email <a href="mailto:support@venting.app">support@venting.app</a> with your app version and device model.</li>
-  </ul>
-</section>
+    <section id="faqs">
+      <h2>FAQs</h2>
+      <h3>Is Venting therapy?</h3>
+      <p>No. It is peer emotional support. Seek licensed professionals for clinical needs.</p>
+      <h3>Can one account be both Ventor and Listener?</h3>
+      <p>Not by default. Choose your role on Welcome; mismatch with an existing account is blocked.</p>
+      <h3>Why is my Listener profile under review?</h3>
+      <p>We review identity and onboarding quality before paid listening. You will see status updates in the app.</p>
+      <h3>Which languages are supported in the UI?</h3>
+      <p>English and Arabic. Speaking languages for matching come from the catalog managed by the platform.</p>
+    </section>
 
-<section id="licenses">
-  <h2>Licenses</h2>
-  <p>Venting uses open-source libraries (Flutter SDK and third-party packages). Full license texts for bundled dependencies are available from the app store listing package or on request at <a href="mailto:support@venting.app">support@venting.app</a>.</p>
-  <p>Product name, logos, and brand assets are property of Venting and may not be reused without permission.</p>
-</section>
+    <section id="app-technical">
+      <h2>App &amp; technical</h2>
+      <ul>
+        <li>Use the latest App Store / Play Store version for bug fixes.</li>
+        <li>Grant microphone (and camera for video) permissions for calls.</li>
+        <li>Stable internet improves call quality; switch networks if audio drops.</li>
+        <li>Still stuck? Email <a href="mailto:support@venting.app">support@venting.app</a> with your app version and
+          device model.</li>
+      </ul>
+    </section>
+
+    <section id="licenses">
+      <h2>Licenses</h2>
+      <p>Venting uses open-source libraries (Flutter SDK and third-party packages). Full license texts for bundled
+        dependencies are available from the app store listing package or on request at <a
+          href="mailto:support@venting.app">support@venting.app</a>.</p>
+      <p>Product name, logos, and brand assets are property of Venting and may not be reused without permission.</p>
+    </section>
 
     <p class="footer">© 2026 Venting · Speak freely. Stay private.</p>
   </main>
 </body>
+
 </html>

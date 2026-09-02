@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class TimeMode(str, Enum):
-    instant = "instant"
     nearest = "nearest"
     scheduled = "scheduled"
 
@@ -15,17 +14,6 @@ class TimeMode(str, Enum):
 class CallModeOut(str, Enum):
     voice = "voice"
     video = "video"
-
-
-class InstantMatchRequest(BaseModel):
-    topic: str | None = None
-    language: str | None = None
-    duration_minutes: int | None = Field(default=None, ge=5, le=120)
-
-
-class InstantMatchResponse(BaseModel):
-    listener: dict[str, Any]
-    suggested_duration_minutes: int
 
 
 class BookSessionRequest(BaseModel):
@@ -59,7 +47,6 @@ class VentorBookedSession(BaseModel):
     amount_paid: float
     voice_change_enabled: bool
     scheduled_at: str | None = None
-    is_instant: bool
     refunded_to_balance: float | None = None
     payment: PaymentInfo | None = None
 
@@ -92,7 +79,6 @@ class ListenerSessionItem(BaseModel):
     speech_language: str
     is_waiting: bool = False
     can_join_now: bool = False
-    is_instant: bool
     is_video_call: bool
     ventor_rating: float | None = None
     status_label: str | None = None
@@ -125,7 +111,6 @@ class SessionRequestItem(BaseModel):
     tags: list[str] | None = None
     received_at: str
     speech_language: str
-    is_instant: bool
     is_video_call: bool
     ventor_rating: float | None = None
 

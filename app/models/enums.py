@@ -43,7 +43,6 @@ class DayOfWeek(str, enum.Enum):
 
 
 class SessionTimeMode(str, enum.Enum):
-    instant = "instant"
     nearest = "nearest"
     scheduled = "scheduled"
 

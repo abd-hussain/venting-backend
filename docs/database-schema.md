@@ -147,7 +147,7 @@ erDiagram
 | `profile_status` | `incomplete`, `under_review`, `approved`, `rejected` |
 | `setup_step_status` | `done`, `in_progress`, `locked` |
 | `day_of_week` | `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun` |
-| `session_time_mode` | `instant`, `nearest`, `scheduled` |
+| `session_time_mode` | `nearest`, `scheduled` |
 | `call_mode` | `voice`, `video` |
 | `session_request_status` | `pending`, `accepted`, `declined`, `expired`, `cancelled` |
 | `session_status` | `upcoming`, `live`, `completed`, `cancelled`, `missed` |
@@ -304,7 +304,6 @@ Optional FCM device tokens from ventor `#8e` / listener `#22j` registration comp
 | `profile_status` | `profile_status` | **IDX** — whole-profile review state |
 | `profile_rejection_reason` | TEXT | ? Last admin reject note (mirrors `#29` `rejection_reason`) |
 | `steps_to_refill` | JSONB | string[] of setup step ids flagged on reject (mirrors `#29`) |
-| `accept_instant_calls` | BOOLEAN | default true |
 | `session_length_minutes` | INT | default 30 |
 | `break_length_minutes` | INT | default 15 |
 | `time_zone_id` | VARCHAR(64) | e.g. `Asia/Beirut` |
@@ -488,7 +487,6 @@ Written from ventor registration step `languages` (`PATCH /v1/ventors/register/s
 | Column | Type | Notes |
 |--------|------|-------|
 | `listener_id` | UUID | **PK, FK** |
-| `accept_instant_calls` | BOOLEAN | |
 | `session_length_minutes` | INT | |
 | `break_length_minutes` | INT | |
 | `time_zone_id` | VARCHAR(64) | |
@@ -607,7 +605,7 @@ Created when ventor books / requests a listener (before accept for non-auto flow
 |--------|------|-------|
 | `id` | UUID | **PK** |
 | `ventor_id` | UUID | **FK** **IDX** |
-| `listener_id` | UUID | **FK** **IDX** (null if broadcast instant?) |
+| `listener_id` | UUID | **FK** **IDX** |
 | `status` | `session_request_status` | **IDX** |
 | `message` | TEXT | ? ventor note |
 | `chosen_reason` | VARCHAR(120) | ? |
@@ -618,16 +616,15 @@ Created when ventor books / requests a listener (before accept for non-auto flow
 | `call_mode` | `call_mode` | |
 | `speech_language` | VARCHAR(64) | |
 | `voice_change_enabled` | BOOLEAN | default false |
-| `is_instant` | BOOLEAN | |
 | `promo_code_id` | UUID | ? **FK → promo_codes** |
 | `reward_offer_id` | UUID | ? **FK → reward_offers** |
 | `quoted_amount` | NUMERIC(12,2) | |
-| `expires_at` | TIMESTAMPTZ | ? for instant race |
+| `expires_at` | TIMESTAMPTZ | ? |
 | `session_id` | UUID | ? set when accepted **FK → sessions** |
 | `created_at` | TIMESTAMPTZ | |
 | `updated_at` | TIMESTAMPTZ | |
 
-**Indexes:** `(listener_id, status)`, `(ventor_id, status)`, `(is_instant, status, created_at)`
+**Indexes:** `(listener_id, status)`, `(ventor_id, status)`
 
 ---
 
@@ -651,7 +648,6 @@ Canonical booked / live / history session.
 | `call_mode` | `call_mode` | |
 | `speech_language` | VARCHAR(64) | |
 | `voice_change_enabled` | BOOLEAN | |
-| `is_instant` | BOOLEAN | |
 | `message` | TEXT | ? |
 | `chosen_reason` | VARCHAR(120) | ? |
 | `tags` | TEXT[] | |
@@ -973,7 +969,7 @@ Append-only money movement (earnings chart + audit).
 
 1. **Cached counters on profiles** (`rating_avg`, `session_count`, `points_balance`, `rate_per_minute`) — discovery and home screens avoid heavy aggregates.
 2. **Append-only `wallet_ledger_entries`** — source of truth for money; wallet balances updated in the same transaction.
-3. **`session_requests` → `sessions`** — keeps accept/decline race (instant first-wins) clean without mutating history oddly.
+3. **`session_requests` → `sessions`** — keeps accept/decline flow clean without mutating history oddly.
 4. **1:1 settings tables** — match GET/PUT API shapes; no JSON soup for toggles you query often.
 5. **Lookup + junction tags** — filter listeners by language/comfort/boundary with indexed joins.
 6. **JSONB only where flexible** — `rating_breakdown`, notification `data`, not core money fields.

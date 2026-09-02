@@ -61,7 +61,6 @@ class SessionRequest(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     speech_language = Column(String(64), nullable=False)
     voice_change_enabled = Column(Boolean, nullable=False, server_default="false")
-    is_instant = Column(Boolean, nullable=False, server_default="false")
     promo_code_id = Column(
         UUID(as_uuid=True),
         ForeignKey("promo_codes.id", ondelete="SET NULL"),
@@ -84,12 +83,6 @@ class SessionRequest(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     __table_args__ = (
         Index("ix_session_requests_listener_status", "listener_id", "status"),
         Index("ix_session_requests_ventor_status", "ventor_id", "status"),
-        Index(
-            "ix_session_requests_instant_status_created",
-            "is_instant",
-            "status",
-            "created_at",
-        ),
     )
 
 
@@ -131,7 +124,6 @@ class Session(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     speech_language = Column(String(64), nullable=False)
     voice_change_enabled = Column(Boolean, nullable=False, server_default="false")
-    is_instant = Column(Boolean, nullable=False, server_default="false")
     message = Column(Text, nullable=True)
     chosen_reason = Column(String(120), nullable=True)
     tags = Column(ARRAY(Text), nullable=True)

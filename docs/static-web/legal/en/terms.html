@@ -1,138 +1,239 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex" />
   <title>Terms of Service · Venting</title>
   <style>
-:root {
-  --bg: #0f0c14;
-  --bg2: #1a1524;
-  --card: #221c2e;
-  --text: #f4f0fa;
-  --muted: #a89bb8;
-  --accent: #8b5cf6;
-  --line: rgba(255,255,255,0.08);
-  --ok: #34d399;
-}
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body {
-  margin: 0;
-  font-family: Inter, "Segoe UI", Tahoma, system-ui, sans-serif;
-  background: linear-gradient(180deg, #16101f 0%, var(--bg) 40%, #0a0810 100%);
-  color: var(--text);
-  line-height: 1.65;
-  min-height: 100vh;
-}
-body.rtl { direction: rtl; font-family: "Segoe UI", Tahoma, "Noto Sans Arabic", sans-serif; }
-.wrap { max-width: 720px; margin: 0 auto; padding: 28px 20px 64px; }
-.brand {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-weight: 800; letter-spacing: 0.04em; font-size: 14px;
-  color: var(--accent); text-transform: uppercase; margin-bottom: 12px;
-}
-h1 { font-size: 1.85rem; line-height: 1.25; margin: 0 0 8px; }
-.meta { color: var(--muted); font-size: 0.92rem; margin-bottom: 28px; }
-h2 {
-  font-size: 1.15rem; margin: 32px 0 10px; padding-top: 8px;
-  border-top: 1px solid var(--line);
-}
-h2:first-of-type { border-top: 0; padding-top: 0; }
-h3 { font-size: 1rem; margin: 18px 0 6px; color: #ddd6fe; }
-p, li { color: #e8e2f2; }
-ul { padding-inline-start: 1.2rem; }
-li { margin: 6px 0; }
-.note {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin: 16px 0 24px;
-  color: var(--muted);
-}
-.note strong { color: var(--ok); }
-.toc {
-  background: var(--bg2);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin: 0 0 28px;
-}
-.toc a { color: #c4b5fd; text-decoration: none; }
-.toc a:hover { text-decoration: underline; }
-.toc ul { margin: 8px 0 0; }
-.footer {
-  margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line);
-  color: var(--muted); font-size: 0.88rem;
-}
-a { color: #c4b5fd; }
-section[id] { scroll-margin-top: 16px; }
-</style>
+    :root {
+      --bg: #0f0c14;
+      --bg2: #1a1524;
+      --card: #221c2e;
+      --text: #f4f0fa;
+      --muted: #a89bb8;
+      --accent: #8b5cf6;
+      --line: rgba(255, 255, 255, 0.08);
+      --ok: #34d399;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, "Segoe UI", Tahoma, system-ui, sans-serif;
+      background: linear-gradient(180deg, #16101f 0%, var(--bg) 40%, #0a0810 100%);
+      color: var(--text);
+      line-height: 1.65;
+      min-height: 100vh;
+    }
+
+    body.rtl {
+      direction: rtl;
+      font-family: "Segoe UI", Tahoma, "Noto Sans Arabic", sans-serif;
+    }
+
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 28px 20px 64px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      font-size: 14px;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 1.85rem;
+      line-height: 1.25;
+      margin: 0 0 8px;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin-bottom: 28px;
+    }
+
+    h2 {
+      font-size: 1.15rem;
+      margin: 32px 0 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--line);
+    }
+
+    h2:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    h3 {
+      font-size: 1rem;
+      margin: 18px 0 6px;
+      color: #ddd6fe;
+    }
+
+    p,
+    li {
+      color: #e8e2f2;
+    }
+
+    ul {
+      padding-inline-start: 1.2rem;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    .note {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin: 16px 0 24px;
+      color: var(--muted);
+    }
+
+    .note strong {
+      color: var(--ok);
+    }
+
+    .toc {
+      background: var(--bg2);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin: 0 0 28px;
+    }
+
+    .toc a {
+      color: #c4b5fd;
+      text-decoration: none;
+    }
+
+    .toc a:hover {
+      text-decoration: underline;
+    }
+
+    .toc ul {
+      margin: 8px 0 0;
+    }
+
+    .footer {
+      margin-top: 40px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    a {
+      color: #c4b5fd;
+    }
+
+    section[id] {
+      scroll-margin-top: 16px;
+    }
+  </style>
 </head>
+
 <body>
   <main class="wrap">
     <div class="brand">Venting</div>
     <h1>Terms of Service</h1>
     <p class="meta">Effective: 25 August 2026 · Applies to the Venting mobile apps and related services</p>
-    
-<div class="note"><strong>Important:</strong> Venting is a peer emotional-support platform. It is <em>not</em> medical care, psychotherapy, crisis intervention, or emergency services. If you are in danger or in crisis, contact local emergency services immediately.</div>
 
-<h2>1. About Venting</h2>
-<p>Venting connects people who want to talk (“<strong>Ventors</strong>”) with trained peer supporters (“<strong>Listeners</strong>”) for private voice or video conversations. Features may include discovery/booking, live sessions, ratings, rewards, listener earnings, training modules, and in-app support.</p>
+    <div class="note"><strong>Important:</strong> Venting is a peer emotional-support platform. It is <em>not</em>
+      medical care, psychotherapy, crisis intervention, or emergency services. If you are in danger or in crisis,
+      contact local emergency services immediately.</div>
 
-<h2>2. Eligibility & accounts</h2>
-<ul>
-  <li>You must be at least <strong>18 years old</strong> to create an account.</li>
-  <li>You may register as a Ventor or a Listener. Role switching for the same account is not supported unless we expressly enable it.</li>
-  <li>Provide accurate information. Keep credentials secure. You are responsible for activity under your account.</li>
-  <li>Listeners may need identity verification and admin approval before accepting paid sessions.</li>
-</ul>
+    <h2>1. About Venting</h2>
+    <p>Venting connects people who want to talk (“<strong>Ventors</strong>”) with trained peer supporters
+      (“<strong>Listeners</strong>”) for private voice or video conversations. Features may include discovery/booking,
+      live sessions, ratings, rewards, listener earnings, training modules, and in-app support.</p>
 
-<h2>3. The service (how it works)</h2>
-<ul>
-  <li><strong>Ventors</strong> complete profile setup (nickname, gender, languages, interests), find Listeners, book or instantly match for sessions, and may earn/redeem rewards.</li>
-  <li><strong>Listeners</strong> complete onboarding (profile, languages, comfort areas, boundaries, availability, training), undergo review, then accept sessions and receive payouts according to platform rules.</li>
-  <li>Sessions may be voice or video and may include optional features such as voice change where offered.</li>
-</ul>
+    <h2>2. Eligibility & accounts</h2>
+    <ul>
+      <li>You must be at least <strong>18 years old</strong> to create an account.</li>
+      <li>You may register as a Ventor or a Listener. Role switching for the same account is not supported unless we
+        expressly enable it.</li>
+      <li>Provide accurate information. Keep credentials secure. You are responsible for activity under your account.
+      </li>
+      <li>Listeners may need identity verification and admin approval before accepting paid sessions.</li>
+    </ul>
 
-<h2>4. Acceptable use</h2>
-<p>You agree not to:</p>
-<ul>
-  <li>Harass, threaten, exploit, or sexually solicit anyone; share illegal content; or encourage self-harm.</li>
-  <li>Impersonate others, scrape the service, reverse engineer, or disrupt infrastructure.</li>
-  <li>Record, screenshot, or redistribute another user’s voice, video, or personal details without clear lawful permission.</li>
-  <li>Use Venting for clinical diagnosis, prescribing, or presenting yourself as a licensed clinician unless you are properly licensed <em>and</em> we authorize that use case (Venting is peer support by default).</li>
-</ul>
+    <h2>3. The service (how it works)</h2>
+    <ul>
+      <li><strong>Ventors</strong> complete profile setup (nickname, gender, languages, interests), find Listeners, and
+        book sessions, and may earn/redeem rewards.</li>
+      <li><strong>Listeners</strong> complete onboarding (profile, languages, comfort areas, boundaries, availability,
+        training), undergo review, then accept sessions and receive payouts according to platform rules.</li>
+      <li>Sessions may be voice or video and may include optional features such as voice change where offered.</li>
+    </ul>
 
-<h2>5. Community & safety</h2>
-<p>Respect Listener boundaries and Ventor comfort topics. Report abuse in-app. We may warn, suspend, or ban accounts; cancel sessions; withhold payouts tied to fraud; and cooperate with lawful requests.</p>
+    <h2>4. Acceptable use</h2>
+    <p>You agree not to:</p>
+    <ul>
+      <li>Harass, threaten, exploit, or sexually solicit anyone; share illegal content; or encourage self-harm.</li>
+      <li>Impersonate others, scrape the service, reverse engineer, or disrupt infrastructure.</li>
+      <li>Record, screenshot, or redistribute another user’s voice, video, or personal details without clear lawful
+        permission.</li>
+      <li>Use Venting for clinical diagnosis, prescribing, or presenting yourself as a licensed clinician unless you are
+        properly licensed <em>and</em> we authorize that use case (Venting is peer support by default).</li>
+    </ul>
 
-<h2>6. Payments, rewards & payouts</h2>
-<ul>
-  <li>Ventor session fees, tips, promos, and reward redemptions are charged as shown in the app before confirmation.</li>
-  <li>Listener earnings, tiers, fees, and payout timing follow in-app rules and may change with notice.</li>
-  <li>Taxes are your responsibility where applicable.</li>
-  <li>Chargebacks, fraud, or policy violations may lead to reversals or account action.</li>
-</ul>
+    <h2>5. Community & safety</h2>
+    <p>Respect Listener boundaries and Ventor comfort topics. Report abuse in-app. We may warn, suspend, or ban
+      accounts; cancel sessions; withhold payouts tied to fraud; and cooperate with lawful requests.</p>
 
-<h2>7. Disclaimers</h2>
-<p>The service is provided “as is.” We do not guarantee continuous availability, specific Listener outcomes, or that conversations will improve your wellbeing. Peer support is not a substitute for professional care.</p>
+    <h2>6. Payments, rewards & payouts</h2>
+    <ul>
+      <li>Ventor session fees, tips, promos, and reward redemptions are charged as shown in the app before confirmation.
+      </li>
+      <li>Listener earnings, tiers, fees, and payout timing follow in-app rules and may change with notice.</li>
+      <li>Taxes are your responsibility where applicable.</li>
+      <li>Chargebacks, fraud, or policy violations may lead to reversals or account action.</li>
+    </ul>
 
-<h2>8. Limitation of liability</h2>
-<p>To the fullest extent permitted by law, Venting and its operators are not liable for indirect, incidental, special, consequential, or punitive damages, or for losses arising from user conduct during sessions. Our aggregate liability for claims relating to the service is limited to the amounts you paid to Venting in the three (3) months before the claim (or USD $50 if greater and required by law).</p>
+    <h2>7. Disclaimers</h2>
+    <p>The service is provided “as is.” We do not guarantee continuous availability, specific Listener outcomes, or that
+      conversations will improve your wellbeing. Peer support is not a substitute for professional care.</p>
 
-<h2>9. Termination</h2>
-<p>You may delete your account in settings (subject to pending payouts or disputes). We may suspend or terminate access for violations, risk, or prolonged inactivity.</p>
+    <h2>8. Limitation of liability</h2>
+    <p>To the fullest extent permitted by law, Venting and its operators are not liable for indirect, incidental,
+      special, consequential, or punitive damages, or for losses arising from user conduct during sessions. Our
+      aggregate liability for claims relating to the service is limited to the amounts you paid to Venting in the three
+      (3) months before the claim (or USD $50 if greater and required by law).</p>
 
-<h2>10. Changes</h2>
-<p>We may update these Terms. Material changes will be reflected by updating the effective date and, where appropriate, in-app notice. Continued use after changes means you accept the updated Terms.</p>
+    <h2>9. Termination</h2>
+    <p>You may delete your account in settings (subject to pending payouts or disputes). We may suspend or terminate
+      access for violations, risk, or prolonged inactivity.</p>
 
-<h2>11. Contact</h2>
-<p>Questions: <a href="mailto:support@venting.app">support@venting.app</a></p>
+    <h2>10. Changes</h2>
+    <p>We may update these Terms. Material changes will be reflected by updating the effective date and, where
+      appropriate, in-app notice. Continued use after changes means you accept the updated Terms.</p>
+
+    <h2>11. Contact</h2>
+    <p>Questions: <a href="mailto:support@venting.app">support@venting.app</a></p>
 
     <p class="footer">© 2026 Venting · Speak freely. Stay private.</p>
   </main>
 </body>
+
 </html>

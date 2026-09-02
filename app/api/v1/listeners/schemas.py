@@ -65,7 +65,6 @@ ALLOWED_BREAK_MINUTES = frozenset({0, 5, 10, 15, 30, 60})
 
 
 class AvailabilityPayload(BaseModel):
-    accept_instant_calls: bool = True
     session_minutes: list[int] = Field(default_factory=list)
     session_length_minutes: int | None = None
     break_length_minutes: int = 15
@@ -154,7 +153,6 @@ class ListenerSavedVoiceIntro(BaseModel):
 
 
 class ListenerSavedAvailability(BaseModel):
-    accept_instant_calls: bool
     session_minutes: list[int] = Field(default_factory=list)
     availability: AvailabilityPayload
 
@@ -226,7 +224,6 @@ class ListenerRegisterVoiceIntroRequest(BaseModel):
 
 
 class ListenerRegisterAvailabilityRequest(BaseModel):
-    accept_instant_calls: bool
     session_minutes: list[int] = Field(default_factory=list)
     availability: AvailabilityPayload
 
@@ -378,28 +375,17 @@ class OnlineStatusResponse(BaseModel):
     is_online: bool
 
 
-class ImpactChartPoint(BaseModel):
-    label: str
-    value: float
-
-
-class DashboardImpact(BaseModel):
-    sessions_today: int
-    minutes_today: int
-    chart: list[ImpactChartPoint]
-
-
 class DashboardUpcomingSession(BaseModel):
     id: str
     ventor_name: str
     when_label: str
     duration_minutes: int
+    ventor_avatar_url: str | None = None
 
 
 class DashboardResponse(BaseModel):
     display_name: str
     setup_progress: SetupProgressResponse
-    impact: DashboardImpact
     next_upcoming_session: DashboardUpcomingSession | None = None
     is_online: bool
     reminder: str | None = None

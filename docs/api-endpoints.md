@@ -672,7 +672,7 @@ Each step `PATCH` returns the **same progress envelope** as `#22a`.
 | **comfort-areas** | `comfort_area_ids[]`, optional `custom_comfort_area_text` |
 | **boundaries** | `boundary_ids[]` (≥1), optional `custom_boundary_text` |
 | **voice-intro** | `voice_intro` (file), `voice_intro_seconds` |
-| **availability** | `accept_instant_calls`, `session_minutes` (int[] — empty = any; max 2 of `30`/`45`/`60`), `availability` object (`#37` shape) |
+| **availability** | `session_minutes` (int[] — empty = any; max 2 of `30`/`45`/`60`), `availability` object (`#37` shape) |
 
 **Do not send:** `agreed_to_terms`, `notifications_enabled`, `document_front`, `document_back`.
 
@@ -1029,7 +1029,7 @@ Mirror **#26** voice intro, but for images:
 |--|--|
 | **Auth** | Bearer |
 | **Screen** | Listener dashboard (aggregate) |
-| **Response** | `{ display_name, setup_progress, impact: { sessions_today, minutes_today, chart: [{ label, value }] }, next_upcoming_session?, is_online, reminder? }` |
+| **Response** | `{ display_name, setup_progress, next_upcoming_session?: { id, ventor_name, when_label, duration_minutes, ventor_avatar_url? }, is_online, reminder? }` |
 
 ---
 
@@ -1113,13 +1113,12 @@ Profile information (languages, comfort areas, experience, boundaries) is **alwa
 |--|--|
 | **Auth** | Bearer |
 | **Screen** | Availability tab |
-| **Response** | `{ accept_instant_calls, session_minutes, break_length_minutes, time_zone_id, days: [{ day: "mon", slots: [{ start: "09:00", end: "12:00" }] }] }` |
+| **Response** | `{ session_minutes, break_length_minutes, time_zone_id, days: [{ day: "mon", slots: [{ start: "09:00", end: "12:00" }] }] }` |
 
 **Fields**
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `accept_instant_calls` | bool | Whether listener accepts instant sessions |
 | `session_minutes` | int[] | Preferred session lengths in minutes. Empty array = any duration. Allowed values: `30`, `45`, `60` (max 2 selections) |
 | `session_length_minutes` | int? | **Deprecated read fallback** when `session_minutes` is absent |
 | `break_length_minutes` | int | Break between sessions. Allowed: `0`, `5`, `10`, `15`, `30`, `60` (`0` = no break) |
@@ -1133,7 +1132,6 @@ Profile information (languages, comfort areas, experience, boundaries) is **alwa
 {
   "status": "success",
   "data": {
-    "accept_instant_calls": true,
     "session_minutes": [30, 45],
     "break_length_minutes": 15,
     "time_zone_id": "Asia/Beirut",
@@ -1152,11 +1150,11 @@ Profile information (languages, comfort areas, experience, boundaries) is **alwa
 | | |
 |--|--|
 | **Auth** | Bearer |
-| **Screen** | Persist instant calls / session lengths / break / full week |
+| **Screen** | Persist session lengths / break / full week |
 | **Body** | Full availability object (#37) |
 | **Response** | Updated availability (#37) |
 
-Mobile sends the full current availability object whenever instant calls, session lengths, or break length change.
+Mobile sends the full current availability object whenever session lengths or break length change.
 
 ---
 
@@ -1185,24 +1183,13 @@ Mobile sends the full current availability object whenever instant calls, sessio
 
 ---
 
-### 41. `POST /v1/sessions/instant-match`
-
-| | |
-|--|--|
-| **Auth** | Bearer (ventor) |
-| **Screen** | “Surprise me” / instant match |
-| **Body** | optional filters: `topic?`, `language?`, `duration_minutes?` |
-| **Response** | `{ listener: ListenerPublic, suggested_duration_minutes }` |
-
----
-
 ### 42. `POST /v1/sessions`
 
 | | |
 |--|--|
 | **Auth** | Bearer (ventor) |
 | **Screen** | Before connecting → pay & book |
-| **Body** | `{ listener_id, duration_minutes, time_mode: "instant" \| "nearest" \| "scheduled", scheduled_at?, call_mode: "voice" \| "video", speech_language, voice_change_enabled, promo_code?, reward_offer_id? }` |
+| **Body** | `{ listener_id, duration_minutes, time_mode: "nearest" \| "scheduled", scheduled_at?, call_mode: "voice" \| "video", speech_language, voice_change_enabled, promo_code?, reward_offer_id? }` |
 | **Response** | `VentorBookedSession` + `payment: { amount_paid, currency, voice_change_fee, discount_amount }` |
 
 ---
@@ -1214,7 +1201,7 @@ Mobile sends the full current availability object whenever instant calls, sessio
 | **Auth** | Bearer |
 | **Screen** | Booked sessions list + home upcoming |
 | **Query** | `status` (`upcoming` \| `live` \| `completed` \| `cancelled`), `page` |
-| **Response** | `{ items: [{ id, listener_id, listener_name, listener_avatar_url, duration_minutes, status, call_mode, speech_language, amount_paid, voice_change_enabled, scheduled_at, is_instant, refunded_to_balance? }] }` |
+| **Response** | `{ items: [{ id, listener_id, listener_name, listener_avatar_url, duration_minutes, status, call_mode, speech_language, amount_paid, voice_change_enabled, scheduled_at, refunded_to_balance? }] }` |
 
 ---
 
@@ -1246,7 +1233,7 @@ Mobile sends the full current availability object whenever instant calls, sessio
 | **Auth** | Bearer |
 | **Screen** | Listener sessions tab |
 | **Query** | `filter` = `upcoming` \| `missed` \| `history` |
-| **Response** | `{ items: [{ id, scheduled_at, duration_minutes, ventor_name, ventor_avatar_url, message, chosen_reason, tags, speech_language, is_waiting, can_join_now, is_instant, is_video_call, ventor_rating, status_label?, session_cost?, is_missed, history_outcome?: "accepted" \| "declined" }] }` |
+| **Response** | `{ items: [{ id, scheduled_at, duration_minutes, ventor_name, ventor_avatar_url, message, chosen_reason, tags, speech_language, is_waiting, can_join_now, is_video_call, ventor_rating, status_label?, session_cost?, is_missed, history_outcome?: "accepted" \| "declined" }] }` |
 
 ---
 
@@ -1266,7 +1253,7 @@ Mobile sends the full current availability object whenever instant calls, sessio
 |--|--|
 | **Auth** | Bearer |
 | **Screen** | Pending requests |
-| **Response** | `{ items: [{ id, ventor_name, ventor_avatar_url, message, chosen_reason, scheduled_at, duration_minutes, tags, received_at, speech_language, is_instant, is_video_call, ventor_rating }] }` |
+| **Response** | `{ items: [{ id, ventor_name, ventor_avatar_url, message, chosen_reason, scheduled_at, duration_minutes, tags, received_at, speech_language, is_video_call, ventor_rating }] }` |
 
 ---
 
@@ -1275,7 +1262,7 @@ Mobile sends the full current availability object whenever instant calls, sessio
 | | |
 |--|--|
 | **Auth** | Bearer |
-| **Notes** | Instant: first accept wins |
+| **Notes** | First accept wins when multiple listeners receive the same request |
 | **Response** | `{ session_id, status: "accepted" \| "already_taken" }` |
 
 ---
@@ -2463,7 +2450,6 @@ Password reset pages are opened from the **email link** (browser / OS), not from
 | 38 | PUT | `/v1/listeners/me/availability` |
 | 39 | PUT | `/v1/listeners/me/availability/days/{day}` |
 | 40 | GET | `/v1/listeners` |
-| 41 | POST | `/v1/sessions/instant-match` |
 | 42 | POST | `/v1/sessions` |
 | 43 | GET | `/v1/ventors/me/sessions` |
 | 44 | GET | `/v1/ventors/me/sessions/{sessionId}` |

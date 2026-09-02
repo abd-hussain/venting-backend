@@ -154,7 +154,6 @@ def parse_register_form(form: Any) -> dict[str, Any]:
         "boundary_ids_raw": form_json_list_raw(form, "boundary_ids"),
         "custom_boundary_text": _scalar(form, "custom_boundary_text"),
         "availability_raw": _scalar(form, "availability"),
-        "accept_instant_calls": _scalar(form, "accept_instant_calls"),
         "session_minutes": parse_session_minutes_list(session_raw),
         "fcm_token": _scalar(form, "fcm_token"),
         "voice_intro_seconds": parse_session_minutes(_scalar(form, "voice_intro_seconds")),

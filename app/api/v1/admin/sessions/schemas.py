@@ -60,7 +60,6 @@ class SessionDetail(SessionItem):
     call_mode: str
     speech_language: str
     voice_change_enabled: bool
-    is_instant: bool
     message: str | None
     chosen_reason: str | None
     tags: list[str] | None
@@ -93,7 +92,6 @@ class SessionRequestItem(BaseModel):
     status: str
     duration_minutes: int
     scheduled_at: datetime | None
-    is_instant: bool
     quoted_amount: float
     expires_at: datetime | None
     created_at: datetime

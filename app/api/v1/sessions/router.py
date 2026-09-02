@@ -8,8 +8,6 @@ from app.api.v1.sessions.schemas import (
     EndSessionRequest,
     EndSessionResponse,
     FeedbackRequest,
-    InstantMatchRequest,
-    InstantMatchResponse,
     JoinCallResponse,
     OkResponse,
     RatingRequest,
@@ -21,7 +19,6 @@ from app.api.v1.sessions.schemas import (
 from app.api.v1.sessions.service import (
     book_session,
     end_session,
-    instant_match,
     join_session,
     rate_session,
     report_session,
@@ -31,21 +28,6 @@ from app.core.responses import success_response
 from app.schemas.envelope import APIErrorResponse, APISuccessResponse
 
 router = APIRouter()
-
-
-@router.post(
-    "/instant-match",
-    response_model=APISuccessResponse[InstantMatchResponse],
-    responses={401: {"model": APIErrorResponse}, 404: {"model": APIErrorResponse}},
-    summary="Instant match a listener",
-)
-def post_instant_match(
-    body: InstantMatchRequest,
-    current_user: CurrentVentor,
-    db: DbSession,
-):
-    data = instant_match(db, current_user, body)
-    return success_response(data.model_dump(mode="json"))
 
 
 @router.post(

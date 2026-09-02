@@ -11,7 +11,6 @@ from jose import jwt
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.v1.listeners.discovery import list_listeners
 from app.api.v1.catalogs.service import assert_active_language
 from app.api.v1.sessions.schemas import (
     AcceptRequestResponse,
@@ -21,8 +20,6 @@ from app.api.v1.sessions.schemas import (
     EndSessionRequest,
     EndSessionResponse,
     FeedbackRequest,
-    InstantMatchRequest,
-    InstantMatchResponse,
     JoinCallResponse,
     ListenerSessionItem,
     ListenerSessionsResponse,
@@ -171,7 +168,6 @@ def _booked_session(
         amount_paid=amount,
         voice_change_enabled=session.voice_change_enabled,
         scheduled_at=_iso(session.scheduled_at),
-        is_instant=session.is_instant,
         refunded_to_balance=refunded if refunded else None,
     )
     if include_payment and payment is not None:
@@ -210,41 +206,6 @@ def _quote_price(
     if amount < 0:
         amount = Decimal("0")
     return amount, voice_fee, discount
-
-
-def instant_match(
-    db: Session,
-    ventor: User,
-    payload: InstantMatchRequest,
-) -> InstantMatchResponse:
-    if ventor.role != UserRole.ventor:
-        raise forbidden()
-    result = list_listeners(
-        db,
-        ventor,
-        topic=payload.topic,
-        languages=payload.language,
-        online_only=True,
-        page=1,
-        page_size=20,
-    )
-    if not result.items:
-        result = list_listeners(
-            db,
-            ventor,
-            topic=payload.topic,
-            languages=payload.language,
-            page=1,
-            page_size=20,
-        )
-    if not result.items:
-        raise not_found("Listener")
-    pick = secrets.choice(result.items)
-    duration = payload.duration_minutes or 30
-    return InstantMatchResponse(
-        listener=pick.model_dump(mode="json"),
-        suggested_duration_minutes=duration,
-    )
 
 
 def book_session(
@@ -309,47 +270,22 @@ def book_session(
         offer=offer,
     )
 
-    is_instant = payload.time_mode == SessionTimeMode.instant
     request = SessionRequest(
         ventor_id=ventor.id,
         listener_id=listener_id,
-        status=SessionRequestStatus.pending if is_instant else SessionRequestStatus.accepted,
+        status=SessionRequestStatus.accepted,
         duration_minutes=payload.duration_minutes,
         time_mode=SessionTimeMode(payload.time_mode.value),
-        scheduled_at=scheduled_at or (_utc_now() if is_instant else None),
+        scheduled_at=scheduled_at or _utc_now(),
         call_mode=CallMode(payload.call_mode.value),
         speech_language=payload.speech_language,
         voice_change_enabled=payload.voice_change_enabled,
-        is_instant=is_instant,
         promo_code_id=promo.id if promo else None,
         reward_offer_id=offer.id if offer else None,
         quoted_amount=amount,
     )
     db.add(request)
     db.flush()
-
-    if is_instant:
-        db.commit()
-        db.refresh(request)
-        return VentorBookedSession(
-            id=str(request.id),
-            listener_id=str(listener_id),
-            listener_name=listener.full_name,
-            listener_avatar_url=listener.avatar_url,
-            duration_minutes=payload.duration_minutes,
-            status="pending",
-            call_mode=payload.call_mode.value,
-            speech_language=payload.speech_language,
-            amount_paid=float(amount),
-            voice_change_enabled=payload.voice_change_enabled,
-            scheduled_at=_iso(request.scheduled_at),
-            is_instant=True,
-            payment=PaymentInfo(
-                amount_paid=float(amount),
-                voice_change_fee=float(voice_fee),
-                discount_amount=float(discount),
-            ),
-        )
 
     session = VentingSession(
         request_id=request.id,
@@ -363,7 +299,6 @@ def book_session(
         call_mode=CallMode(payload.call_mode.value),
         speech_language=payload.speech_language,
         voice_change_enabled=payload.voice_change_enabled,
-        is_instant=payload.time_mode == SessionTimeMode.instant,
         call_channel_id=f"venting-{secrets.token_hex(8)}",
     )
     db.add(session)
@@ -524,7 +459,6 @@ def list_listener_sessions(
                 speech_language=session.speech_language,
                 is_waiting=session.status == SessionStatus.upcoming,
                 can_join_now=can_join and session.status != SessionStatus.cancelled,
-                is_instant=session.is_instant,
                 is_video_call=session.call_mode == CallMode.video,
                 ventor_rating=_ventor_avg_rating(db, session.ventor_id),
                 status_label=session.status.value,
@@ -601,9 +535,8 @@ def list_session_requests(db: Session, listener: User) -> SessionRequestsRespons
                 tags=list(req.tags) if req.tags else None,
                 received_at=_iso(req.created_at) or _iso(_utc_now()) or "",
                 speech_language=req.speech_language,
-                is_instant=req.is_instant,
                 is_video_call=req.call_mode == CallMode.video,
-                ventor_rating=_ventor_avg_rating(db, session.ventor_id),
+                ventor_rating=_ventor_avg_rating(db, req.ventor_id),
             )
         )
     return SessionRequestsResponse(items=items)
@@ -628,13 +561,7 @@ def accept_session_request(
     ):
         return AcceptRequestResponse(session_id=str(req.session_id), status="accepted")
 
-    if req.is_instant:
-        if req.status != SessionRequestStatus.pending:
-            return AcceptRequestResponse(session_id=None, status="already_taken")
-        if req.listener_id is not None and req.listener_id != listener.id:
-            return AcceptRequestResponse(session_id=None, status="already_taken")
-        req.listener_id = listener.id
-    elif req.listener_id != listener.id:
+    if req.listener_id != listener.id:
         raise forbidden()
     if req.status != SessionRequestStatus.pending:
         return AcceptRequestResponse(session_id=None, status="already_taken")
@@ -644,15 +571,14 @@ def accept_session_request(
         request_id=req.id,
         ventor_id=req.ventor_id,
         listener_id=listener.id,
-        status=SessionStatus.live if req.is_instant else SessionStatus.upcoming,
+        status=SessionStatus.upcoming,
         duration_minutes=req.duration_minutes,
         time_mode=req.time_mode,
         scheduled_at=req.scheduled_at or _utc_now(),
-        started_at=_utc_now() if req.is_instant else None,
+        started_at=None,
         call_mode=req.call_mode,
         speech_language=req.speech_language,
         voice_change_enabled=req.voice_change_enabled,
-        is_instant=req.is_instant,
         message=req.message,
         chosen_reason=req.chosen_reason,
         tags=req.tags,

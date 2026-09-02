@@ -162,7 +162,6 @@ def get_register_progress(db: Session, user: User) -> ListenerRegisterProgressRe
         if "availability" in done:
             availability = get_availability_payload(db, user.id)
             saved.availability = ListenerSavedAvailability(
-                accept_instant_calls=availability.accept_instant_calls,
                 session_minutes=list(availability.session_minutes),
                 availability=availability,
             )
@@ -498,7 +497,6 @@ def save_register_availability_step(
         db,
         user.id,
         availability,
-        accept_instant_calls=payload.accept_instant_calls,
         session_minutes=payload.session_minutes,
     )
     profile.setup_availability_status = SetupStepStatus.done

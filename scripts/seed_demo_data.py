@@ -1,11 +1,13 @@
 """
-Seed catalogs + demo users for local development.
+Seed catalogs + demo users + activity for local development.
 
 Usage (from repo root, venv active):
 
+    alembic upgrade head
     python -m scripts.seed_demo_data
 
-Idempotent: re-running upserts catalogs and skips existing demo users.
+Idempotent: re-running upserts catalogs, skips existing demo users, and
+backfills demo sessions/earnings/notifications via stable UUIDs.
 """
 
 from __future__ import annotations
@@ -19,11 +21,12 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import SessionLocal
-from app.models.auth import User
+from app.models.auth import AuthIdentity, PasswordResetToken, RefreshToken, User
 from app.models.availability import ListenerAvailabilitySettings, ListenerAvailabilitySlot
-from app.models.earnings import ListenerWallet
+from app.models.earnings import ListenerWallet, Payout, PayoutMethod, WalletLedgerEntry
 from app.models.enums import (
     AdminStatus,
+    AuthProvider,
     BannerPlacement,
     CallMode,
     CmsPageStatus,
@@ -31,11 +34,19 @@ from app.models.enums import (
     EarningsTier,
     Gender,
     InviteStatus,
+    LedgerEntryType,
     ModerationActionType,
     MoodKind,
     NotificationType,
+    PaymentStatus,
+    PayoutMethodType,
+    PayoutStatus,
+    PointPurchaseStatus,
     ProfileStatus,
+    ReportReason,
+    ReportedRole,
     RewardOfferKind,
+    SessionRequestStatus,
     SessionStatus,
     SessionTimeMode,
     SetupStepStatus,
@@ -52,12 +63,20 @@ from app.models.lookups import (
     ListenerLanguage,
     ListenerLifeExperience,
     VentorInterest,
+    VentorLanguage,
 )
-from app.models.notifications import Notification
-from app.models.profiles import ListenerProfile, VentorProfile
-from app.models.promo import PromoCode
-from app.models.rewards import InviteCode, InviteEvent, PointPackage, RewardOffer
+from app.models.notifications import Notification, UserPushToken
+from app.models.profiles import ListenerIdentityVerification, ListenerProfile, VentorProfile
+from app.models.promo import PromoCode, PromoRedemption
+from app.models.rewards import InviteCode, InviteEvent, PointPackage, PointPurchase, RewardOffer, RewardTrade
 from app.models.sessions import Session as VentingSession
+from app.models.sessions import (
+    SessionListenerFeedback,
+    SessionPayment,
+    SessionRating,
+    SessionReport,
+    SessionRequest,
+)
 from app.models.settings import (
     ListenerNotificationPreferences,
     ListenerPrivacySettings,
@@ -81,6 +100,30 @@ from app.models.admin import (
 
 DEMO_PASSWORD = "Password123!"
 DEMO_ADMIN_PASSWORD = "Admin123!"
+
+# Stable demo entity IDs — safe to re-run seed against existing DBs.
+DEMO_COMPLETED_SESSION_ID = uuid.UUID("a1000001-0001-4001-8001-000000000001")
+DEMO_COMPLETED_REQUEST_ID = uuid.UUID("a1000001-0001-4001-8001-000000000002")
+DEMO_UPCOMING_SESSION_ID = uuid.UUID("a1000001-0001-4001-8001-000000000003")
+DEMO_UPCOMING_REQUEST_ID = uuid.UUID("a1000001-0001-4001-8001-000000000004")
+DEMO_PENDING_REQUEST_ID = uuid.UUID("a1000001-0001-4001-8001-000000000005")
+DEMO_PENDING_REQUEST_L2_ID = uuid.UUID("a1000001-0001-4001-8001-000000000006")
+DEMO_PAYMENT_ID = uuid.UUID("a1000001-0001-4001-8001-000000000007")
+DEMO_RATING_ID = uuid.UUID("a1000001-0001-4001-8001-000000000008")
+DEMO_FEEDBACK_ID = uuid.UUID("a1000001-0001-4001-8001-000000000009")
+DEMO_PAYOUT_METHOD_ID = uuid.UUID("a1000001-0001-4001-8001-00000000000a")
+DEMO_PAYOUT_ID = uuid.UUID("a1000001-0001-4001-8001-00000000000b")
+DEMO_LEDGER_EARNING_ID = uuid.UUID("a1000001-0001-4001-8001-00000000000c")
+DEMO_LEDGER_PAYOUT_ID = uuid.UUID("a1000001-0001-4001-8001-00000000000d")
+DEMO_REWARD_TRADE_ID = uuid.UUID("a1000001-0001-4001-8001-00000000000e")
+DEMO_POINT_PURCHASE_ID = uuid.UUID("a1000001-0001-4001-8001-00000000000f")
+DEMO_PROMO_REDEMPTION_ID = uuid.UUID("a1000001-0001-4001-8001-000000000010")
+DEMO_IDENTITY_VERIFICATION_ID = uuid.UUID("a1000001-0001-4001-8001-000000000011")
+DEMO_SESSION_REPORT_ID = uuid.UUID("a1000001-0001-4001-8001-000000000012")
+DEMO_INVITE_EVENT_PENDING_ID = uuid.UUID("a1000001-0001-4001-8001-000000000013")
+DEMO_WELCOME_OFFER_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
+DEMO_WELCOME_PROMO_ID = uuid.UUID("33333333-3333-3333-3333-333333333333")
+DEMO_PKG_500_ID = uuid.UUID("44444444-4444-4444-4444-444444444441")
 
 
 def _hash_password(password: str) -> str:
@@ -324,6 +367,8 @@ def seed_demo_users(db: Session) -> dict[str, uuid.UUID]:
         db.add(VentorNotificationPreferences(ventor_id=ventor.id))
         db.add(VentorInterest(ventor_id=ventor.id, comfort_area_id="stress_anxiety"))
         db.add(VentorInterest(ventor_id=ventor.id, comfort_area_id="relationships"))
+        for lang in ("en", "ar"):
+            db.add(VentorLanguage(ventor_id=ventor.id, language_id=lang))
         db.add(
             MoodCheckin(
                 ventor_id=ventor.id,
@@ -383,7 +428,6 @@ def seed_demo_users(db: Session) -> dict[str, uuid.UUID]:
                 is_online=True,
                 is_verified=True,
                 profile_status=ProfileStatus.approved,
-                accept_instant_calls=True,
                 session_length_minutes=30,
                 break_length_minutes=15,
                 time_zone_id="Asia/Beirut",
@@ -405,7 +449,6 @@ def seed_demo_users(db: Session) -> dict[str, uuid.UUID]:
         db.add(
             ListenerAvailabilitySettings(
                 listener_id=listener.id,
-                accept_instant_calls=True,
                 session_length_minutes=30,
                 break_length_minutes=15,
                 time_zone_id="Asia/Beirut",
@@ -503,7 +546,6 @@ def seed_demo_users(db: Session) -> dict[str, uuid.UUID]:
         db.add(
             ListenerAvailabilitySettings(
                 listener_id=listener2.id,
-                accept_instant_calls=False,
                 session_length_minutes=45,
                 break_length_minutes=15,
                 time_zone_id="Asia/Dubai",
@@ -512,12 +554,36 @@ def seed_demo_users(db: Session) -> dict[str, uuid.UUID]:
         db.add(ListenerPrivacySettings(listener_id=listener2.id))
         db.add(ListenerNotificationPreferences(listener_id=listener2.id))
         db.add(ListenerWallet(listener_id=listener2.id, available_balance=Decimal("210.00")))
+        for day in (DayOfWeek.tue, DayOfWeek.thu):
+            db.add(
+                ListenerAvailabilitySlot(
+                    listener_id=listener2.id,
+                    day=day,
+                    start_time=time(10, 0),
+                    end_time=time(14, 0),
+                )
+            )
         db.add(ListenerLanguage(listener_id=listener2.id, language_id="en"))
         db.add(ListenerLanguage(listener_id=listener2.id, language_id="ar"))
         db.add(ListenerComfortArea(listener_id=listener2.id, comfort_area_id="career_work"))
         db.add(ListenerComfortArea(listener_id=listener2.id, comfort_area_id="stress_anxiety"))
         db.add(ListenerLifeExperience(listener_id=listener2.id, life_experience_id="career_change"))
         db.add(ListenerBoundary(listener_id=listener2.id, boundary_id="religion"))
+        db.add(
+            ListenerTrainingProgress(
+                listener_id=listener2.id,
+                module_id="art_of_listening",
+                status=TrainingStatus.completed,
+                completed_at=datetime.now(timezone.utc),
+            )
+        )
+        db.add(
+            ListenerTrainingProgress(
+                listener_id=listener2.id,
+                module_id="empathy",
+                status=TrainingStatus.in_progress,
+            )
+        )
         print(f"  + created listener {listener2_email}")
     else:
         print(f"  · listener exists {listener2_email}")
@@ -547,53 +613,490 @@ def seed_demo_users(db: Session) -> dict[str, uuid.UUID]:
             )
         )
 
+    return ids
+
+
+def _ensure_notification(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    title: str,
+    type: NotificationType,
+    body: str,
+    data: dict | None = None,
+    is_read: bool = False,
+) -> None:
+    if db.query(Notification).filter_by(user_id=user_id, title=title).one_or_none() is not None:
+        return
+    db.add(
+        Notification(
+            user_id=user_id,
+            type=type,
+            title=title,
+            body=body,
+            data=data,
+            is_read=is_read,
+        )
+    )
+
+
+def seed_demo_activity(db: Session, ids: dict[str, uuid.UUID]) -> None:
+    """Sessions, payments, earnings, auth extras — idempotent via stable UUIDs."""
+    now = datetime.now(timezone.utc)
+    ventor_id = ids["ventor"]
+    listener_id = ids["listener"]
+    listener2_id = ids["listener2"]
+    ops_admin = db.query(AdminUser).filter(AdminUser.email == "ops@venting.app").one_or_none()
+    ops_admin_id = ops_admin.id if ops_admin is not None else None
+
+    for lang in ("en", "ar"):
+        if (
+            db.query(VentorLanguage)
+            .filter_by(ventor_id=ventor_id, language_id=lang)
+            .one_or_none()
+            is None
+        ):
+            db.add(VentorLanguage(ventor_id=ventor_id, language_id=lang))
+
+    existing_google = (
+        db.query(AuthIdentity)
+        .filter_by(provider=AuthProvider.google, provider_user_id="demo-google-ventor")
+        .one_or_none()
+    )
+    if existing_google is None:
+        db.add(
+            AuthIdentity(
+                user_id=ventor_id,
+                provider=AuthProvider.google,
+                provider_user_id="demo-google-ventor",
+                email="ventor@venting.app",
+                raw_profile={"name": "Sam", "picture": None},
+            )
+        )
+
+    for user_id, token in (
+        (ventor_id, "demo-push-token-ventor-device"),
+        (listener_id, "demo-push-token-listener-device"),
+        (listener2_id, "demo-push-token-listener2-device"),
+    ):
+        if db.query(UserPushToken).filter_by(token=token).one_or_none() is None:
+            db.add(UserPushToken(user_id=user_id, token=token))
+
     if (
-        db.query(Notification)
-        .filter_by(user_id=ids["listener"], title="Welcome to Venting")
+        db.query(PasswordResetToken)
+        .filter_by(user_id=ventor_id, token_hash="demo-reset-token-hash")
         .one_or_none()
         is None
     ):
         db.add(
-            Notification(
-                user_id=ids["listener"],
-                type=NotificationType.system,
-                title="Welcome to Venting",
-                body="Your listener profile is ready. Turn online when you want sessions.",
-                data={"screen": "listener_dashboard"},
-                is_read=False,
+            PasswordResetToken(
+                user_id=ventor_id,
+                token_hash="demo-reset-token-hash",
+                expires_at=now + timedelta(hours=24),
+                requested_ip="127.0.0.1",
+                locale="en",
             )
         )
 
     if (
-        db.query(VentingSession)
-        .filter_by(ventor_id=ids["ventor"], listener_id=ids["listener"])
-        .count()
-        == 0
+        db.query(RefreshToken)
+        .filter_by(user_id=ventor_id, token_hash="demo-refresh-token-hash")
+        .one_or_none()
+        is None
     ):
-        started = datetime.now(timezone.utc) - timedelta(days=2, hours=1)
-        ended = started + timedelta(minutes=28)
+        db.add(
+            RefreshToken(
+                user_id=ventor_id,
+                token_hash="demo-refresh-token-hash",
+                device_info="Demo iPhone",
+                expires_at=now + timedelta(days=30),
+            )
+        )
+
+    if db.get(ListenerIdentityVerification, DEMO_IDENTITY_VERIFICATION_ID) is None:
+        db.add(
+            ListenerIdentityVerification(
+                id=DEMO_IDENTITY_VERIFICATION_ID,
+                listener_id=listener_id,
+                identity_document_url="https://example.com/demo/listener-id.jpg",
+                selfie_url="https://example.com/demo/listener-selfie.jpg",
+                status=ProfileStatus.approved,
+                reviewed_at=now - timedelta(days=30),
+                reviewer_note="Demo ID verified.",
+                reviewed_by_admin_id=ops_admin_id,
+            )
+        )
+
+    completed_started = now - timedelta(days=2, hours=1)
+    completed_ended = completed_started + timedelta(minutes=28)
+    session_price = Decimal("7.50")
+    discount = Decimal("1.50")
+    amount_paid = session_price - discount
+
+    if db.get(VentingSession, DEMO_COMPLETED_SESSION_ID) is None:
         db.add(
             VentingSession(
-                ventor_id=ids["ventor"],
-                listener_id=ids["listener"],
+                id=DEMO_COMPLETED_SESSION_ID,
+                ventor_id=ventor_id,
+                listener_id=listener_id,
                 status=SessionStatus.completed,
                 duration_minutes=30,
                 actual_duration_seconds=28 * 60,
                 time_mode=SessionTimeMode.scheduled,
-                scheduled_at=started,
-                started_at=started,
-                ended_at=ended,
+                scheduled_at=completed_started,
+                started_at=completed_started,
+                ended_at=completed_ended,
                 call_mode=CallMode.voice,
                 speech_language="en",
                 voice_change_enabled=False,
-                is_instant=False,
                 message="Needed someone to talk about work stress.",
                 tags=["stress_anxiety", "career_work"],
                 listener_history_outcome="accepted",
             )
         )
+        db.flush()
 
-    return ids
+    if db.get(SessionRequest, DEMO_COMPLETED_REQUEST_ID) is None:
+        db.add(
+            SessionRequest(
+                id=DEMO_COMPLETED_REQUEST_ID,
+                ventor_id=ventor_id,
+                listener_id=listener_id,
+                status=SessionRequestStatus.accepted,
+                message="Needed someone to talk about work stress.",
+                chosen_reason="Stress at work",
+                tags=["stress_anxiety", "career_work"],
+                duration_minutes=30,
+                time_mode=SessionTimeMode.scheduled,
+                scheduled_at=completed_started,
+                call_mode=CallMode.voice,
+                speech_language="en",
+                voice_change_enabled=False,
+                promo_code_id=DEMO_WELCOME_PROMO_ID,
+                quoted_amount=amount_paid,
+                session_id=DEMO_COMPLETED_SESSION_ID,
+            )
+        )
+        db.flush()
+        completed_session = db.get(VentingSession, DEMO_COMPLETED_SESSION_ID)
+        if completed_session is not None and completed_session.request_id is None:
+            completed_session.request_id = DEMO_COMPLETED_REQUEST_ID
+            db.flush()
+
+    upcoming_at = now + timedelta(hours=4)
+    if db.get(VentingSession, DEMO_UPCOMING_SESSION_ID) is None:
+        db.add(
+            VentingSession(
+                id=DEMO_UPCOMING_SESSION_ID,
+                ventor_id=ventor_id,
+                listener_id=listener_id,
+                status=SessionStatus.upcoming,
+                duration_minutes=30,
+                time_mode=SessionTimeMode.scheduled,
+                scheduled_at=upcoming_at,
+                call_mode=CallMode.voice,
+                speech_language="en",
+                voice_change_enabled=False,
+                message="Follow-up on coping strategies.",
+                tags=["stress_anxiety"],
+            )
+        )
+        db.flush()
+
+    if db.get(SessionRequest, DEMO_UPCOMING_REQUEST_ID) is None:
+        db.add(
+            SessionRequest(
+                id=DEMO_UPCOMING_REQUEST_ID,
+                ventor_id=ventor_id,
+                listener_id=listener_id,
+                status=SessionRequestStatus.accepted,
+                message="Follow-up on coping strategies.",
+                chosen_reason="Continue our conversation",
+                tags=["stress_anxiety"],
+                duration_minutes=30,
+                time_mode=SessionTimeMode.scheduled,
+                scheduled_at=upcoming_at,
+                call_mode=CallMode.voice,
+                speech_language="en",
+                voice_change_enabled=False,
+                quoted_amount=Decimal("7.50"),
+                session_id=DEMO_UPCOMING_SESSION_ID,
+            )
+        )
+        db.flush()
+        upcoming_session = db.get(VentingSession, DEMO_UPCOMING_SESSION_ID)
+        if upcoming_session is not None and upcoming_session.request_id is None:
+            upcoming_session.request_id = DEMO_UPCOMING_REQUEST_ID
+            db.flush()
+
+    pending_at = now + timedelta(days=1, hours=2)
+    if db.get(SessionRequest, DEMO_PENDING_REQUEST_ID) is None:
+        db.add(
+            SessionRequest(
+                id=DEMO_PENDING_REQUEST_ID,
+                ventor_id=ventor_id,
+                listener_id=listener_id,
+                status=SessionRequestStatus.pending,
+                message="Could we talk about relationship boundaries?",
+                chosen_reason="Relationships",
+                tags=["relationships"],
+                duration_minutes=45,
+                time_mode=SessionTimeMode.scheduled,
+                scheduled_at=pending_at,
+                call_mode=CallMode.video,
+                speech_language="en",
+                voice_change_enabled=True,
+                quoted_amount=Decimal("12.75"),
+                expires_at=pending_at - timedelta(hours=1),
+            )
+        )
+
+    pending_l2_at = now + timedelta(days=2)
+    if db.get(SessionRequest, DEMO_PENDING_REQUEST_L2_ID) is None:
+        db.add(
+            SessionRequest(
+                id=DEMO_PENDING_REQUEST_L2_ID,
+                ventor_id=ventor_id,
+                listener_id=listener2_id,
+                status=SessionRequestStatus.pending,
+                message="Looking for career guidance before a big interview.",
+                chosen_reason="Career change",
+                tags=["career_work"],
+                duration_minutes=45,
+                time_mode=SessionTimeMode.nearest,
+                scheduled_at=pending_l2_at,
+                call_mode=CallMode.voice,
+                speech_language="en",
+                voice_change_enabled=False,
+                quoted_amount=Decimal("14.85"),
+                expires_at=pending_l2_at,
+            )
+        )
+
+    if db.get(SessionPayment, DEMO_PAYMENT_ID) is None:
+        db.add(
+            SessionPayment(
+                id=DEMO_PAYMENT_ID,
+                session_id=DEMO_COMPLETED_SESSION_ID,
+                session_price=session_price,
+                voice_change_fee=Decimal("0"),
+                discount_amount=discount,
+                tip_amount=Decimal("2.00"),
+                amount_paid=amount_paid,
+                status=PaymentStatus.paid,
+                provider="sandbox",
+                provider_payment_id="demo_pay_completed_001",
+                promo_code_id=DEMO_WELCOME_PROMO_ID,
+            )
+        )
+
+    if db.get(SessionRating, DEMO_RATING_ID) is None:
+        db.add(
+            SessionRating(
+                id=DEMO_RATING_ID,
+                session_id=DEMO_COMPLETED_SESSION_ID,
+                ventor_id=ventor_id,
+                listener_id=listener_id,
+                stars=5,
+                review="Layla was incredibly supportive and helped me feel heard.",
+                tip_amount=Decimal("2.00"),
+            )
+        )
+
+    if db.get(SessionListenerFeedback, DEMO_FEEDBACK_ID) is None:
+        db.add(
+            SessionListenerFeedback(
+                id=DEMO_FEEDBACK_ID,
+                session_id=DEMO_COMPLETED_SESSION_ID,
+                listener_id=listener_id,
+                ventor_id=ventor_id,
+                stars=5,
+                felt_heard=True,
+                talk_again=True,
+            )
+        )
+
+    if db.get(PromoRedemption, DEMO_PROMO_REDEMPTION_ID) is None:
+        db.add(
+            PromoRedemption(
+                id=DEMO_PROMO_REDEMPTION_ID,
+                promo_code_id=DEMO_WELCOME_PROMO_ID,
+                ventor_id=ventor_id,
+                session_id=DEMO_COMPLETED_SESSION_ID,
+                discount_amount=discount,
+            )
+        )
+        promo = db.get(PromoCode, DEMO_WELCOME_PROMO_ID)
+        if promo is not None and promo.redemption_count < 1:
+            promo.redemption_count = 1
+
+    if db.get(PayoutMethod, DEMO_PAYOUT_METHOD_ID) is None:
+        db.add(
+            PayoutMethod(
+                id=DEMO_PAYOUT_METHOD_ID,
+                listener_id=listener_id,
+                type=PayoutMethodType.bank,
+                is_default=True,
+                account_holder_name="Layla Hassan",
+                bank_name="Bank of Beirut",
+                iban_or_account="LB12345678901234567890123456",
+                swift_code="BLOMLBBX",
+                label="Bank of Beirut ••••3456",
+            )
+        )
+        db.flush()
+
+    if db.get(Payout, DEMO_PAYOUT_ID) is None:
+        db.add(
+            Payout(
+                id=DEMO_PAYOUT_ID,
+                listener_id=listener_id,
+                payout_method_id=DEMO_PAYOUT_METHOD_ID,
+                amount=Decimal("25.00"),
+                status=PayoutStatus.completed,
+                method_label="Bank of Beirut ••••3456",
+                reference="DEMO-PAY-001",
+                requested_at=now - timedelta(days=10),
+                processed_at=now - timedelta(days=9),
+                reviewed_by_admin_id=ops_admin_id,
+                admin_note="Demo payout processed.",
+            )
+        )
+        db.flush()
+
+    if db.get(WalletLedgerEntry, DEMO_LEDGER_EARNING_ID) is None:
+        db.add(
+            WalletLedgerEntry(
+                id=DEMO_LEDGER_EARNING_ID,
+                listener_id=listener_id,
+                type=LedgerEntryType.session_earning,
+                amount=Decimal("7.50"),
+                balance_after=Decimal("50.00"),
+                session_id=DEMO_COMPLETED_SESSION_ID,
+                idempotency_key="demo-ledger-earning-001",
+                note="Session earning (demo)",
+            )
+        )
+
+    if db.get(WalletLedgerEntry, DEMO_LEDGER_PAYOUT_ID) is None:
+        db.add(
+            WalletLedgerEntry(
+                id=DEMO_LEDGER_PAYOUT_ID,
+                listener_id=listener_id,
+                type=LedgerEntryType.payout,
+                amount=Decimal("-25.00"),
+                balance_after=Decimal("42.50"),
+                payout_id=DEMO_PAYOUT_ID,
+                idempotency_key="demo-ledger-payout-001",
+                note="Payout to bank (demo)",
+            )
+        )
+
+    if db.get(RewardTrade, DEMO_REWARD_TRADE_ID) is None:
+        db.add(
+            RewardTrade(
+                id=DEMO_REWARD_TRADE_ID,
+                ventor_id=ventor_id,
+                offer_id=DEMO_WELCOME_OFFER_ID,
+                points_spent=0,
+                is_welcome_gift=True,
+            )
+        )
+
+    if db.get(PointPurchase, DEMO_POINT_PURCHASE_ID) is None:
+        db.add(
+            PointPurchase(
+                id=DEMO_POINT_PURCHASE_ID,
+                ventor_id=ventor_id,
+                package_id=DEMO_PKG_500_ID,
+                package_code="pkg_500",
+                points_added=500,
+                price_usd=Decimal("4.99"),
+                payment_provider="sandbox",
+                payment_reference="demo_stripe_ch_001",
+                status=PointPurchaseStatus.completed,
+            )
+        )
+
+    if db.get(SessionReport, DEMO_SESSION_REPORT_ID) is None:
+        db.add(
+            SessionReport(
+                id=DEMO_SESSION_REPORT_ID,
+                session_id=DEMO_COMPLETED_SESSION_ID,
+                reporter_user_id=ventor_id,
+                reported_role=ReportedRole.listener,
+                reason=ReportReason.not_listening,
+                details="Demo report — resolved in review, kept for admin portal.",
+                status="open",
+                assigned_admin_id=ops_admin_id,
+            )
+        )
+
+    invite = db.query(InviteCode).filter_by(ventor_id=ventor_id).one_or_none()
+    if invite is not None and db.get(InviteEvent, DEMO_INVITE_EVENT_PENDING_ID) is None:
+        db.add(
+            InviteEvent(
+                id=DEMO_INVITE_EVENT_PENDING_ID,
+                invite_code_id=invite.id,
+                inviter_ventor_id=ventor_id,
+                invitee_user_id=None,
+                invitee_display_name="Alex (pending)",
+                status=InviteStatus.pending,
+                points_earned=0,
+            )
+        )
+
+    _ensure_notification(
+        db,
+        user_id=listener_id,
+        title="Welcome to Venting",
+        type=NotificationType.system,
+        body="Your listener profile is ready. Turn online when you want sessions.",
+        data={"screen": "listener_dashboard"},
+    )
+    _ensure_notification(
+        db,
+        user_id=listener_id,
+        title="New session request",
+        type=NotificationType.session_request,
+        body="Sam requested a 45-minute video session about relationships.",
+        data={"screen": "session_requests", "request_id": str(DEMO_PENDING_REQUEST_ID)},
+    )
+    _ensure_notification(
+        db,
+        user_id=listener_id,
+        title="Upcoming session reminder",
+        type=NotificationType.session_reminder,
+        body="You have a session with Sam in about 4 hours.",
+        data={"screen": "sessions", "session_id": str(DEMO_UPCOMING_SESSION_ID)},
+    )
+    _ensure_notification(
+        db,
+        user_id=ventor_id,
+        title="Session booked",
+        type=NotificationType.session_reminder,
+        body="Your follow-up with Layla is scheduled soon.",
+        data={"screen": "sessions", "session_id": str(DEMO_UPCOMING_SESSION_ID)},
+    )
+    _ensure_notification(
+        db,
+        user_id=ventor_id,
+        title="How was your session?",
+        type=NotificationType.review,
+        body="Rate your conversation with Layla — it helps others find great listeners.",
+        data={"screen": "session_rating", "session_id": str(DEMO_COMPLETED_SESSION_ID)},
+        is_read=True,
+    )
+    _ensure_notification(
+        db,
+        user_id=ventor_id,
+        title="Points added",
+        type=NotificationType.rewards,
+        body="500 points from your purchase are ready to use.",
+        data={"screen": "rewards"},
+    )
+
+    db.flush()
 
 
 def _admin_by_email(db: Session, email: str) -> AdminUser | None:
@@ -682,7 +1185,6 @@ def seed_admin_cms(db: Session, mobile_ids: dict[str, uuid.UUID] | None = None) 
 
     # Feature flags
     for key, description, enabled, audience in [
-        ("instant_match_enabled", "Allow ventors to start instant match", True, "ventor"),
         ("voice_change_enabled", "Voice anonymization in calls", True, "all"),
         ("tips_enabled", "Allow tips after sessions", True, "all"),
         ("invite_rewards_enabled", "Invite friends rewards tab", True, "ventor"),
@@ -936,6 +1438,8 @@ def main() -> None:
         ids = seed_demo_users(db)
         print("Admin CMS:")
         seed_admin_cms(db, ids)
+        print("Demo activity:")
+        seed_demo_activity(db, ids)
         db.commit()
         print("\nDone.")
         print("Mobile logins (password for all):", DEMO_PASSWORD)

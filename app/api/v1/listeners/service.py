@@ -17,14 +17,12 @@ from app.api.v1.listeners.schemas import (
     ALLOWED_SESSION_MINUTES,
     AvailabilityDay,
     AvailabilityPayload,
-    DashboardImpact,
     DashboardResponse,
     DashboardUpcomingSession,
     DayAvailabilityResponse,
     DayOfWeekOut,
     IdentityStatusOut,
     IdentityVerificationResponse,
-    ImpactChartPoint,
     ListenerLifeExperiencesOut,
     ListenerNotificationPreferences,
     ListenerPrivacySettings,
@@ -580,14 +578,8 @@ def _apply_availability(
     listener_id: UUID,
     availability: AvailabilityPayload,
     *,
-    accept_instant_calls: bool | None = None,
     session_minutes: list[int] | None = None,
 ) -> None:
-    accept = (
-        accept_instant_calls
-        if accept_instant_calls is not None
-        else availability.accept_instant_calls
-    )
     minutes_list = _validate_session_minutes(
         list(session_minutes)
         if session_minutes is not None
@@ -606,7 +598,6 @@ def _apply_availability(
     if settings_row is None:
         settings_row = ListenerAvailabilitySettings(
             listener_id=listener_id,
-            accept_instant_calls=accept,
             session_length_minutes=session_length,
             session_minutes=minutes_list,
             break_length_minutes=availability.break_length_minutes,
@@ -614,7 +605,6 @@ def _apply_availability(
         )
         db.add(settings_row)
     else:
-        settings_row.accept_instant_calls = accept
         settings_row.session_length_minutes = session_length
         settings_row.session_minutes = minutes_list
         settings_row.break_length_minutes = availability.break_length_minutes
@@ -622,7 +612,6 @@ def _apply_availability(
 
     profile = db.get(ListenerProfile, listener_id)
     if profile is not None:
-        profile.accept_instant_calls = accept
         profile.session_length_minutes = session_length
         profile.break_length_minutes = availability.break_length_minutes
         profile.time_zone_id = availability.time_zone_id or profile.time_zone_id
@@ -716,11 +705,6 @@ def get_availability_payload(db: Session, listener_id: UUID) -> AvailabilityPayl
             else (profile.session_length_minutes if profile else 30)
         )
     return AvailabilityPayload(
-        accept_instant_calls=(
-            settings_row.accept_instant_calls
-            if settings_row
-            else bool(profile.accept_instant_calls if profile else True)
-        ),
         session_minutes=minutes_list,
         session_length_minutes=legacy_minutes,
         break_length_minutes=(
@@ -1012,7 +996,6 @@ async def register_listener(
     boundary_ids_raw: str | None,
     custom_boundary_text: str | None,
     availability_raw: str | None,
-    accept_instant_calls: str | bool | None,
     session_minutes: list[int] | None,
     fcm_token: str | None,
     avatar: UploadFile | None,
@@ -1058,7 +1041,6 @@ async def register_listener(
             "availability.days must include at least one day",
             ar="يجب تضمين يوم واحد على الأقل في التوفر",
         )
-    accept_instant = _parse_bool(accept_instant_calls, field="accept_instant_calls")
     session_minutes_list = _validate_session_minutes(
         session_minutes
         if isinstance(session_minutes, list)
@@ -1135,7 +1117,6 @@ async def register_listener(
         voice_intro_url=voice_url,
         voice_intro_seconds=voice_intro_seconds,
         profile_status=ProfileStatus.under_review,
-        accept_instant_calls=accept_instant,
         session_length_minutes=session_length,
         break_length_minutes=availability.break_length_minutes,
         time_zone_id=tz,
@@ -1192,7 +1173,6 @@ async def register_listener(
         db,
         user.id,
         availability,
-        accept_instant_calls=accept_instant,
         session_minutes=session_minutes_list,
     )
     db.add(ListenerPrivacySettingsRow(listener_id=user.id))
@@ -1596,43 +1576,6 @@ def set_online_status(
 
 
 def get_dashboard(db: Session, profile: ListenerProfile) -> DashboardResponse:
-    today = _utc_today()
-    start_today = datetime.combine(today, time.min, tzinfo=timezone.utc)
-    end_today = start_today + timedelta(days=1)
-
-    today_sessions = (
-        db.query(VentingSession)
-        .filter(
-            VentingSession.listener_id == profile.user_id,
-            VentingSession.status == SessionStatus.completed,
-            VentingSession.ended_at >= start_today,
-            VentingSession.ended_at < end_today,
-        )
-        .all()
-    )
-    sessions_today = len(today_sessions)
-    minutes_today = sum(
-        (s.actual_duration_seconds or s.duration_minutes * 60) // 60 for s in today_sessions
-    )
-
-    chart: list[ImpactChartPoint] = []
-    for offset in range(6, -1, -1):
-        day = today - timedelta(days=offset)
-        day_start = datetime.combine(day, time.min, tzinfo=timezone.utc)
-        day_end = day_start + timedelta(days=1)
-        count = (
-            db.query(func.count(VentingSession.id))
-            .filter(
-                VentingSession.listener_id == profile.user_id,
-                VentingSession.status == SessionStatus.completed,
-                VentingSession.ended_at >= day_start,
-                VentingSession.ended_at < day_end,
-            )
-            .scalar()
-            or 0
-        )
-        chart.append(ImpactChartPoint(label=day.strftime("%a"), value=float(count)))
-
     upcoming = (
         db.query(VentingSession, VentorProfile)
         .outerjoin(VentorProfile, VentorProfile.user_id == VentingSession.ventor_id)
@@ -1651,6 +1594,7 @@ def get_dashboard(db: Session, profile: ListenerProfile) -> DashboardResponse:
             ventor_name=ventor.nickname if ventor else "Ventor",
             when_label=_when_label(session.scheduled_at or session.started_at),
             duration_minutes=session.duration_minutes,
+            ventor_avatar_url=ventor.avatar_url if ventor else None,
         )
 
     reminder = None
@@ -1670,11 +1614,6 @@ def get_dashboard(db: Session, profile: ListenerProfile) -> DashboardResponse:
     return DashboardResponse(
         display_name=profile.full_name,
         setup_progress=progress,
-        impact=DashboardImpact(
-            sessions_today=sessions_today,
-            minutes_today=minutes_today,
-            chart=chart,
-        ),
         next_upcoming_session=next_session,
         is_online=display_online,
         reminder=reminder,

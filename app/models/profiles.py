@@ -93,7 +93,6 @@ class ListenerProfile(Base, TimestampMixin):
         nullable=False,
         server_default="incomplete",
     )
-    accept_instant_calls = Column(Boolean, nullable=False, server_default="true")
     session_length_minutes = Column(Integer, nullable=False, server_default="30")
     break_length_minutes = Column(Integer, nullable=False, server_default="15")
     time_zone_id = Column(String(64), nullable=False)

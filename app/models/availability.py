@@ -27,7 +27,6 @@ class ListenerAvailabilitySettings(Base):
         ForeignKey("listener_profiles.user_id", ondelete="CASCADE"),
         primary_key=True,
     )
-    accept_instant_calls = Column(Boolean, nullable=False, server_default="true")
     session_length_minutes = Column(Integer, nullable=False, server_default="30")
     session_minutes = Column(JSONB, nullable=True)
     break_length_minutes = Column(Integer, nullable=False, server_default="15")
